@@ -110,6 +110,8 @@
 .mr-desc{color:var(--muted);font-size:12.5px;margin:4px 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mr-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted2)}
 .mr-chip{padding:1px 8px;border:1px solid var(--line2);border-radius:999px;font-size:11px;color:var(--muted);white-space:nowrap}
+.mr-chip.warn{color:var(--yellow);border-color:rgba(212,168,79,.45);background:rgba(212,168,79,.08)}
+.mr-warn{margin:0 22px;padding:10px 12px;border:1px solid rgba(212,168,79,.45);background:rgba(212,168,79,.08);border-radius:8px;color:#e2c47a;font-size:12.5px;line-height:1.5}
 .mr-chip.rel{color:var(--green);border-color:rgba(88,185,120,.4)}
 .mr-chip.beta{color:var(--yellow);border-color:rgba(212,168,79,.4)}
 .mr-chip.alpha{color:var(--red);border-color:rgba(215,103,103,.4)}
@@ -128,6 +130,7 @@
 .mr-dbody{padding:18px 22px 22px;overflow-y:auto;flex:1;min-height:0}
 .mr-md{font-size:13.5px;line-height:1.65;color:#cdd3dc;word-wrap:break-word}
 .mr-md h1,.mr-md h2,.mr-md h3,.mr-md h4{margin:18px 0 8px;color:var(--text);line-height:1.3}
+.mr-md h1,.mr-md h2,.mr-md h3,.mr-md h4{font-weight:700}
 .mr-md h1{font-size:19px}.mr-md h2{font-size:16.5px}.mr-md h3,.mr-md h4{font-size:14.5px}
 .mr-md p{margin:0 0 10px}
 .mr-md ul,.mr-md ol{margin:0 0 10px;padding-left:22px}
@@ -2427,6 +2430,8 @@ const mrAgo = (iso) => {
   return t('{n}y ago', { n: Math.floor(days / 365) });
 };
 const mrIcon = (icon, title, cls = '') => (icon ? `<img class="mr-icon ${cls}" alt="" loading="lazy" src="${MR_IMG(icon)}">` : `<div class="mr-icon ${cls}">${esc((title || '?').slice(0, 1).toUpperCase())}</div>`);
+const MR_LOW_DOWNLOADS = 50000;
+const mrLow = (n) => Number(n) < MR_LOW_DOWNLOADS;
 const mrChips = (list) => (list || []).map((c) => `<span class="mr-chip">${esc(c)}</span>`).join('');
 function mrCard(h) {
   return `<article class="mr-card" data-mr-open="${esc(h.projectId)}" tabindex="0">
@@ -2434,7 +2439,7 @@ function mrCard(h) {
     <div class="mr-main">
       <div class="mr-title"><b>${esc(h.title)}</b><span class="mr-by">${esc(t('by'))} ${esc(h.author)}</span></div>
       <div class="mr-desc">${esc(h.description)}</div>
-      <div class="mr-meta"><span>${mrNum(h.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(h.follows)} ${esc(t('followers'))}</span>${h.updated ? `<span>${esc(mrAgo(h.updated))}</span>` : ''}${mrChips(h.categories.slice(0, 3))}</div>
+      <div class="mr-meta"><span>${mrNum(h.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(h.follows)} ${esc(t('followers'))}</span>${h.updated ? `<span>${esc(mrAgo(h.updated))}</span>` : ''}${mrLow(h.downloads) ? `<span class="mr-chip warn" title="${esc(t('Fewer than 50,000 downloads. Fewer people have tried it, so check it before you install.'))}">${esc(t('Under 50k downloads'))}</span>` : ''}${mrChips(h.categories.slice(0, 3))}</div>
     </div>
     <div class="mr-act">${h.installed ? `<span class="tag">${t('Installed')}</span>` : `<button class="btn primary" data-mr-install="${esc(h.projectId)}">${t('Install')}</button>`}</div>
   </article>`;
@@ -2535,6 +2540,7 @@ async function mrOpenDetail(projectId) {
         <div class="mr-dstats"><span>${authors.length ? `${esc(t('by'))} ${esc(authors.join(', '))}` : ''}</span><span>${mrNum(p.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(p.followers)} ${esc(t('followers'))}</span>${p.updated ? `<span>${esc(t('Updated'))} ${esc(mrAgo(p.updated))}</span>` : ''}</div>
         <div class="mr-meta">${mrChips(p.categories)}</div></div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${p.installed ? `<span class="tag">${t('Installed')}</span>` : `<button class="btn primary" data-mr-install="${esc(p.projectId)}">${t('Install')}</button>`}<button class="btn" data-mr-close>${t('Close')}</button></div></div>
+    ${mrLow(p.downloads) ? `<div class="mr-warn" style="margin-top:12px">${esc(t('This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.'))}</div>` : ''}
     <div class="mr-tabs">${tabs.map((k, i) => `<button data-mr-tab="${k}"${i ? '' : ' class="on"'}>${esc(labels[k])}</button>`).join('')}</div>
     <div class="mr-dbody" id="mrDetBody">${panes.description}</div>`;
   mrDet.panes = panes;

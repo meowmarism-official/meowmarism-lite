@@ -728,7 +728,10 @@
   "{n}d ago": "vor {n} T.",
   "{n}mo ago": "vor {n} Mon.",
   "{n}y ago": "vor {n} J.",
-  "Compatible versions for Minecraft {mc}": "Kompatible Versionen für Minecraft {mc}"
+  "Compatible versions for Minecraft {mc}": "Kompatible Versionen für Minecraft {mc}",
+  "Under 50k downloads": "Unter 50k Downloads",
+  "Fewer than 50,000 downloads. Fewer people have tried it, so check it before you install.": "Weniger als 50.000 Downloads. Weniger Leute haben es ausprobiert, prüfe es vor der Installation.",
+  "This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.": "Dieses Projekt hat weniger als 50.000 Downloads. Weniger Leute haben es ausprobiert, lies die Beschreibung, sieh dir den Quellcode an und sei vorsichtig mit den Dateien, die du installierst."
  },
  "patterns": [
   [
