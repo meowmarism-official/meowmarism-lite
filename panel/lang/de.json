@@ -758,7 +758,11 @@
   "Shaders are used by players, not by the server. You can look at them here and open them on Modrinth.": "Shader nutzen Spieler, nicht der Server. Du kannst sie hier ansehen und auf Modrinth öffnen.",
   "Modpacks are used by players to set up their game. You can look at them here and open them on Modrinth.": "Modpacks nutzen Spieler, um ihr Spiel einzurichten. Du kannst sie hier ansehen und auf Modrinth öffnen.",
   "This server has no Minecraft version set.": "Für diesen Server ist keine Minecraft-Version gesetzt.",
-  "Showing {kind} for Minecraft {mc}.": "Zeige {kind} für Minecraft {mc}."
+  "Showing {kind} for Minecraft {mc}.": "Zeige {kind} für Minecraft {mc}.",
+  "Running": "Läuft",
+  "Memory in use": "Speicher in Benutzung",
+  "CPU in use": "CPU in Benutzung",
+  "No instances yet - create your first server with the + button.": "Noch keine Instanzen - erstelle deinen ersten Server mit dem +-Knopf."
  },
  "patterns": [
   [

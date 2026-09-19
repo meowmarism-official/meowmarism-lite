@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "451b730dfaef2363e7d061b2d3331584c5d3fdd3",
+  "commit": "c2ed7b877e7dc3659b9521a045317bf9a39dbd57",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -22,6 +22,7 @@
     "panel/core/modules/ratelimit.js",
     "panel/core/modules/runtime-contract.js",
     "panel/core/modules/safety.js",
-    "panel/core/modules/scheduler.js"
+    "panel/core/modules/scheduler.js",
+    "panel/core/ui/loaders.js"
   ]
 }

@@ -757,11 +757,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const coreMatch = req.method === 'GET' && url.pathname.match(/^\/core\/(tokens\/tokens\.css|brand\/[\w.-]+\.(?:svg|png))$/);
+  const coreMatch = req.method === 'GET' && url.pathname.match(/^\/core\/(tokens\/tokens\.css|brand\/[\w.-]+\.(?:svg|png)|ui\/[\w.-]+\.(?:js|css))$/);
   if (coreMatch) {
     const file = path.join(__dirname, 'core', coreMatch[1]);
     if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
-    const types = { css: 'text/css; charset=utf-8', svg: 'image/svg+xml', png: 'image/png' };
+    const types = { css: 'text/css; charset=utf-8', svg: 'image/svg+xml', png: 'image/png', js: 'application/javascript; charset=utf-8' };
     res.writeHead(200, { 'Content-Type': types[path.extname(file).slice(1)], 'Cache-Control': 'public, max-age=3600' });
     fs.createReadStream(file).pipe(res);
     return;
@@ -949,7 +949,7 @@ const server = http.createServer(async (req, res) => {
         rssMB: status.stats?.server?.rssMB ?? null,
         crash: erroredOut ? status.crash : null,
       };
-    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create') }));
+    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create'), hostMemMB: Math.round(os.totalmem() / 1048576) }));
     return;
   }
 
