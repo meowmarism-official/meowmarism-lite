@@ -98,6 +98,7 @@ function createProcessRuntime(ctx) {
   }
 
   return {
+    getChild: () => child,
     isRunning: () => !!child,
     isReady: () => !!child && hooks.getPhase() === 'ready',
     start,

@@ -9,6 +9,7 @@ const METHODS = {
   kill: 'stop immediately without saving',
   stopAndWait: 'graceful stop, resolves once the server is down',
   command: 'send a console command, returns false when nothing runs',
+  stats: 'current use of the server as { cpuPercent, memoryMB }, or null when nothing runs',
 };
 
 function assertRuntime(runtime) {

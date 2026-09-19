@@ -69,7 +69,6 @@ let consoleSeq = 0;
 let statsSeq = 0;
 let rawSampleSeq = 0;
 let smoothState = null;
-let previousProcIo = null;
 let minecraftVersion = null;
 let lagWarningCount = 0;
 let lastLagWarning = null;
@@ -163,15 +162,10 @@ let restartPlanTimer = null;
 let restartPlanTicker = null;
 let detectedFeatures = { engine: 'unknown', spark: false, plugins: [], jmx: false, jstat: false, jcmd: false, scannedAt: 0 };
 let featureScanAt = 0;
-let javaRuntimeCache = { pid: null, at: 0, data: null };
-let javaGcPrevious = null;
 let lastPerfProbeAt = 0;
 
 let previousCpuSample = takeCpuSample();
 let previousNetSample = takeNetworkSample();
-let previousProcCpu = null;
-let cachedServerPid = null;
-let cachedServerPidAt = 0;
 let latestStats = null;
 let fastSamples = [];
 let settingsSeq = 0;
@@ -477,61 +471,12 @@ function scanFeatures(force = false) {
   return detectedFeatures;
 }
 
-let javaRuntimeProbeInFlight = false;
 
 // Returns whatever's cached immediately (never blocks) and, if the cache is
 // stale, kicks off a background refresh for next time. jstat -gc can take
 // up to ~900ms; running it synchronously stalled the whole event loop -
 // including every SSE stream - for that long, often visible as a display
 // delay spike.
-function getJavaRuntimeStats(pid) {
-  if (!pid) return null;
-  const now = Date.now();
-  const stale = javaRuntimeCache.pid !== pid || now - javaRuntimeCache.at >= 5000;
-  if (stale && !javaRuntimeProbeInFlight) {
-    const features = scanFeatures();
-    if (features.jstat) {
-      javaRuntimeProbeInFlight = true;
-      execFile('jstat', ['-gc', String(pid)], { timeout: 900 }, (err, stdout) => {
-        javaRuntimeProbeInFlight = false;
-        const sampledAt = Date.now();
-        if (err) { javaRuntimeCache = { pid, at: sampledAt, data: null }; return; }
-        try {
-          const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-          if (lines.length < 2) { javaRuntimeCache = { pid, at: sampledAt, data: null }; return; }
-          const headers = lines[0].trim().split(/\s+/);
-          const values = lines[1].trim().split(/\s+/).map(Number);
-          const m = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
-          const heapUsedKB = [m.S0U, m.S1U, m.EU, m.OU].filter(Number.isFinite).reduce((a, b) => a + b, 0);
-          const heapCapKB = [m.S0C, m.S1C, m.EC, m.OC].filter(Number.isFinite).reduce((a, b) => a + b, 0);
-          const gcTimeSec = Number(m.GCT) || 0;
-          const prev = javaGcPrevious && javaGcPrevious.pid === pid ? javaGcPrevious : null;
-          const dtSec = prev ? Math.max(.001, (sampledAt - prev.at) / 1000) : null;
-          const gcDeltaMs = prev ? Math.max(0, (gcTimeSec - prev.gcTimeSec) * 1000) : 0;
-          javaGcPrevious = { pid, at: sampledAt, gcTimeSec };
-          const data = {
-            sampledAt,
-            heapUsedMB: heapUsedKB / 1024,
-            heapCapacityMB: heapCapKB / 1024,
-            heapPercent: heapCapKB > 0 ? (heapUsedKB / heapCapKB) * 100 : null,
-            metaspaceUsedMB: Number.isFinite(m.MU) ? m.MU / 1024 : null,
-            metaspaceCapacityMB: Number.isFinite(m.MC) ? m.MC / 1024 : null,
-            youngGcCount: Number.isFinite(m.YGC) ? m.YGC : null,
-            fullGcCount: Number.isFinite(m.FGC) ? m.FGC : null,
-            concurrentGcCount: Number.isFinite(m.CGC) ? m.CGC : null,
-            gcTimeSec,
-            gcDeltaMs,
-            gcLoadPercent: dtSec ? Math.min(100, (gcDeltaMs / (dtSec * 1000)) * 100) : 0,
-          };
-          for (const [k, v] of Object.entries(data)) if (typeof v === 'number' && Number.isFinite(v)) data[k] = Number(v.toFixed(2));
-          javaRuntimeCache = { pid, at: sampledAt, data };
-        } catch (_) { javaRuntimeCache = { pid, at: sampledAt, data: null }; }
-      });
-    }
-  }
-  return javaRuntimeCache.pid === pid ? javaRuntimeCache.data : null;
-}
-
 function buildHealthSnapshot({ cpu, memory, disk }) {
   const state = (value, warn, bad) => !Number.isFinite(Number(value)) ? 'unknown' : Number(value) >= bad ? 'high' : Number(value) >= warn ? 'elevated' : 'normal';
   const now = Date.now();
@@ -750,6 +695,7 @@ const runtime = require('./runtime').createRuntime({
   propertiesFile: PROPERTIES_FILE,
   mcVersion: INSTANCE_MC_VERSION,
   panelConfig,
+  hasJstat: () => scanFeatures().jstat,
   hooks: {
     getPhase: () => serverPhase,
     startAttempt: () => { lastStartBlock = null; },
@@ -994,10 +940,7 @@ function onProcessSpawned(proc, launch) {
   players.clear();
   lastTps = null;
   lastLagWarning = null;
-  previousProcCpu = null;
-  previousProcIo = null;
-  cachedServerPid = null;
-  cachedServerPidAt = 0;
+  procMetrics.reset();
 
   pushTimeline('start', 'Server starting', `Launcher PID ${proc.pid}`, 'info');
   broadcast(`--- server starting (pid ${proc.pid}) ---`);
@@ -1031,12 +974,7 @@ function onProcessExit({ code, signal, reason, intent }) {
   startupDurationMs = null;
   lastExitAt = Date.now();
   players.clear();
-  previousProcCpu = null;
-  previousProcIo = null;
-  cachedServerPid = null;
-  cachedServerPidAt = 0;
-  javaRuntimeCache = { pid: null, at: 0, data: null };
-  javaGcPrevious = null;
+  procMetrics.reset();
   broadcastStatus();
   if (intent === 'sleep') startSleepProxy();
   if (wasCrash) maybeAutoRestartAfterCrash();
@@ -1152,139 +1090,11 @@ function readTemperature() {
   return candidates.length ? Number(Math.max(...candidates).toFixed(1)) : null;
 }
 
-function getProcInfo(pid) {
-  try {
-    const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8');
-    const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim();
-    const ppid = Number(status.match(/^PPid:\s+(\d+)$/m)?.[1] || 0);
-    return { pid: Number(pid), ppid, cmdline, status };
-  } catch (_) {
-    return null;
-  }
-}
-
-function findServerPid() {
-  if (!child?.pid) return null;
-  const rootPid = child.pid;
-  const infos = [];
-  try {
-    for (const entry of fs.readdirSync('/proc')) {
-      if (!/^\d+$/.test(entry)) continue;
-      const info = getProcInfo(entry);
-      if (info) infos.push(info);
-    }
-  } catch (_) {
-    return rootPid;
-  }
-
-  const descendants = new Set([rootPid]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const info of infos) {
-      if (!descendants.has(info.pid) && descendants.has(info.ppid)) {
-        descendants.add(info.pid);
-        changed = true;
-      }
-    }
-  }
-
-  const java = infos.find((info) => descendants.has(info.pid) && /(^|\s|\/)java(?:\s|$)/i.test(info.cmdline));
-  return java?.pid || rootPid;
-}
-
-function findCachedServerPid() {
-  if (!child?.pid) {
-    cachedServerPid = null;
-    cachedServerPidAt = 0;
-    return null;
-  }
-
-  const now = Date.now();
-  if (
-    cachedServerPid &&
-    now - cachedServerPidAt < 2000 &&
-    fs.existsSync(`/proc/${cachedServerPid}/stat`)
-  ) {
-    return cachedServerPid;
-  }
-
-  cachedServerPid = findServerPid();
-  cachedServerPidAt = now;
-  return cachedServerPid;
-}
-
-function processFastStats() {
-  const pid = findCachedServerPid();
-  if (!pid) return null;
-
-  const result = {
-    pid,
-    launcherPid: child?.pid || null,
-    rssMB: null,
-    threads: null,
-    cpuPercent: null,
-    readBps: null,
-    writeBps: null,
-    readBytes: null,
-    writeBytes: null,
-    voluntaryCtx: null,
-    involuntaryCtx: null,
-  };
-
-  try {
-    const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8');
-    const rss = status.match(/^VmRSS:\s+(\d+)\s+kB$/m);
-    const threads = status.match(/^Threads:\s+(\d+)$/m);
-    const voluntary = status.match(/^voluntary_ctxt_switches:\s+(\d+)$/m);
-    const involuntary = status.match(/^nonvoluntary_ctxt_switches:\s+(\d+)$/m);
-    if (rss) result.rssMB = Number(rss[1]) / 1024;
-    if (threads) result.threads = Number(threads[1]);
-    if (voluntary) result.voluntaryCtx = Number(voluntary[1]);
-    if (involuntary) result.involuntaryCtx = Number(involuntary[1]);
-  } catch (_) {}
-
-  try {
-    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-    const close = stat.lastIndexOf(')');
-    const fields = stat.slice(close + 2).split(' ');
-    const ticks = Number(fields[11]) + Number(fields[12]);
-    const now = Date.now();
-    if (previousProcCpu && previousProcCpu.pid === pid) {
-      const dt = (now - previousProcCpu.at) / 1000;
-      const tickRate = 100;
-      if (dt > 0) result.cpuPercent = Math.max(0, ((ticks - previousProcCpu.ticks) / tickRate / dt) * 100);
-    }
-    previousProcCpu = { pid, ticks, at: now };
-  } catch (_) {}
-
-  try {
-    const io = fs.readFileSync(`/proc/${pid}/io`, 'utf8');
-    const readBytes = Number(io.match(/^read_bytes:\s+(\d+)$/m)?.[1] || 0);
-    const writeBytes = Number(io.match(/^write_bytes:\s+(\d+)$/m)?.[1] || 0);
-    const now = Date.now();
-    result.readBytes = readBytes;
-    result.writeBytes = writeBytes;
-    if (previousProcIo && previousProcIo.pid === pid) {
-      const dt = Math.max(0.001, (now - previousProcIo.at) / 1000);
-      result.readBps = Math.max(0, (readBytes - previousProcIo.readBytes) / dt);
-      result.writeBps = Math.max(0, (writeBytes - previousProcIo.writeBytes) / dt);
-    }
-    previousProcIo = { pid, at: now, readBytes, writeBytes };
-  } catch (_) {}
-
-  if (result.cpuPercent != null) result.cpuPercent = Number(result.cpuPercent.toFixed(2));
-  return result;
-}
-
-function processOpenFiles(pid) {
-  if (!pid) return null;
-  try {
-    return fs.readdirSync(`/proc/${pid}/fd`).length;
-  } catch (_) {
-    return null;
-  }
-}
+const procMetrics = runtime.metrics;
+function findCachedServerPid() { return procMetrics.pid(); }
+function processFastStats() { return procMetrics.stats(); }
+function processOpenFiles(pid) { return procMetrics.openFiles(pid); }
+function getJavaRuntimeStats(pid) { return procMetrics.javaStats(pid); }
 
 function takeNetworkSample() {
   let rx = 0;
