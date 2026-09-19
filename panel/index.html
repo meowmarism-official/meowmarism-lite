@@ -110,6 +110,11 @@
 .mr-desc{color:var(--muted);font-size:12.5px;margin:4px 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mr-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted2)}
 .mr-chip{padding:1px 8px;border:1px solid var(--line2);border-radius:999px;font-size:11px;color:var(--muted);white-space:nowrap}
+.mr-kinds{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.mr-kinds button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--muted);cursor:pointer;font:inherit;font-size:12.5px}
+.mr-kinds button:hover{border-color:var(--line2);color:var(--text)}
+.mr-kinds button.on{color:#ffb3e0;border-color:rgba(255,111,196,.5);background:rgba(255,111,196,.1)}
+.mr-note{margin:0 0 12px;padding:9px 12px;border:1px solid var(--line2);border-radius:8px;color:var(--muted);font-size:12.5px;background:var(--panel)}
 .mr-chip.warn{color:var(--yellow);border-color:rgba(212,168,79,.45);background:rgba(212,168,79,.08)}
 .mr-warn{margin:0 22px;padding:10px 12px;border:1px solid rgba(212,168,79,.45);background:rgba(212,168,79,.08);border-radius:8px;color:#e2c47a;font-size:12.5px;line-height:1.5}
 .mr-chip.rel{color:var(--green);border-color:rgba(88,185,120,.4)}
@@ -321,6 +326,8 @@
           <div class="settings-toolbar"><div><div class="card-title">Modrinth</div><div class="settings-status" id="mrNote">—</div></div>
             <div class="settings-actions"><input class="compact-input" id="mrQuery" placeholder="Search Modrinth..." style="width:260px"><select class="compact-select" id="mrSort"><option value="relevance">Relevance</option><option value="downloads">Most downloaded</option><option value="follows">Most followed</option><option value="newest">Newest</option><option value="updated">Recently updated</option></select></div>
           </div>
+          <div class="mr-kinds" id="mrKinds"></div>
+          <div class="mr-note" id="mrKindNote" style="display:none"></div>
           <div id="mrResults" class="mr-grid"></div>
           <div class="hint" id="mrEmpty" style="display:none;padding:10px 4px">Nothing found.</div>
           <div style="padding:10px 0"><button class="btn" id="mrMore" style="display:none">Load more</button></div>
@@ -2471,7 +2478,9 @@ loadSchedule();
 setInterval(() => { if (currentPage === 'schedule') loadSchedule(); }, 15000);
 
 // --- Modrinth ---
-let mrInfo = null, mrOffset = 0, mrTimer = null, mrUpdates = null;
+let mrReq = 0;
+let mrInfo = null, mrOffset = 0, mrTimer = null, mrUpdates = null, mrKind = 'mod';
+let mrCtx = { installable: true, kind: 'mod' };
 function showModsTab(tab) {
   document.querySelectorAll('[data-mods-tab]').forEach((b) => b.classList.toggle('primary', b.dataset.modsTab === tab));
   $('modsInstalled').style.display = tab === 'installed' ? '' : 'none';
@@ -2485,15 +2494,35 @@ async function mrEnsureInfo() {
   if (!mrInfo) mrInfo = await (await fetch('/api/modrinth/info')).json();
   return mrInfo;
 }
+const MR_KIND_LABELS = () => [['mod', t(mrInfo && mrInfo.kind === 'plugin' ? 'Plugins' : 'Mods')], ['datapack', t('Datapacks')], ['resourcepack', t('Resource packs')], ['shader', t('Shaders')], ['modpack', t('Modpacks')]];
+function mrRenderKinds() {
+  $('mrKinds').innerHTML = MR_KIND_LABELS().map(([k, label]) => `<button data-mr-kind="${k}"${k === mrKind ? ' class="on"' : ''}>${esc(label)}</button>`).join('');
+}
+const MR_KIND_NOTES = () => ({
+  datapack: t('Datapacks are installed into the world folder and load after a restart or /reload.'),
+  resourcepack: t('Resource packs are used by players, not by the server. You can look at them here and open them on Modrinth.'),
+  shader: t('Shaders are used by players, not by the server. You can look at them here and open them on Modrinth.'),
+  modpack: t('Modpacks are used by players to set up their game. You can look at them here and open them on Modrinth.'),
+});
 async function mrSearch(reset) {
+  const my = ++mrReq;
   const info = await mrEnsureInfo();
+  if (my !== mrReq) return;
   if (reset) { mrOffset = 0; $('mrResults').innerHTML = ''; }
-  if (!info.supported) { $('mrNote').textContent = t('This server type has no mods or plugins on Modrinth.'); return; }
-  $('mrNote').textContent = t('Showing {kind} for Minecraft {mc} ({loader}).', { kind: t(info.kind === 'plugin' ? 'plugins' : 'mods'), mc: info.mcVersion, loader: info.loader });
-  const r = await fetch(`/api/modrinth/search?q=${encodeURIComponent($('mrQuery').value)}&offset=${mrOffset}&sort=${encodeURIComponent($('mrSort').value)}`);
+  mrRenderKinds();
+  const note = MR_KIND_NOTES()[mrKind];
+  $('mrKindNote').style.display = note ? '' : 'none';
+  $('mrKindNote').textContent = note || '';
+  if (!(info.kinds && info.kinds[mrKind])) { $('mrNote').textContent = mrKind === 'mod' ? t('This server type has no mods or plugins on Modrinth.') : t('This server has no Minecraft version set.'); $('mrMore').style.display = 'none'; return; }
+  $('mrNote').textContent = mrKind === 'mod'
+    ? t('Showing {kind} for Minecraft {mc} ({loader}).', { kind: t(info.kind === 'plugin' ? 'plugins' : 'mods'), mc: info.mcVersion, loader: info.loader })
+    : t('Showing {kind} for Minecraft {mc}.', { kind: MR_KIND_LABELS().find(([k]) => k === mrKind)[1].toLowerCase(), mc: info.mcVersion });
+  const r = await fetch(`/api/modrinth/search?q=${encodeURIComponent($('mrQuery').value)}&offset=${mrOffset}&sort=${encodeURIComponent($('mrSort').value)}&kind=${encodeURIComponent(mrKind)}`);
   const d = await r.json();
+  if (my !== mrReq) return;
   if (!r.ok) { $('mrNote').textContent = t(d.error || 'Could not reach Modrinth'); return; }
-  $('mrResults').insertAdjacentHTML('beforeend', d.hits.map(mrCard).join(''));
+  mrCtx = { installable: d.installable !== false, kind: d.kind || mrKind };
+  $('mrResults').insertAdjacentHTML('beforeend', d.hits.map((h) => mrCard(h, mrCtx)).join(''));
   mrOffset += d.hits.length;
   $('mrEmpty').style.display = !mrOffset ? '' : 'none';
   $('mrMore').style.display = d.total > mrOffset ? '' : 'none';
@@ -2501,6 +2530,7 @@ async function mrSearch(reset) {
 $('mrQuery').addEventListener('input', () => { clearTimeout(mrTimer); mrTimer = setTimeout(() => mrSearch(true), 350); });
 $('mrMore').addEventListener('click', () => mrSearch(false));
 $('mrSort').addEventListener('change', () => mrSearch(true));
+$('mrKinds').addEventListener('click', (e) => { const b = e.target.closest('[data-mr-kind]'); if (b) { mrKind = b.dataset.mrKind; mrSearch(true); } });
 function mrReport(d) {
   if (!d.ok) { toast(t(d.error || 'Failed'), 'error'); return; }
   const files = d.installed.filter((x) => x.file);
@@ -2510,7 +2540,7 @@ function mrReport(d) {
   loadMods();
 }
 async function mrInstall(projectId, versionId) {
-  const r = await fetch('/api/modrinth/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, versionId }) });
+  const r = await fetch('/api/modrinth/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, versionId, kind: mrKind }) });
   const d = await r.json();
   mrReport(d);
   if (d.ok) {
@@ -2569,7 +2599,8 @@ const mrIcon = (icon, title, cls = '') => (icon ? `<img class="mr-icon ${cls}" a
 const MR_LOW_DOWNLOADS = 50000;
 const mrLow = (n) => Number(n) < MR_LOW_DOWNLOADS;
 const mrChips = (list) => (list || []).map((c) => `<span class="mr-chip">${esc(c)}</span>`).join('');
-function mrCard(h) {
+function mrCard(h, ctx) {
+  const canInstall = !ctx || ctx.installable !== false;
   return `<article class="mr-card" data-mr-open="${esc(h.projectId)}" tabindex="0">
     ${mrIcon(h.icon, h.title)}
     <div class="mr-main">
@@ -2577,7 +2608,7 @@ function mrCard(h) {
       <div class="mr-desc">${esc(h.description)}</div>
       <div class="mr-meta"><span>${mrNum(h.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(h.follows)} ${esc(t('followers'))}</span>${h.updated ? `<span>${esc(mrAgo(h.updated))}</span>` : ''}${mrLow(h.downloads) ? `<span class="mr-chip warn" title="${esc(t('Fewer than 50,000 downloads. Fewer people have tried it, so check it before you install.'))}">${esc(t('Under 50k downloads'))}</span>` : ''}${mrChips(h.categories.slice(0, 3))}</div>
     </div>
-    <div class="mr-act">${h.installed ? `<span class="tag">${t('Installed')}</span>` : `<button class="btn primary" data-mr-install="${esc(h.projectId)}">${t('Install')}</button>`}</div>
+    <div class="mr-act">${h.installed ? `<span class="tag">${t('Installed')}</span>` : canInstall ? `<button class="btn primary" data-mr-install="${esc(h.projectId)}">${t('Install')}</button>` : `<a class="btn" href="https://modrinth.com/${esc(ctx.kind)}/${esc(h.slug)}" target="_blank" rel="noopener noreferrer">${t('Open on Modrinth')}</a>`}</div>
   </article>`;
 }
 
@@ -2635,7 +2666,7 @@ async function mrOpenDetail(projectId) {
   mrDet = { id: token };
   let p, versions;
   try {
-    const [pr, vr] = await Promise.all([fetch(`/api/modrinth/project?id=${encodeURIComponent(projectId)}`), fetch(`/api/modrinth/versions?project=${encodeURIComponent(projectId)}`)]);
+    const [pr, vr] = await Promise.all([fetch(`/api/modrinth/project?id=${encodeURIComponent(projectId)}`), fetch(`/api/modrinth/versions?project=${encodeURIComponent(projectId)}&kind=${encodeURIComponent(mrKind)}`)]);
     p = await pr.json();
     if (!pr.ok) throw new Error(p.error || 'Could not reach Modrinth');
     versions = ((await vr.json()).versions) || [];
@@ -2657,7 +2688,7 @@ async function mrOpenDetail(projectId) {
     versions: versions.length
       ? `<div class="hint" style="margin-bottom:10px">${esc(t('Compatible versions for Minecraft {mc}', { mc: info.mcVersion }))}</div>${versions.map((v) => `<div class="mr-ver"><div style="min-width:0"><b>${esc(v.name || v.number)}</b> <span class="mr-chip ${v.channel === 'release' ? 'rel' : v.channel}">${esc(v.channel)}</span>
           <div class="hint" style="margin-top:3px">${esc(v.number)} · ${esc((v.gameVersions || []).join(', '))} · ${esc(mrAgo(v.published))} · ${mrNum(v.downloads)} ${esc(t('downloads'))}${v.size ? ` · ${(v.size / 1048576).toFixed(1)} MB` : ''}</div></div>
-          <button class="btn" data-mr-pick="${esc(v.id)}" data-mr-project="${esc(p.projectId)}">${t('Install')}</button></div>`).join('')}`
+          ${p.installable === false ? '' : `<button class="btn" data-mr-pick="${esc(v.id)}" data-mr-project="${esc(p.projectId)}">${t('Install')}</button>`}</div>`).join('')}`
       : `<div class="hint">${t('No compatible versions.')}</div>`,
     info: `<table class="mr-info"><tbody>
       <tr><td>${t('License')}</td><td>${esc(p.license ? (p.license.name || p.license.id || '-') : '-')}</td></tr>
@@ -2675,7 +2706,7 @@ async function mrOpenDetail(projectId) {
         <div class="mr-dsub">${esc(p.description)}</div>
         <div class="mr-dstats"><span>${authors.length ? `${esc(t('by'))} ${esc(authors.join(', '))}` : ''}</span><span>${mrNum(p.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(p.followers)} ${esc(t('followers'))}</span>${p.updated ? `<span>${esc(t('Updated'))} ${esc(mrAgo(p.updated))}</span>` : ''}</div>
         <div class="mr-meta">${mrChips(p.categories)}</div></div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${p.installed ? `<span class="tag">${t('Installed')}</span>` : `<button class="btn primary" data-mr-install="${esc(p.projectId)}">${t('Install')}</button>`}<button class="btn" data-mr-close>${t('Close')}</button></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${p.installed ? `<span class="tag">${t('Installed')}</span>` : p.installable === false ? `<a class="btn primary" href="${esc(p.links.site)}" target="_blank" rel="noopener noreferrer">${t('Open on Modrinth')}</a>` : `<button class="btn primary" data-mr-install="${esc(p.projectId)}">${t('Install')}</button>`}<button class="btn" data-mr-close>${t('Close')}</button></div></div>
     ${mrLow(p.downloads) ? `<div class="mr-warn" style="margin-top:12px">${esc(t('This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.'))}</div>` : ''}
     <div class="mr-tabs">${tabs.map((k, i) => `<button data-mr-tab="${k}"${i ? '' : ' class="on"'}>${esc(labels[k])}</button>`).join('')}</div>
     <div class="mr-dbody" id="mrDetBody">${panes.description}</div>`;

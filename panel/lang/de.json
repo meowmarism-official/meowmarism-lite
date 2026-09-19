@@ -747,7 +747,18 @@
   "This kind of file cannot be edited here": "Diese Dateiart kann hier nicht bearbeitet werden",
   "This file is too large to edit here ({mb} MB). Download it instead.": "Diese Datei ist zu groß zum Bearbeiten ({mb} MB). Lade sie stattdessen herunter.",
   "This is not a text file. Download it instead.": "Das ist keine Textdatei. Lade sie stattdessen herunter.",
-  "characters": "Zeichen"
+  "characters": "Zeichen",
+  "Plugins": "Plugins",
+  "Datapacks": "Datapacks",
+  "Resource packs": "Ressourcenpakete",
+  "Shaders": "Shader",
+  "Modpacks": "Modpacks",
+  "Datapacks are installed into the world folder and load after a restart or /reload.": "Datapacks werden im Weltordner installiert und laden nach einem Neustart oder mit /reload.",
+  "Resource packs are used by players, not by the server. You can look at them here and open them on Modrinth.": "Ressourcenpakete nutzen Spieler, nicht der Server. Du kannst sie hier ansehen und auf Modrinth öffnen.",
+  "Shaders are used by players, not by the server. You can look at them here and open them on Modrinth.": "Shader nutzen Spieler, nicht der Server. Du kannst sie hier ansehen und auf Modrinth öffnen.",
+  "Modpacks are used by players to set up their game. You can look at them here and open them on Modrinth.": "Modpacks nutzen Spieler, um ihr Spiel einzurichten. Du kannst sie hier ansehen und auf Modrinth öffnen.",
+  "This server has no Minecraft version set.": "Für diesen Server ist keine Minecraft-Version gesetzt.",
+  "Showing {kind} for Minecraft {mc}.": "Zeige {kind} für Minecraft {mc}."
  },
  "patterns": [
   [

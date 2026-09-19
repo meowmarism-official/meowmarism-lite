@@ -912,7 +912,7 @@ setInterval(checkSleep, 30000).unref();
 
 let modrinthInstance = null;
 function modrinth() {
-  if (!modrinthInstance) modrinthInstance = createModrinth({ modsDir: MODS_DIR, disabledDir: DISABLED_MODS_DIR, oldDir: path.join(SERVER_DIR, MODS_DIR.endsWith('plugins') ? 'plugins-old' : 'mods-old'), mcVersion: INSTANCE_MC_VERSION, loader: INSTANCE_LOADER });
+  if (!modrinthInstance) modrinthInstance = createModrinth({ modsDir: MODS_DIR, disabledDir: DISABLED_MODS_DIR, oldDir: path.join(SERVER_DIR, MODS_DIR.endsWith('plugins') ? 'plugins-old' : 'mods-old'), datapackDir: path.join(WORLD_DIR, 'datapacks'), mcVersion: INSTANCE_MC_VERSION, loader: INSTANCE_LOADER });
   return modrinthInstance;
 }
 let launchMode = 'none';
@@ -2061,11 +2061,11 @@ const server = http.createServer((req, res) => {
     const mr = modrinth();
     const fail = (err) => sendJson(res, 502, { ok: false, error: err.message || 'Modrinth request failed' });
     if (url.pathname === '/api/modrinth/info' && req.method === 'GET') {
-      sendJson(res, 200, { supported: mr.supported(), loader: INSTANCE_LOADER, mcVersion: INSTANCE_MC_VERSION, kind: mr.type });
+      sendJson(res, 200, { supported: mr.supported(), kinds: { mod: mr.supported('mod'), datapack: mr.supported('datapack'), resourcepack: mr.supported('resourcepack'), shader: mr.supported('shader'), modpack: mr.supported('modpack') }, loader: INSTANCE_LOADER, mcVersion: INSTANCE_MC_VERSION, kind: mr.type });
       return;
     }
     if (url.pathname === '/api/modrinth/search' && req.method === 'GET') {
-      mr.search(url.searchParams.get('q') || '', url.searchParams.get('offset'), url.searchParams.get('sort')).then((r) => sendJson(res, 200, r)).catch(fail);
+      mr.search(url.searchParams.get('q') || '', url.searchParams.get('offset'), url.searchParams.get('sort'), url.searchParams.get('kind')).then((r) => sendJson(res, 200, r)).catch(fail);
       return;
     }
     if (url.pathname === '/api/modrinth/project' && req.method === 'GET') {
@@ -2080,7 +2080,7 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (url.pathname === '/api/modrinth/versions' && req.method === 'GET') {
-      mr.projectVersions(String(url.searchParams.get('project') || '')).then((r) => sendJson(res, 200, { versions: r })).catch(fail);
+      mr.projectVersions(String(url.searchParams.get('project') || ''), url.searchParams.get('kind')).then((r) => sendJson(res, 200, { versions: r })).catch(fail);
       return;
     }
     if (url.pathname === '/api/modrinth/updates' && req.method === 'GET') {
@@ -2094,7 +2094,7 @@ const server = http.createServer((req, res) => {
         let data;
         try { data = JSON.parse(body || '{}'); } catch (_) { sendJson(res, 400, { ok: false, error: 'bad json' }); return; }
         const job = url.pathname.endsWith('/install')
-          ? mr.install(String(data.projectId || ''), data.versionId ? String(data.versionId) : null)
+          ? mr.install(String(data.projectId || ''), data.versionId ? String(data.versionId) : null, data.kind ? String(data.kind) : null)
           : mr.applyUpdates(data.all ? 'all' : (Array.isArray(data.files) ? data.files.map(String) : []));
         job.then((installed) => { pushAudit(url.pathname.endsWith('/install') ? 'mods.install' : 'mods.update', 'server', installed.filter((x) => x.file).map((x) => x.file).join(', ')); sendJson(res, 200, { ok: true, installed }); }).catch(fail);
       });
