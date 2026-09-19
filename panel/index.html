@@ -8,6 +8,7 @@
 <script src="/core/ui/modrinth-ui.js"></script>
 <script src="/core/ui/files-ui.js"></script>
 <script src="/core/ui/schedule-ui.js"></script>
+<script src="/core/ui/settings-ui.js"></script>
 <script>
 (() => {
   const m = location.pathname.match(/^\/instance\/[^/]+/);
@@ -49,13 +50,9 @@
 .system-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.kv{display:grid}.kv-row{min-height:37px;display:grid;grid-template-columns:160px minmax(0,1fr);align-items:center;border-bottom:1px solid #24282d;gap:18px}.kv-row:last-child{border-bottom:0}.kv-key{color:var(--muted);font-size:11px}.kv-value{text-align:right;font:11px "Cascadia Mono",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.uptime-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.uptime-box{border:1px solid #282d33;background:#141619;border-radius:4px;padding:11px}.uptime-box .u{font:650 16px "Cascadia Mono",Consolas,monospace}.uptime-box .k{color:var(--muted2);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-top:5px}
 
 .player-link{border:0;background:transparent;color:#e2e5e9;padding:0;cursor:pointer;font-weight:650;text-align:left}.player-link:hover{color:#fff;text-decoration:underline}.player-row:hover td{background:#1a1d21}.player-open{color:var(--muted2);text-align:right;font-size:14px}.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:39;opacity:0;pointer-events:none;transition:opacity .16s ease}.drawer-backdrop.open{opacity:1;pointer-events:auto}.player-drawer{position:fixed;z-index:40;right:0;top:0;bottom:0;width:min(420px,100vw);background:#15171a;border-left:1px solid var(--line);transform:translateX(100%);transition:transform .2s cubic-bezier(.2,.75,.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 30px rgba(0,0,0,.2)}.player-drawer.open{transform:none}.drawer-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}.drawer-title{font-size:14px;font-weight:650}.drawer-close{width:30px;height:30px;border:1px solid var(--line2);border-radius:4px;background:#1b1e22;color:var(--muted);cursor:pointer}.drawer-body{overflow:auto;padding:14px}.player-identity{padding:4px 2px 15px;border-bottom:1px solid var(--line);margin-bottom:14px}.player-big-name{font:650 19px/1.2 "Cascadia Mono",Consolas,monospace}.online-tag{display:inline-flex;align-items:center;gap:6px;color:var(--green);font-size:10px;margin-top:7px}.online-tag:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}.drawer-section{border:1px solid var(--line);border-radius:5px;background:#17191d;margin-bottom:10px;overflow:hidden}.drawer-section-title{height:36px;display:flex;align-items:center;padding:0 11px;border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);font-weight:700}.drawer-section-body{padding:10px}.action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.action-btn{min-height:34px;border:1px solid var(--line2);border-radius:4px;background:#1b1e22;color:#cbd0d6;cursor:pointer;font-size:10px;padding:6px 8px}.action-btn:hover{background:#24282e}.action-btn.warn{color:#e2bd72}.action-btn.danger{color:#ef9a9a;border-color:#4c3033}.reason-input{width:100%;height:32px;background:#101215;border:1px solid var(--line2);border-radius:4px;color:var(--text);padding:0 9px;outline:0;margin-bottom:7px;font-size:11px}.reason-input:focus{border-color:#4a6684}.drawer-kv{display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid #23272c;font-size:11px}.drawer-kv:last-child{border-bottom:0}.drawer-kv span:first-child{color:var(--muted)}.drawer-kv span:last-child{font-family:"Cascadia Mono",Consolas,monospace}
-.settings-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}.settings-status{font-size:11px;color:var(--muted)}.settings-actions{display:flex;gap:6px}.restart-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin-bottom:12px;border:1px solid #584729;background:#201c15;border-radius:var(--radius);color:#d8bd86;font-size:11px}.restart-banner.show{display:flex}.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.settings-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;min-width:0}.settings-card-head{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line)}.settings-card-title{font-size:12px;font-weight:650}.settings-list{display:grid}.setting-row{min-height:66px;display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:18px;align-items:center;padding:10px 12px;border-bottom:1px solid #24282d}.setting-row:last-child{border-bottom:0}.setting-name{font-size:11px;font-weight:600}.setting-desc{font-size:10px;color:var(--muted2);margin-top:3px;line-height:1.35}.setting-badges{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle}.setting-badge{padding:1px 4px;border:1px solid #333941;border-radius:3px;color:#77808b;font:8px/1.5 "Cascadia Mono",Consolas,monospace;text-transform:uppercase}.setting-badge.live{color:#77b98d;border-color:#2d5038}.setting-badge.restart{color:#c0a36b;border-color:#51442c}.setting-control{display:flex;align-items:center;justify-content:flex-end;gap:6px}.setting-input,.setting-select{width:100%;height:31px;background:#101215;border:1px solid var(--line2);border-radius:4px;color:var(--text);padding:0 8px;outline:0;font-size:11px}.setting-input:focus,.setting-select:focus{border-color:#4a6684}.setting-suffix{color:var(--muted2);font-size:9px;min-width:max-content}.toggle-control{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--muted);font-size:10px}.toggle-control input{appearance:none;width:30px;height:16px;border-radius:8px;background:#292d32;border:1px solid #343940;position:relative;cursor:pointer;margin:0}.toggle-control input:after{content:"";position:absolute;width:10px;height:10px;left:2px;top:2px;border-radius:50%;background:#89919b;transition:left .12s ease,background .12s ease}.toggle-control input:checked{background:#263b30;border-color:#355744}.toggle-control input:checked:after{left:16px;background:#72bd88}.setting-row.dirty{background:#191d21}.setting-row.dirty .setting-name:after{content:" · modified";color:#7ea8d7;font-weight:400}.toast-stack{position:fixed;right:14px;bottom:14px;z-index:60;display:grid;gap:6px;pointer-events:none}.toast{min-width:220px;max-width:360px;padding:9px 11px;border:1px solid var(--line2);border-radius:5px;background:#1b1e22;color:#d9dce0;font-size:11px;animation:toastIn .18s ease}.toast.error{border-color:#59363a;color:#eca5a5}.toast.ok{border-color:#31503b;color:#a5d6b3}@keyframes toastIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.page.active,.console-line.live-enter,.status-strip.starting .state-dot{animation:none}.bar>div,.core-fill{transition:none}}
-@media(max-width:1100px){.telemetry-grid{grid-template-columns:repeat(3,1fr)}.telemetry-item:nth-child(3n){border-right:0}.settings-grid{grid-template-columns:1fr}.status-strip{grid-template-columns:repeat(2,1fr)}.status-main{grid-column:1/-1;border-bottom:1px solid var(--line)}.status-cell{border-left:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.span-3{grid-column:span 6}.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:1/-1}.core-grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:760px){.chart-head-right{gap:6px}.chart-legend{display:none}.chart-range{flex:none}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.telemetry-item:nth-child(3n){border-right:1px solid #25292f}.telemetry-item:nth-child(2n){border-right:0}.setting-row{grid-template-columns:1fr;gap:8px}.setting-control{justify-content:flex-start}.settings-toolbar,.restart-banner{align-items:flex-start;flex-direction:column}.player-drawer{width:100vw}:root{--sidebar-w:0px}.app{display:block}.sidebar{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line)}.server-name{height:48px}.nav{display:flex;overflow:auto;padding:6px}.nav-label,.sidebar-foot{display:none}.nav a{flex:0 0 auto}.content{grid-column:auto}.topbar{top:0;padding:0 12px}.workspace{padding:12px}.status-strip{grid-template-columns:1fr 1fr}.span-3{grid-column:1/-1}.system-grid{grid-template-columns:1fr}.core-grid{grid-template-columns:repeat(2,1fr)}.page-sub{display:none}.top-actions .btn{padding:0 8px}.uptime-list{grid-template-columns:1fr}.kv-row{grid-template-columns:110px minmax(0,1fr)}.player-summary{grid-template-columns:1fr}.player-stat{border-right:0;border-bottom:1px solid var(--line)}#console{height:58vh}.search{width:150px}}
+.settings-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}.settings-status{font-size:11px;color:var(--muted)}.settings-actions{display:flex;gap:6px}.toast-stack{position:fixed;right:14px;bottom:14px;z-index:60;display:grid;gap:6px;pointer-events:none}.toast{min-width:220px;max-width:360px;padding:9px 11px;border:1px solid var(--line2);border-radius:5px;background:#1b1e22;color:#d9dce0;font-size:11px;animation:toastIn .18s ease}.toast.error{border-color:#59363a;color:#eca5a5}.toast.ok{border-color:#31503b;color:#a5d6b3}@keyframes toastIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.page.active,.console-line.live-enter,.status-strip.starting .state-dot{animation:none}.bar>div,.core-fill{transition:none}}@media(max-width:1100px){.telemetry-grid{grid-template-columns:repeat(3,1fr)}.telemetry-item:nth-child(3n){border-right:0}.status-strip{grid-template-columns:repeat(2,1fr)}.status-main{grid-column:1/-1;border-bottom:1px solid var(--line)}.status-cell{border-left:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.span-3{grid-column:span 6}.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:1/-1}.core-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.chart-head-right{gap:6px}.chart-legend{display:none}.chart-range{flex:none}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.telemetry-item:nth-child(3n){border-right:1px solid #25292f}.telemetry-item:nth-child(2n){border-right:0}.player-drawer{width:100vw}:root{--sidebar-w:0px}.app{display:block}.sidebar{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line)}.server-name{height:48px}.nav{display:flex;overflow:auto;padding:6px}.nav-label,.sidebar-foot{display:none}.nav a{flex:0 0 auto}.content{grid-column:auto}.topbar{top:0;padding:0 12px}.workspace{padding:12px}.status-strip{grid-template-columns:1fr 1fr}.span-3{grid-column:1/-1}.system-grid{grid-template-columns:1fr}.core-grid{grid-template-columns:repeat(2,1fr)}.page-sub{display:none}.top-actions .btn{padding:0 8px}.uptime-list{grid-template-columns:1fr}.kv-row{grid-template-columns:110px minmax(0,1fr)}.player-summary{grid-template-columns:1fr}.player-stat{border-right:0;border-bottom:1px solid var(--line)}#console{height:58vh}.search{width:150px}}
 
-.health-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}.health-item{padding:12px 13px;border-right:1px solid var(--line)}.health-item:last-child{border-right:0}.health-v{font:650 13px "Cascadia Mono",Consolas,monospace}.health-k{margin-top:4px;color:var(--muted2);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.health-v.warn{color:var(--yellow)}.health-v.bad{color:var(--red)}.health-v.good{color:var(--green)}
-@media(max-width:1100px){.health-grid{grid-template-columns:repeat(2,1fr)}.health-item:nth-child(2n){border-right:0}}@media(max-width:760px){.health-grid{grid-template-columns:1fr}.health-item{border-right:0;border-bottom:1px solid var(--line)}.health-item:last-child{border-bottom:0}}
+.health-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}.health-item{padding:12px 13px;border-right:1px solid var(--line)}.health-item:last-child{border-right:0}.health-v{font:650 13px "Cascadia Mono",Consolas,monospace}.health-k{margin-top:4px;color:var(--muted2);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.health-v.warn{color:var(--yellow)}.health-v.bad{color:var(--red)}.health-v.good{color:var(--green)}@media(max-width:1100px){.health-grid{grid-template-columns:repeat(2,1fr)}.health-item:nth-child(2n){border-right:0}}@media(max-width:760px){.health-grid{grid-template-columns:1fr}.health-item{border-right:0;border-bottom:1px solid var(--line)}.health-item:last-child{border-bottom:0}}
 
 /* v11 operational UI */
 .health-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);margin-bottom:12px;overflow:hidden}.health-summary-item{padding:10px 12px;border-right:1px solid var(--line)}.health-summary-item:last-child{border-right:0}.health-summary-v{font:650 12px "Cascadia Mono",Consolas,monospace}.health-summary-k{font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}.health-summary-v.normal{color:#9fd0ad}.health-summary-v.elevated{color:#ddbd72}.health-summary-v.high{color:#e88888}
@@ -63,15 +60,10 @@
 .console-filter-row{display:flex;gap:4px;align-items:center;flex-wrap:wrap}.filter-chip{height:25px;padding:0 7px;border:1px solid #30353b;border-radius:3px;background:#171a1e;color:#747d88;font-size:9px;cursor:pointer}.filter-chip.active{background:#232c36;border-color:#3c536b;color:#dcecff}.console-line{display:flex;align-items:flex-start;gap:8px}.console-ts{flex:0 0 auto;border:0;background:transparent;color:#505964;font:9px/1.7 "Cascadia Mono",Consolas,monospace;padding:0;cursor:pointer}.console-ts:hover{color:#92a5ba}.console-msg{min-width:0;white-space:pre-wrap;word-break:break-word}.console-line.level-warn .console-msg{color:#d7ba77}.console-line.level-error .console-msg{color:#df8282}.console-line.cat-chat .console-msg{color:#b8c9dc}.console-line.cat-player .console-msg{color:#a9cbb2}.console-line.cat-command .console-msg{color:#c2b5d7}.console-paused{display:none;padding:7px 10px;border-bottom:1px solid #4b3f27;background:#211e17;color:#d2b46f;font-size:10px;align-items:center;justify-content:space-between}.console-paused.show{display:flex}
 .lifecycle-grid{display:grid;gap:8px}.restart-row{display:grid;grid-template-columns:90px minmax(0,1fr);gap:8px;align-items:center}.compact-input,.compact-select{height:31px;border:1px solid var(--line2);border-radius:4px;background:#111316;color:var(--text);padding:0 8px;min-width:0}.restart-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.restart-live{margin-top:8px;padding:8px;border:1px solid #4a4029;background:#1e1b15;border-radius:4px;color:#cdb16c;font:10px "Cascadia Mono",Consolas,monospace;display:none}.restart-live.show{display:block}
 .feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.feature-box{padding:9px;border:1px solid #282d33;border-radius:4px;background:#141619}.feature-box .v{font:600 11px "Cascadia Mono",Consolas,monospace}.feature-box .k{font-size:9px;color:var(--muted2);margin-top:3px}.metric-state{font-size:9px;text-transform:uppercase;margin-left:6px}.metric-state.normal{color:var(--green)}.metric-state.elevated{color:var(--yellow)}.metric-state.high{color:var(--red)}
-.pending-preview{display:none;margin-bottom:12px;border:1px solid #3b4148;border-radius:var(--radius);background:#141619}.pending-preview.show{display:block}.pending-head{padding:9px 11px;border-bottom:1px solid #292e34;display:flex;justify-content:space-between;align-items:center}.pending-list{padding:4px 11px 8px}.pending-item{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,1fr) 18px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #22262b;font:10px "Cascadia Mono",Consolas,monospace}.pending-item:last-child{border-bottom:0}.pending-old{color:#737c87}.pending-new{color:#d8dce1}.pending-arrow{color:#59616b;text-align:center}.pending-tag{font-size:8px;color:#a98c54}
 .history-mode-btn{display:none;height:27px;border:1px solid #46596e;border-radius:4px;background:#1b2732;color:#bfd5eb;font-size:9px;padding:0 8px;cursor:pointer}.history-mode-btn.show{display:block}.chart-hint{font-size:9px;color:#5f6873;margin-top:5px}.chart-mark{pointer-events:none}
 .palette-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:80;display:none;align-items:flex-start;justify-content:center;padding-top:12vh}.palette-backdrop.open{display:flex}.palette{width:min(620px,calc(100vw - 28px));background:#141619;border:1px solid #3a4048;border-radius:7px;box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden}.palette-input{width:100%;height:46px;border:0;border-bottom:1px solid #30353b;background:#111316;color:var(--text);outline:0;padding:0 14px;font-size:13px}.palette-list{max-height:420px;overflow:auto;padding:5px}.palette-item{width:100%;min-height:42px;border:0;border-radius:4px;background:transparent;color:#cdd2d8;text-align:left;padding:6px 9px;display:flex;justify-content:space-between;gap:10px;cursor:pointer}.palette-item.active,.palette-item:hover{background:#20252b}.palette-main{font-size:11px}.palette-sub{font-size:9px;color:var(--muted2);margin-top:2px}.palette-key{font:9px "Cascadia Mono",Consolas,monospace;color:#69727d;align-self:center}
 .diagnostics-body.collapsed{display:none}.diagnostics-toggle{height:24px}.player-history-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.ph-box{border:1px solid #282d33;padding:8px;border-radius:4px}.ph-box .v{font:600 11px "Cascadia Mono",Consolas,monospace}.ph-box .k{font-size:9px;color:var(--muted2);margin-top:2px}.session-list{max-height:150px;overflow:auto;font:9px/1.5 "Cascadia Mono",Consolas,monospace;color:#8e97a1}.session-line{padding:4px 0;border-bottom:1px solid #24282d}.session-line:last-child{border-bottom:0}
-.crash-box{display:none;border:1px solid #5a3333;background:#1f1516;border-radius:4px;padding:10px;margin-top:8px}.crash-box.show{display:block}.crash-title{color:#e18b8b;font-weight:650}.crash-detail{margin-top:4px;color:#a88b8b;font:10px "Cascadia Mono",Consolas,monospace}
-@media(max-width:1000px){.health-summary{grid-template-columns:repeat(2,1fr)}.health-summary-item{border-bottom:1px solid var(--line)}.player-summary{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.event-row{grid-template-columns:62px 7px minmax(0,1fr)}.event-type{display:none}.feature-grid,.player-history-grid{grid-template-columns:1fr}.pending-item{grid-template-columns:1fr}.pending-arrow{display:none}.health-summary{grid-template-columns:1fr}.health-summary-item{border-right:0}.console-filter-row{width:100%}}
-
-</style>
+.crash-box{display:none;border:1px solid #5a3333;background:#1f1516;border-radius:4px;padding:10px;margin-top:8px}.crash-box.show{display:block}.crash-title{color:#e18b8b;font-weight:650}.crash-detail{margin-top:4px;color:#a88b8b;font:10px "Cascadia Mono",Consolas,monospace}@media(max-width:1000px){.health-summary{grid-template-columns:repeat(2,1fr)}.health-summary-item{border-bottom:1px solid var(--line)}.player-summary{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.event-row{grid-template-columns:62px 7px minmax(0,1fr)}.event-type{display:none}.feature-grid,.player-history-grid{grid-template-columns:1fr}.health-summary{grid-template-columns:1fr}.health-summary-item{border-right:0}.console-filter-row{width:100%}}</style>
 <style id="rail">
 .sidebar{width:var(--sidebar-w);overflow:hidden;transition:width .15s ease}
 .sidebar:hover{width:var(--sidebar-open)}
@@ -88,22 +80,19 @@
 .sidebar-foot{margin-top:0;padding:8px 0;overflow:hidden;white-space:nowrap}
 .back-link{position:relative;display:flex;align-items:center;gap:14px;height:42px;padding:0 18.5px;color:var(--muted);text-decoration:none;font-size:13px}
 .back-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.live-row{padding:6px 24.5px;gap:12px}.live-row span+span{opacity:0;transition:opacity .1s ease}
-
-@media(max-width:760px){:root{--sidebar-w:0px}.sidebar{width:100%;transition:none}.sidebar:hover{width:100%}.side-brand{display:none}.side-label,.live-row span+span,#updateBadge{opacity:1}.nav{flex-direction:row;display:flex;padding:6px;flex:none}.nav a{height:36px;padding:0 10px;gap:8px}.sidebar-foot{display:none}}
-</style>
+.live-row{padding:6px 24.5px;gap:12px}.live-row span+span{opacity:0;transition:opacity .1s ease}@media(max-width:760px){:root{--sidebar-w:0px}.sidebar{width:100%;transition:none}.sidebar:hover{width:100%}.side-brand{display:none}.side-label,.live-row span+span,#updateBadge{opacity:1}.nav{flex-direction:row;display:flex;padding:6px;flex:none}.nav a{height:36px;padding:0 10px;gap:8px}.sidebar-foot{display:none}}</style>
 <style id="modal-css">
 .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
 .modal-back.open{display:flex}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;width:360px;max-width:100%}
 .modal-title{font-size:14.5px;font-weight:650;margin:0 0 8px}
 .modal-msg{color:var(--muted);font-size:12.5px;line-height:1.55;margin:0 0 18px;white-space:pre-line}
-.modal-actions{display:flex;justify-content:flex-end;gap:8px}
-</style>
+.modal-actions{display:flex;justify-content:flex-end;gap:8px}</style>
 
 
 <link rel="stylesheet" href="/core/ui/modrinth-ui.css">
 <link rel="stylesheet" href="/core/ui/files-ui.css">
+<link rel="stylesheet" href="/core/ui/settings-ui.css">
 </head>
 <body>
 <div class="app">
@@ -207,16 +196,13 @@
       </section>
 
       <section class="page" id="page-settings">
-        <div class="restart-banner" id="restartBanner"><span id="restartBannerText"><strong>Restart required.</strong> Saved settings are waiting for a Minecraft server restart.</span><button class="btn" id="btnRestartSettings">Restart server</button></div>
-        <div class="pending-preview" id="pendingPreview"><div class="pending-head"><div class="card-title">Pending changes</div><div class="card-meta" id="pendingCount">0</div></div><div class="pending-list" id="pendingList"></div></div>
         <article class="card" id="serverIconCard" style="margin-bottom:14px"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
           <img id="serverIconImg" width="64" height="64" alt="" style="image-rendering:pixelated;border-radius:6px;background:#17191d;border:1px solid var(--line)">
           <div style="flex:1;min-width:220px"><div class="card-title">Server icon</div>
             <div class="hint" style="margin:4px 0 8px">Shown in the Minecraft server list. It is scaled to 64x64. Restart the server to apply it.</div>
             <div class="settings-actions"><button class="btn" id="btnIconChange">Change icon...</button> <button class="btn" id="btnIconReset">Use the meowmarism icon</button><input type="file" id="iconFile" accept="image/*" style="display:none"></div></div>
         </div></article>
-        <div class="settings-toolbar"><div><div class="card-title">server.properties</div><div class="settings-status" id="settingsStatus">Loading settings…</div></div><div class="settings-actions"><button class="btn" id="btnResetSettings" disabled>Reset changes</button><button class="btn primary" id="btnSaveSettings" disabled>Save changes</button></div></div>
-        <div class="settings-grid" id="settingsGrid"><div class="card"><div class="card-body hint">Loading server settings…</div></div></div>
+        <div id="settingsRoot"></div>
       </section>
 
       <section class="page" id="page-backups">
@@ -454,7 +440,6 @@ let startupDurationMs = null;
 let lastReadyAt = null;
 let lastStartupDurationMs = null;
 let selectedPlayerName = null;
-let settingsState = null;
 let autoscroll = true;
 let totalLines = 0;
 let peakPlayers = 0;
@@ -508,7 +493,6 @@ const consoleSeen = new Set();
 const receivedConsoleSeq = new Set();
 let contiguousConsoleSeq = 0;
 let highestConsoleSeq = 0;
-const dirtySettings = new Set();
 const chartHover = new Map();
 const chartScaleState = new Map();
 const quickButtons = [...document.querySelectorAll('.quick')];
@@ -1008,66 +992,6 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlaye
 
 function toast(message, type = 'ok') { const d = document.createElement('div'); d.className = `toast ${type}`; d.textContent = message; $('toastStack').appendChild(d); setTimeout(() => d.remove(), 3200); }
 
-function settingInputValue(el, field) { if (field.type === 'boolean') return el.checked; if (field.type === 'number') return Number(el.value); return el.value; }
-function renderSettingRow(f, value) {
-  let control;
-  if (f.type === 'boolean') control = `<label class="toggle-control"><input type="checkbox" data-setting="${esc(f.key)}" ${value ? 'checked' : ''}><span>${value ? 'On' : 'Off'}</span></label>`;
-  else if (f.type === 'select') control = `<select class="setting-select" data-setting="${esc(f.key)}">${(f.options || []).map((o) => `<option value="${esc(o)}" ${String(o) === String(value) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-  else {
-    const type = f.type === 'number' ? 'number' : 'text';
-    control = `<input class="setting-input" type="${type}" data-setting="${esc(f.key)}" value="${esc(value ?? '')}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} ${f.step != null ? `step="${f.step}"` : ''} ${f.maxLength != null ? `maxlength="${f.maxLength}"` : ''}>`;
-  }
-  const badge = f.restartRequired ? '<span class="setting-badge restart">restart</span>' : f.liveApply ? '<span class="setting-badge live">live</span>' : '';
-  return `<div class="setting-row" data-row="${esc(f.key)}"><div><div class="setting-name">${esc(f.label)} <span class="setting-badges">${badge}</span></div><div class="setting-desc">${esc(f.description || '')}</div></div><div class="setting-control">${control}${f.suffix ? `<span class="setting-suffix">${esc(f.suffix)}</span>` : ''}</div></div>`;
-}
-function renderSettings(state, { preserveDirty = false } = {}) {
-  if (!state) return;
-  const preserved = {};
-  if (preserveDirty) for (const key of dirtySettings) {
-    const el = document.querySelector(`[data-setting="${CSS.escape(key)}"]`), field = settingsState?.fields?.find((f) => f.key === key);
-    if (el && field) preserved[key] = settingInputValue(el, field);
-  }
-  settingsState = state;
-  const groups = new Map();
-  for (const field of state.fields || []) { if (!groups.has(field.group)) groups.set(field.group, []); groups.get(field.group).push(field); }
-  $('settingsGrid').innerHTML = [...groups].map(([group, fields]) => `<section class="settings-card"><div class="settings-card-head"><div class="settings-card-title">${esc(group)}</div><div class="card-meta">${fields.length} settings</div></div><div class="settings-list">${fields.map((f) => renderSettingRow(f, Object.prototype.hasOwnProperty.call(preserved, f.key) ? preserved[f.key] : state.values?.[f.key])).join('')}</div></section>`).join('');
-  $('settingsGrid').querySelectorAll('[data-setting]').forEach((el) => {
-    const field = state.fields.find((f) => f.key === el.dataset.setting), event = field?.type === 'text' ? 'input' : 'change';
-    el.addEventListener(event, () => markSettingDirty(el.dataset.setting));
-  });
-  for (const key of dirtySettings) $('settingsGrid').querySelector(`[data-row="${CSS.escape(key)}"]`)?.classList.add('dirty');
-  updateSettingsUi();
-}
-function markSettingDirty(key) {
-  const row = document.querySelector(`[data-row="${CSS.escape(key)}"]`), el = document.querySelector(`[data-setting="${CSS.escape(key)}"]`), field = settingsState?.fields?.find((f) => f.key === key);
-  if (!el || !field) return;
-  const now = settingInputValue(el, field), base = settingsState?.values?.[key];
-  const same = field.type === 'number' ? Number(now) === Number(base) : String(now) === String(base);
-  if (same) { dirtySettings.delete(key); row?.classList.remove('dirty'); } else { dirtySettings.add(key); row?.classList.add('dirty'); }
-  if (field.type === 'boolean') el.nextElementSibling.textContent = el.checked ? 'On' : 'Off';
-  updateSettingsUi();
-}
-function updateSettingsUi() {
-  const dirty = dirtySettings.size, pending = settingsState?.pendingRestart?.length || 0;
-  $('btnSaveSettings').disabled = !dirty; $('btnResetSettings').disabled = !dirty;
-  $('settingsStatus').textContent = dirty ? `${dirty} unsaved change${dirty === 1 ? '' : 's'}` : `Synced · ${settingsState?.fields?.length || 0} settings`;
-  $('restartBanner').classList.toggle('show', !!pending);
-  $('restartBannerText').innerHTML = pending ? `<strong>Restart required.</strong> ${pending} saved setting${pending === 1 ? '' : 's'} waiting to become active.` : '<strong>Restart required.</strong>';
-  const preview = $('pendingPreview'), list = $('pendingList');
-  if (preview && list) {
-    preview.classList.toggle('show', dirty > 0);
-    $('pendingCount').textContent = `${dirty} change${dirty === 1 ? '' : 's'}`;
-    const rows = [];
-    for (const key of dirtySettings) {
-      const field = settingsState?.fields?.find((f) => f.key === key), el = document.querySelector(`[data-setting="${CSS.escape(key)}"]`);
-      if (!field || !el) continue;
-      const oldVal = settingsState?.values?.[key], newVal = settingInputValue(el, field);
-      rows.push(`<div class="pending-item"><span>${esc(field.label)}</span><span class="pending-old">${esc(oldVal)}</span><span class="pending-arrow">→</span><span class="pending-new">${esc(newVal)}</span><span class="pending-tag">${field.restartRequired ? 'restart' : field.liveApply ? 'live' : ''}</span></div>`);
-    }
-    list.innerHTML = rows.join('');
-  }
-}
-function applySettingsState(state) { if (state) renderSettings(state, { preserveDirty: dirtySettings.size > 0 }); }
 
 function renderCores(values = []) {
   const root = $('coreGrid');
@@ -1499,14 +1423,14 @@ async function post(url, body) {
   const text = await res.text(); let data; try { data = JSON.parse(text); } catch { data = null; }
   if (!res.ok) throw new Error(data?.error || text || `HTTP ${res.status}`); return data;
 }
-$('btnSaveSettings').onclick = async () => {
-  if (!settingsState || !dirtySettings.size) return;
-  const patch = {};
-  for (const key of dirtySettings) { const field = settingsState.fields.find((f) => f.key === key), el = document.querySelector(`[data-setting="${CSS.escape(key)}"]`); if (field && el) patch[key] = settingInputValue(el, field); }
-  try { const result = await post('/api/settings', { settings: patch }); dirtySettings.clear(); renderSettings(result.settings); toast('Server settings saved'); } catch (e) { toast(e.message, 'error'); }
-};
-$('btnResetSettings').onclick = () => { dirtySettings.clear(); renderSettings(settingsState); toast('Unsaved changes reset'); };
-$('btnRestartSettings').onclick = async () => { if (!(await modalConfirm('Restart the server?', 'Players will be disconnected while it restarts.', 'Restart', true))) return; try { await post('/restart'); toast('Server restart requested'); } catch (e) { toast(e.message, 'error'); } };
+const SETTINGS = MeowSettings.mount({
+  el: $('settingsRoot'),
+  load: async () => (await fetch(`${window.__BASE || ''}/api/settings`)).json(),
+  save: (patch) => post('/api/settings', { settings: patch }),
+  restart: () => post('/restart'),
+  t, esc, toast,
+  confirm: (title, message, label, danger) => modalConfirm(title, message, label, danger),
+});
 $('btnStart').onclick = () => post('/start').catch((e) => toast(e.message, 'error'));
 $('btnStop').onclick = async () => { if (await modalConfirm('Stop the server?', 'Players will be disconnected and the world is saved.', 'Stop', true)) post('/stop').catch(console.error); };
 $('btnRestart').onclick = async () => { if (await modalConfirm('Restart the server?', 'Players will be disconnected while it restarts.', 'Restart', true)) post('/restart').catch(console.error); };
@@ -1661,7 +1585,7 @@ function applySnapshot(d) {
   if (instanceChanged) resetForNewInstance();
   panelInstanceId = d.instanceId || panelInstanceId;
   if (!clockSynced && Number.isFinite(Number(d.serverTime))) clockOffsetMs = Number(d.serverTime) - Date.now();
-  updateStats(d); applySettingsState(d.settings); mergeHistoryTiers(d.historyTiers || {}, d.history || []); mergeTimeline(d.timeline || []); mergeAudit(d.audit || []); applyRestartPlan(d.restartPlan || d.stats?.restartPlan || null);
+  updateStats(d); SETTINGS.render(d.settings); mergeHistoryTiers(d.historyTiers || {}, d.history || []); mergeTimeline(d.timeline || []); mergeAudit(d.audit || []); applyRestartPlan(d.restartPlan || d.stats?.restartPlan || null);
   if ('sleeping' in d) { isSleeping = d.sleeping; updateLifecycleUi(); }
   const recent = Array.isArray(d.recentSamples) ? d.recentSamples : [];
   ingestSamples(recent, { enqueue: false, initializeCursor: !hasSnapshot });
@@ -1730,7 +1654,7 @@ es.addEventListener('console', (e) => {
   } catch (err) { console.error(err); }
 });
 es.addEventListener('status', (e) => { try { setLifecycle(JSON.parse(e.data)); updateUptimes(); markSynced(); } catch (_) {} });
-es.addEventListener('settings', (e) => { try { applySettingsState(JSON.parse(e.data)); markSynced(); } catch (err) { console.error(err); } });
+es.addEventListener('settings', (e) => { try { SETTINGS.render(JSON.parse(e.data)); markSynced(); } catch (err) { console.error(err); } });
 es.addEventListener('timeline', (e) => { try { mergeTimeline([JSON.parse(e.data)]); markSynced(); } catch (err) { console.error(err); } });
 es.addEventListener('audit', (e) => { try { mergeAudit([JSON.parse(e.data)]); markSynced(); } catch (err) { console.error(err); } });
 es.addEventListener('restart-plan', (e) => { try { applyRestartPlan(JSON.parse(e.data)); markSynced(); } catch (err) { console.error(err); } });
