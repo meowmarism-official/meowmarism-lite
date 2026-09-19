@@ -731,7 +731,23 @@
   "Compatible versions for Minecraft {mc}": "Kompatible Versionen für Minecraft {mc}",
   "Under 50k downloads": "Unter 50k Downloads",
   "Fewer than 50,000 downloads. Fewer people have tried it, so check it before you install.": "Weniger als 50.000 Downloads. Weniger Leute haben es ausprobiert, prüfe es vor der Installation.",
-  "This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.": "Dieses Projekt hat weniger als 50.000 Downloads. Weniger Leute haben es ausprobiert, lies die Beschreibung, sieh dir den Quellcode an und sei vorsichtig mit den Dateien, die du installierst."
+  "This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.": "Dieses Projekt hat weniger als 50.000 Downloads. Weniger Leute haben es ausprobiert, lies die Beschreibung, sieh dir den Quellcode an und sei vorsichtig mit den Dateien, die du installierst.",
+  "Saved": "Gespeichert",
+  "Unsaved changes": "Ungespeicherte Änderungen",
+  "Save failed": "Speichern fehlgeschlagen",
+  "Discard changes?": "Änderungen verwerfen?",
+  "Your changes to this file will be lost.": "Deine Änderungen an dieser Datei gehen verloren.",
+  "Discard": "Verwerfen",
+  "The file changed": "Die Datei hat sich geändert",
+  "It was changed by someone else since you opened it. Overwrite it with your version?": "Sie wurde seit dem Öffnen von jemand anderem geändert. Mit deiner Version überschreiben?",
+  "Overwrite": "Überschreiben",
+  "This is not valid JSON": "Das ist kein gültiges JSON",
+  "Save anyway": "Trotzdem speichern",
+  "Could not open the file": "Datei konnte nicht geöffnet werden",
+  "This kind of file cannot be edited here": "Diese Dateiart kann hier nicht bearbeitet werden",
+  "This file is too large to edit here ({mb} MB). Download it instead.": "Diese Datei ist zu groß zum Bearbeiten ({mb} MB). Lade sie stattdessen herunter.",
+  "This is not a text file. Download it instead.": "Das ist keine Textdatei. Lade sie stattdessen herunter.",
+  "characters": "Zeichen"
  },
  "patterns": [
   [

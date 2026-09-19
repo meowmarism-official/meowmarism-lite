@@ -673,17 +673,7 @@ function broadcast(line) {
 
 // Resolves a user-supplied relative path against SERVER_DIR and refuses
 // anything that would escape it (symlinks, ../, absolute paths, etc.).
-function safeServerPath(rel) {
-  const resolved = path.resolve(SERVER_DIR, rel || '.');
-  const base = path.resolve(SERVER_DIR) + path.sep;
-  if (resolved !== path.resolve(SERVER_DIR) && !resolved.startsWith(base)) return null;
-  try {
-    const real = fs.realpathSync(resolved);
-    const realBase = fs.realpathSync(SERVER_DIR) + path.sep;
-    if (real !== fs.realpathSync(SERVER_DIR) && !real.startsWith(realBase)) return null;
-  } catch (_) { /* doesn't exist yet / broken symlink - let the caller's fs call report the real error */ }
-  return resolved;
-}
+const filesApi = require('./core/modules/files').createFiles({ root: SERVER_DIR });
 
 const backupLib = require('./core/modules/backup').createBackups({ SERVER_DIR, WORLD_DIR, BACKUP_DIR, panelConfig });
 const { BACKUP_EXT, BACKUP_NAME_RE, listBackups, pruneBackups, ensureBackupDir } = backupLib;
@@ -2015,101 +2005,56 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/files' && req.method === 'GET') {
+  if (url.pathname.startsWith('/api/files')) {
     const rel = url.searchParams.get('path') || '.';
-    const resolved = safeServerPath(rel);
-    if (!resolved) { sendJson(res, 400, { ok: false, error: 'invalid path' }); return; }
+    const bad = (err) => sendJson(res, err.status || 500, { ok: false, error: err.message });
     try {
-      const st = fs.statSync(resolved);
-      if (!st.isDirectory()) { sendJson(res, 400, { ok: false, error: 'not a directory' }); return; }
-      const entries = fs.readdirSync(resolved, { withFileTypes: true }).map((d) => {
-        let size = null, mtime = null;
-        try {
-          const s = fs.statSync(path.join(resolved, d.name));
-          size = s.isFile() ? s.size : null;
-          mtime = s.mtimeMs;
-        } catch (_) {}
-        return { name: d.name, isDir: d.isDirectory(), sizeMB: size != null ? +(size / 1024 / 1024).toFixed(3) : null, mtime };
-      }).sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
-      sendJson(res, 200, { path: path.relative(SERVER_DIR, resolved) || '.', entries });
-    } catch (err) { sendJson(res, 404, { ok: false, error: err.message }); }
-    return;
-  }
-
-  if (url.pathname === '/api/files/content' && req.method === 'GET') {
-    const rel = url.searchParams.get('path') || '';
-    const resolved = safeServerPath(rel);
-    if (!resolved) { sendJson(res, 400, { ok: false, error: 'invalid path' }); return; }
-    try {
-      const st = fs.statSync(resolved);
-      if (!st.isFile()) { sendJson(res, 400, { ok: false, error: 'not a file' }); return; }
-      const MAX_PREVIEW = 512 * 1024;
-      if (st.size > MAX_PREVIEW) { sendJson(res, 200, { tooLarge: true, sizeMB: +(st.size / 1024 / 1024).toFixed(2) }); return; }
-      const buf = fs.readFileSync(resolved);
-      const isBinary = buf.subarray(0, 8000).includes(0);
-      if (isBinary) { sendJson(res, 200, { binary: true, sizeMB: +(st.size / 1024 / 1024).toFixed(2) }); return; }
-      sendJson(res, 200, { text: buf.toString('utf8'), sizeMB: +(st.size / 1024 / 1024).toFixed(2) });
-    } catch (err) { sendJson(res, 404, { ok: false, error: err.message }); }
-    return;
-  }
-
-  if (url.pathname === '/api/files/download' && req.method === 'GET') {
-    const rel = url.searchParams.get('path') || '';
-    const resolved = safeServerPath(rel);
-    if (!resolved) { res.writeHead(400); res.end('invalid path'); return; }
-    try {
-      const st = fs.statSync(resolved);
-      if (!st.isFile()) { res.writeHead(400); res.end('not a file'); return; }
-      res.writeHead(200, {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${path.basename(resolved)}"`,
-        'Content-Length': st.size,
-      });
-      fs.createReadStream(resolved).pipe(res);
-    } catch (err) { res.writeHead(404); res.end(err.message); }
-    return;
-  }
-
-  if (url.pathname === '/api/files/upload' && req.method === 'POST') {
-    const dirRel = url.searchParams.get('path') || '.';
-    const name = url.searchParams.get('name') || '';
-    const dir = safeServerPath(dirRel);
-    if (!dir || !name || name.includes('/') || name.includes('\\') || name === '.' || name === '..') {
-      sendJson(res, 400, { ok: false, error: 'invalid path or filename' }); return;
-    }
-    const dest = safeServerPath(path.join(dirRel, name));
-    if (!dest) { sendJson(res, 400, { ok: false, error: 'invalid path' }); return; }
-    try {
-      if (!fs.statSync(dir).isDirectory()) { sendJson(res, 400, { ok: false, error: 'not a directory' }); return; }
-    } catch (err) { sendJson(res, 404, { ok: false, error: err.message }); return; }
-    const MAX_UPLOAD = 200 * 1024 * 1024;
-    let size = 0;
-    const out = fs.createWriteStream(dest);
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > MAX_UPLOAD) { req.destroy(); out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} }
-    });
-    req.on('error', () => { out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} });
-    req.pipe(out);
-    out.on('finish', () => {
-      pushAudit('files.upload', name, dirRel);
-      sendJson(res, 200, { ok: true, name, sizeMB: +(size / 1024 / 1024).toFixed(2) });
-    });
-    out.on('error', (err) => { sendJson(res, 500, { ok: false, error: err.message }); });
-    return;
-  }
-
-  if (url.pathname === '/api/files' && req.method === 'DELETE') {
-    const rel = url.searchParams.get('path') || '';
-    const resolved = safeServerPath(rel);
-    if (!resolved || resolved === path.resolve(SERVER_DIR)) { sendJson(res, 400, { ok: false, error: 'invalid path' }); return; }
-    try {
-      const st = fs.statSync(resolved);
-      fs.rmSync(resolved, { recursive: st.isDirectory(), force: true });
-      pushAudit('files.delete', path.basename(resolved), path.dirname(rel));
-      sendJson(res, 200, { ok: true });
-    } catch (err) { sendJson(res, 404, { ok: false, error: err.message }); }
-    return;
+      if (url.pathname === '/api/files' && req.method === 'GET') { sendJson(res, 200, filesApi.list(rel)); return; }
+      if (url.pathname === '/api/files/content' && req.method === 'GET') { sendJson(res, 200, filesApi.read(rel)); return; }
+      if (url.pathname === '/api/files/download' && req.method === 'GET') {
+        const info = filesApi.fileInfo(rel);
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${info.name.replace(/[\r\n"]/g, '_')}"`, 'Content-Length': info.size });
+        fs.createReadStream(info.resolved).pipe(res);
+        return;
+      }
+      if (url.pathname === '/api/files/save' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (c) => { body += c; if (body.length > filesApi.MAX_EDIT_BYTES * 2) req.destroy(); });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const saved = filesApi.write(String(data.path || ''), data.text, { expectedMtime: Number(data.mtime) });
+            pushAudit('files.edit', path.basename(String(data.path || '')), path.dirname(String(data.path || '')));
+            sendJson(res, 200, { ok: true, ...saved });
+          } catch (err) { bad(err instanceof SyntaxError ? Object.assign(err, { status: 400, message: 'bad json' }) : err); }
+        });
+        return;
+      }
+      if (url.pathname === '/api/files/upload' && req.method === 'POST') {
+        const name = url.searchParams.get('name') || '';
+        const dest = filesApi.uploadTarget(rel, name);
+        let size = 0;
+        const out = fs.createWriteStream(dest);
+        req.on('data', (chunk) => {
+          size += chunk.length;
+          if (size > filesApi.MAX_UPLOAD_BYTES) { req.destroy(); out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} }
+        });
+        req.on('error', () => { out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} });
+        req.pipe(out);
+        out.on('finish', () => {
+          pushAudit('files.upload', name, rel);
+          sendJson(res, 200, { ok: true, name, sizeMB: +(size / 1024 / 1024).toFixed(2) });
+        });
+        out.on('error', (err) => { sendJson(res, 500, { ok: false, error: err.message }); });
+        return;
+      }
+      if (url.pathname === '/api/files' && req.method === 'DELETE') {
+        const removed = filesApi.remove(rel);
+        pushAudit('files.delete', removed.name, removed.dir);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+    } catch (err) { bad(err); return; }
   }
 
   if (url.pathname.startsWith('/api/modrinth')) {
