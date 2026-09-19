@@ -79,7 +79,6 @@ let lastWorldStats = null;
 let lastCrash = null;
 let recentCrashTimestamps = [];
 let lastExitInfo = null;
-let intentionalExitReason = null;
 let eventSeq = 0;
 let auditSeq = 0;
 const timelineEvents = [];
@@ -603,19 +602,10 @@ function scheduleRestart(delaySec = 10, reason = 'Scheduled restart', warnPlayer
 
 function forceStopServer() {
   if (!child) return false;
-  intentionalExitReason = 'force-stop';
-  // child is the run.sh launcher, not necessarily the JVM - if run.sh doesn't
-  // exec into java, killing child alone can leave the actual server process
-  // running. Kill the real java PID we already track for monitoring, and
-  // fall back to child.kill() if we don't have one.
   const javaPid = findCachedServerPid();
   pushTimeline('force_stop', 'Force stop requested', `SIGKILL sent to pid ${javaPid || child.pid}`, 'warn');
   pushAudit('server.force-stop', 'server');
-  try {
-    if (javaPid && javaPid !== child.pid) { try { process.kill(javaPid, 'SIGKILL'); } catch (_) {} }
-    child.kill('SIGKILL');
-    return true;
-  } catch (_) { return false; }
+  return runtime.kill(javaPid);
 }
 
 function maybeProbePerformance() {
@@ -755,13 +745,28 @@ const { BACKUP_EXT, BACKUP_NAME_RE, listBackups, pruneBackups, ensureBackupDir }
 const backupState = backupLib.state; // { backupInProgress, lastBackupAt, lastBackupError }
 
 const runtime = require('./runtime').createRuntime({
-  getChild: () => child,
-  getPhase: () => serverPhase,
-  start: startServer,
-  stop: stopServer,
-  restart: restartServer,
-  kill: forceStopServer,
-  command: sendCommand,
+  serverDir: SERVER_DIR,
+  logFile: LOG_FILE,
+  propertiesFile: PROPERTIES_FILE,
+  mcVersion: INSTANCE_MC_VERSION,
+  panelConfig,
+  hooks: {
+    getPhase: () => serverPhase,
+    startAttempt: () => { lastStartBlock = null; },
+    blocked: (msg) => {
+      lastStartBlock = msg;
+      broadcast(`--- cannot start: ${msg} ---`);
+      pushTimeline('start_blocked', 'Server did not start', msg, 'error');
+    },
+    releasePort: () => stopSleepProxy(),
+    willSpawn: () => clearRestartPlan('server starting'),
+    notice: (text) => broadcast(text),
+    spawned: onProcessSpawned,
+    line: (text, isErr) => broadcast(isErr ? `[stderr] ${text}` : text),
+    spawnError: onProcessError,
+    stopping: onProcessStopping,
+    exited: onProcessExit,
+  },
 });
 
 const backupDeps = {
@@ -976,45 +981,12 @@ function modrinth() {
 }
 let launchMode = 'none';
 let lastStartBlock = null;
-function portBusy(port) {
-  const r = require('child_process').spawnSync(process.execPath, ['-e', "const s=require('net').createServer();s.once('error',()=>process.exit(1));s.listen(Number(process.argv[1]),'0.0.0.0',()=>s.close(()=>process.exit(0)))", String(port)], { timeout: 5000 });
-  return r.status === 1;
-}
-function startServer() {
-  if (child) return false;
-  lastStartBlock = null;
-  const needJava = launchLib.requiredJavaMajor(INSTANCE_MC_VERSION);
-  const haveJava = launchLib.javaMajor(panelConfig.javaPath);
-  if (needJava && (haveJava == null || haveJava < needJava)) {
-    lastStartBlock = `Minecraft ${INSTANCE_MC_VERSION} needs Java ${needJava}, but ${haveJava == null ? 'no Java was found' : `Java ${haveJava} is installed`}. Install Java ${needJava} under Automation > Startup.`;
-    broadcast(`--- cannot start: ${lastStartBlock} ---`);
-    pushTimeline('start_blocked', 'Server did not start', lastStartBlock, 'error');
-    return false;
-  }
-  stopSleepProxy();
-  const mcPort = Number((fs.existsSync(PROPERTIES_FILE) ? fs.readFileSync(PROPERTIES_FILE, 'utf8').match(/^server-port\s*=\s*(\d+)/m) : null)?.[1]) || 25565;
-  if (portBusy(mcPort)) {
-    lastStartBlock = `Port ${mcPort} is already used by another program. Change the port under Settings (server-port) or stop the program that uses it.`;
-    broadcast(`--- cannot start: ${lastStartBlock} ---`);
-    pushTimeline('start_blocked', 'Server did not start', lastStartBlock, 'error');
-    return false;
-  }
-  clearRestartPlan('server starting');
+function startServer() { return runtime.start(); }
 
-  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'w' });
-  if (panelConfig.ramMaxMB) {
-    try { fs.writeFileSync(path.join(SERVER_DIR, 'user_jvm_args.txt'), launchLib.jvmArgsFile(panelConfig)); }
-    catch (err) { broadcast(`--- could not write JVM arguments: ${err.message} ---`); }
-  }
-  const launch = launchLib.buildLaunch(panelConfig, process.env);
+function onProcessSpawned(proc, launch) {
   launchMode = launch.mode;
-  child = spawn(launch.cmd, launch.args, {
-    cwd: SERVER_DIR,
-    env: launch.env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  child = proc;
   startedAt = Date.now();
-  intentionalExitReason = null;
   serverPhase = 'starting';
   readyAt = null;
   startupDurationMs = null;
@@ -1027,69 +999,47 @@ function startServer() {
   cachedServerPid = null;
   cachedServerPidAt = 0;
 
-  pushTimeline('start', 'Server starting', `Launcher PID ${child.pid}`, 'info');
-  broadcast(`--- server starting (pid ${child.pid}) ---`);
+  pushTimeline('start', 'Server starting', `Launcher PID ${proc.pid}`, 'info');
+  broadcast(`--- server starting (pid ${proc.pid}) ---`);
   broadcastStatus();
   settingsSeq++;
   broadcastEvent('settings', buildSettingsState());
+}
 
-  child.stdout.on('data', (d) => {
-    const text = d.toString();
-    logStream.write(text);
-    text.split(/\r?\n/).forEach((line) => {
-      if (line.length) broadcast(line);
-    });
-  });
+function onProcessError(err, noPid) {
+  serverPhase = 'error';
+  broadcast(`--- failed to start server: ${err.message} ---`);
+  if (noPid) { child = null; startedAt = null; }
+  broadcastStatus();
+}
 
-  child.stderr.on('data', (d) => {
-    const text = d.toString();
-    logStream.write(text);
-    text.split(/\r?\n/).forEach((line) => {
-      if (line.length) broadcast(`[stderr] ${line}`);
-    });
-  });
-
-  child.on('error', (err) => {
-    serverPhase = 'error';
-    broadcast(`--- failed to start server: ${err.message} ---`);
-    if (child && child.pid === undefined) { child = null; startedAt = null; }
-    broadcastStatus();
-  });
-
-  child.on('exit', (code, signal) => {
-    const reason = signal ? `signal ${signal}` : `code ${code}`;
-    const intent = intentionalExitReason;
-    const wasCrash = !intent && ((code != null && code !== 0) || !!signal);
-    broadcast(`--- server process exited (${reason}) ---`);
-    lastExitInfo = { at: Date.now(), code, signal, reason, intentional: !!intent, intent };
-    if (wasCrash) {
-      lastCrash = { ...lastExitInfo, runtimeMs: startedAt ? Date.now() - startedAt : null, lastConsole: recentConsole.slice(-100) };
-      pushTimeline('crash', 'Server crashed', `${reason}${lastCrash.runtimeMs != null ? ` · runtime ${Math.floor(lastCrash.runtimeMs / 1000)}s` : ''}`, 'error', { code, signal });
-    } else if (intent !== 'sleep') {
-      pushTimeline('stop', 'Server offline', `${reason}${intent ? ` · ${intent}` : ''}`, 'info', { code, signal, intent });
-    }
-    for (const name of [...players.keys()]) recordPlayerLeave(name, 'shutdown', false);
-    child = null;
-    startedAt = null;
-    serverPhase = 'offline';
-    readyAt = null;
-    startupDurationMs = null;
-    lastExitAt = Date.now();
-    intentionalExitReason = null;
-    players.clear();
-    previousProcCpu = null;
-    previousProcIo = null;
-    cachedServerPid = null;
-    cachedServerPidAt = 0;
-    javaRuntimeCache = { pid: null, at: 0, data: null };
-    javaGcPrevious = null;
-    logStream.end();
-    broadcastStatus();
-    if (intent === 'sleep') startSleepProxy();
-    if (wasCrash) maybeAutoRestartAfterCrash();
-  });
-
-  return true;
+function onProcessExit({ code, signal, reason, intent }) {
+  const wasCrash = !intent && ((code != null && code !== 0) || !!signal);
+  broadcast(`--- server process exited (${reason}) ---`);
+  lastExitInfo = { at: Date.now(), code, signal, reason, intentional: !!intent, intent };
+  if (wasCrash) {
+    lastCrash = { ...lastExitInfo, runtimeMs: startedAt ? Date.now() - startedAt : null, lastConsole: recentConsole.slice(-100) };
+    pushTimeline('crash', 'Server crashed', `${reason}${lastCrash.runtimeMs != null ? ` · runtime ${Math.floor(lastCrash.runtimeMs / 1000)}s` : ''}`, 'error', { code, signal });
+  } else if (intent !== 'sleep') {
+    pushTimeline('stop', 'Server offline', `${reason}${intent ? ` · ${intent}` : ''}`, 'info', { code, signal, intent });
+  }
+  for (const name of [...players.keys()]) recordPlayerLeave(name, 'shutdown', false);
+  child = null;
+  startedAt = null;
+  serverPhase = 'offline';
+  readyAt = null;
+  startupDurationMs = null;
+  lastExitAt = Date.now();
+  players.clear();
+  previousProcCpu = null;
+  previousProcIo = null;
+  cachedServerPid = null;
+  cachedServerPidAt = 0;
+  javaRuntimeCache = { pid: null, at: 0, data: null };
+  javaGcPrevious = null;
+  broadcastStatus();
+  if (intent === 'sleep') startSleepProxy();
+  if (wasCrash) maybeAutoRestartAfterCrash();
 }
 
 function maybeAutoRestartAfterCrash() {
@@ -1108,14 +1058,12 @@ function maybeAutoRestartAfterCrash() {
   setTimeout(() => { if (!child) startServer(); }, delaySec * 1000);
 }
 
-function stopServer(intent = 'stop') {
-  if (!child || !child.stdin.writable) return false;
-  intentionalExitReason = intent;
+function stopServer(intent = 'stop') { return runtime.stop(intent); }
+
+function onProcessStopping(intent) {
   serverPhase = 'stopping';
   pushTimeline('stop_requested', intent === 'restart' || intent === 'scheduled' ? 'Restart requested' : 'Stop requested', intent, 'info');
   broadcastStatus();
-  child.stdin.write('stop\n');
-  return true;
 }
 
 function restartServer(intent = 'restart') {
@@ -1129,11 +1077,7 @@ function restartServer(intent = 'restart') {
   return startServer();
 }
 
-function sendCommand(cmd) {
-  if (!child || !child.stdin.writable) return false;
-  child.stdin.write(`${cmd}\n`);
-  return true;
-}
+function sendCommand(cmd) { return runtime.command(cmd); }
 
 function takeCpuSample() {
   return os.cpus().map((cpu) => {
