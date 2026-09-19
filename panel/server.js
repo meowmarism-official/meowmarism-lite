@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const cfg = require('./lib/config');
 const launchLib = require('./runtime/launch');
 const scheduler = require('./core/modules/scheduler');
-const { createModrinth } = require('./core/modules/modrinth');
+const { createModrinth, fetchImage } = require('./core/modules/modrinth');
 const {
   SERVER_DIR, LOG_FILE, PROPERTIES_FILE, WORLD_DIR, BACKUP_DIR, CONFIG_FILE,
   HISTORY_FILE, METRICS_FILE, MODS_DIR, DISABLED_MODS_DIR, INSTANCE_LOADER, INSTANCE_MC_VERSION, WHITELIST_FILE, OPS_FILE,
@@ -2120,7 +2120,18 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (url.pathname === '/api/modrinth/search' && req.method === 'GET') {
-      mr.search(url.searchParams.get('q') || '', url.searchParams.get('offset')).then((r) => sendJson(res, 200, r)).catch(fail);
+      mr.search(url.searchParams.get('q') || '', url.searchParams.get('offset'), url.searchParams.get('sort')).then((r) => sendJson(res, 200, r)).catch(fail);
+      return;
+    }
+    if (url.pathname === '/api/modrinth/project' && req.method === 'GET') {
+      mr.project(String(url.searchParams.get('id') || '')).then((r) => sendJson(res, 200, r)).catch(fail);
+      return;
+    }
+    if (url.pathname === '/api/modrinth/img' && req.method === 'GET') {
+      fetchImage(String(url.searchParams.get('u') || '')).then(({ type, buf }) => {
+        res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'Content-Length': buf.length });
+        res.end(buf);
+      }).catch(() => { res.writeHead(404); res.end(); });
       return;
     }
     if (url.pathname === '/api/modrinth/versions' && req.method === 'GET') {
