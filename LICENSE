@@ -12,7 +12,7 @@ Meowmarism is source-available software. Commercial use is permitted, but moneti
 
 "Distribution" means giving a copy of the Software or a Modified Version to another person or entity by any means, including repositories, releases, downloads, packages, installers, archives, binaries, mirrors, container images, or preinstalled systems.
 
-Running the Software or a Modified Version on servers that you or your organization control, including servers that serve your own customers or users, is not Distribution as long as no copy is given to them. Modifications used only in that way do not have to be published. Section 6 (Software Monetization) and Sections 10 to 13 (unofficial status, naming, non-affiliation, and rebranding requirements) still apply to such use.
+Running the Software or a Modified Version on servers that you or your organization control, including servers that serve your own customers or users, is not Distribution as long as no copy is given to them. Modifications used only in that way do not have to be published. Section 6 (Software Monetization) and, where the use is public-facing, Sections 10 to 13 (unofficial status, naming, non-affiliation, and rebranding requirements) still apply.
 
 "Corresponding Source" means the complete source code in the preferred form for making modifications, together with build scripts, dependency information, configuration templates, and other files reasonably necessary to build and modify the distributed version. Secrets, passwords, credentials, private keys, personal data, and other information that should reasonably remain confidential are excluded.
 
@@ -264,7 +264,9 @@ Where reasonably applicable, this notice must appear on the repository or downlo
 
 No branding, domain, layout, description, or other presentation may reasonably mislead users into believing an independent version is official.
 
-Running the Software, a Modified Version, or an independent version does not make the operator an official partner, reseller, sponsor, or representative of the Meowmarism Project. Hosting providers and other operators who publicly offer servers or services built on the Software must not claim or imply any official partnership, certification, approval, or endorsement, and must accurately disclose that the service runs on Meowmarism, or a modified version of it, wherever they describe how it works.
+Running the Software, a Modified Version, or an independent version does not make the operator an official partner, reseller, sponsor, or representative of the Meowmarism Project. Hosting providers and other operators who publicly offer servers or services built on the Software must not claim or imply any official partnership, certification, approval, or endorsement.
+
+Hosting providers and other operators who use a Modified Version must accurately disclose that the service runs on a modified version of Meowmarism wherever they describe the software or control panel being used. Operators of the unmodified official Software need not mention it.
 
 ## 13. Rebranded Modified Versions
 
