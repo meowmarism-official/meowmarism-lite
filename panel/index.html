@@ -324,9 +324,8 @@
         </div>
         <div id="modsBrowse" style="display:none">
           <div class="settings-toolbar"><div><div class="card-title">Modrinth</div><div class="settings-status" id="mrNote">—</div></div>
-            <div class="settings-actions"><input class="compact-input" id="mrQuery" placeholder="Search Modrinth..." style="width:260px"><select class="compact-select" id="mrSort"><option value="relevance">Relevance</option><option value="downloads">Most downloaded</option><option value="follows">Most followed</option><option value="newest">Newest</option><option value="updated">Recently updated</option></select></div>
+            <div class="settings-actions"><select class="compact-select" id="mrKindSel" aria-label="What are you looking for?"></select><input class="compact-input" id="mrQuery" placeholder="Search Modrinth..." style="width:260px"><select class="compact-select" id="mrSort"><option value="relevance">Relevance</option><option value="downloads">Most downloaded</option><option value="follows">Most followed</option><option value="newest">Newest</option><option value="updated">Recently updated</option></select></div>
           </div>
-          <div class="mr-kinds" id="mrKinds"></div>
           <div class="mr-note" id="mrKindNote" style="display:none"></div>
           <div id="mrResults" class="mr-grid"></div>
           <div class="hint" id="mrEmpty" style="display:none;padding:10px 4px">Nothing found.</div>
@@ -2496,7 +2495,7 @@ async function mrEnsureInfo() {
 }
 const MR_KIND_LABELS = () => [['mod', t(mrInfo && mrInfo.kind === 'plugin' ? 'Plugins' : 'Mods')], ['datapack', t('Datapacks')], ['resourcepack', t('Resource packs')], ['shader', t('Shaders')], ['modpack', t('Modpacks')]];
 function mrRenderKinds() {
-  $('mrKinds').innerHTML = MR_KIND_LABELS().map(([k, label]) => `<button data-mr-kind="${k}"${k === mrKind ? ' class="on"' : ''}>${esc(label)}</button>`).join('');
+  $('mrKindSel').innerHTML = MR_KIND_LABELS().map(([k, label]) => `<option value="${k}"${k === mrKind ? ' selected' : ''}>${esc(label)}</option>`).join('');
 }
 const MR_KIND_NOTES = () => ({
   datapack: t('Datapacks are installed into the world folder and load after a restart or /reload.'),
@@ -2530,7 +2529,7 @@ async function mrSearch(reset) {
 $('mrQuery').addEventListener('input', () => { clearTimeout(mrTimer); mrTimer = setTimeout(() => mrSearch(true), 350); });
 $('mrMore').addEventListener('click', () => mrSearch(false));
 $('mrSort').addEventListener('change', () => mrSearch(true));
-$('mrKinds').addEventListener('click', (e) => { const b = e.target.closest('[data-mr-kind]'); if (b) { mrKind = b.dataset.mrKind; mrSearch(true); } });
+$('mrKindSel').addEventListener('change', () => { mrKind = $('mrKindSel').value; mrSearch(true); });
 function mrReport(d) {
   if (!d.ok) { toast(t(d.error || 'Failed'), 'error'); return; }
   const files = d.installed.filter((x) => x.file);
