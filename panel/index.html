@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="color-scheme" content="dark" />
 <script src="/i18n.js"></script>
+<script src="/core/ui/modrinth-ui.js"></script>
 <script>
 (() => {
   const m = location.pathname.match(/^\/instance\/[^/]+/);
@@ -97,68 +98,7 @@
 .modal-msg{color:var(--muted);font-size:12.5px;line-height:1.55;margin:0 0 18px;white-space:pre-line}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px}
 </style>
-<style id="mr-css">
-.mr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-@media(max-width:900px){.mr-grid{grid-template-columns:minmax(0,1fr)}}
-.mr-card{display:flex;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);cursor:pointer;min-width:0;transition:border-color .12s,background .12s}
-.mr-card:hover{border-color:var(--line2);background:var(--panel2)}
-.mr-icon{flex:0 0 52px;width:52px;height:52px;border-radius:10px;background:var(--panel2);object-fit:cover;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:var(--muted2);overflow:hidden}
-.mr-main{flex:1;min-width:0}
-.mr-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.mr-title b{font-size:14.5px}
-.mr-by{color:var(--muted2);font-size:12px}
-.mr-desc{color:var(--muted);font-size:12.5px;margin:4px 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.mr-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted2)}
-.mr-chip{padding:1px 8px;border:1px solid var(--line2);border-radius:999px;font-size:11px;color:var(--muted);white-space:nowrap}
-.mr-kinds{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
-.mr-kinds button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--muted);cursor:pointer;font:inherit;font-size:12.5px}
-.mr-kinds button:hover{border-color:var(--line2);color:var(--text)}
-.mr-kinds button.on{color:#ffb3e0;border-color:rgba(255,111,196,.5);background:rgba(255,111,196,.1)}
-.mr-note{margin:0 0 12px;padding:9px 12px;border:1px solid var(--line2);border-radius:8px;color:var(--muted);font-size:12.5px;background:var(--panel)}
-.mr-chip.warn{color:var(--yellow);border-color:rgba(212,168,79,.45);background:rgba(212,168,79,.08)}
-.mr-warn{margin:0 22px;padding:10px 12px;border:1px solid rgba(212,168,79,.45);background:rgba(212,168,79,.08);border-radius:8px;color:#e2c47a;font-size:12.5px;line-height:1.5}
-.mr-chip.rel{color:var(--green);border-color:rgba(88,185,120,.4)}
-.mr-chip.beta{color:var(--yellow);border-color:rgba(212,168,79,.4)}
-.mr-chip.alpha{color:var(--red);border-color:rgba(215,103,103,.4)}
-.mr-act{flex:0 0 auto;align-self:flex-start}
-.mr-det{width:min(880px,96vw)!important;height:min(88vh,780px);display:flex;flex-direction:column;padding:0!important;overflow:hidden}
-.mr-det>div{display:flex;flex-direction:column;min-height:0;flex:1}
-.mr-dhead{display:flex;gap:16px;padding:20px 22px 14px;align-items:flex-start;border-bottom:1px solid var(--line)}
-.mr-dhead .mr-icon{flex-basis:76px;width:76px;height:76px;border-radius:14px;font-size:26px}
-.mr-dtitle{font-size:19px;font-weight:700;letter-spacing:-.01em}
-.mr-dsub{color:var(--muted);font-size:13px;margin:3px 0 8px}
-.mr-dstats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted2);margin-bottom:8px}
-.mr-dclose{margin-left:auto}
-.mr-tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--line)}
-.mr-tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;color:var(--muted);cursor:pointer;font:inherit}
-.mr-tabs button.on{color:var(--text);border-color:var(--accent)}
-.mr-dbody{padding:18px 22px 22px;overflow-y:auto;flex:1;min-height:0}
-.mr-md{font-size:13.5px;line-height:1.65;color:#cdd3dc;word-wrap:break-word}
-.mr-md h1,.mr-md h2,.mr-md h3,.mr-md h4{margin:18px 0 8px;color:var(--text);line-height:1.3}
-.mr-md h1,.mr-md h2,.mr-md h3,.mr-md h4{font-weight:700}
-.mr-md h1{font-size:19px}.mr-md h2{font-size:16.5px}.mr-md h3,.mr-md h4{font-size:14.5px}
-.mr-md p{margin:0 0 10px}
-.mr-md ul,.mr-md ol{margin:0 0 10px;padding-left:22px}
-.mr-md li{margin:2px 0}
-.mr-md code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px}
-.mr-md pre{background:#0c0d0f;border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto;font-size:12px;margin:0 0 10px}
-.mr-md blockquote{margin:0 0 10px;padding:4px 12px;border-left:3px solid var(--line2);color:var(--muted)}
-.mr-md a{color:var(--accent)}
-.mr-md hr{border:0;border-top:1px solid var(--line);margin:14px 0}
-.mr-md-img{max-width:100%;border-radius:6px;margin:4px 0;display:block}
-.mr-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.mr-gal figure{margin:0;cursor:zoom-in}
-.mr-gal img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block;background:var(--panel2)}
-.mr-gal figcaption{font-size:11.5px;color:var(--muted2);margin-top:4px}
-.mr-ver{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
-.mr-ver b{font-size:13px}
-.mr-info{width:100%;border-collapse:collapse;font-size:13px}
-.mr-info td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
-.mr-info td:first-child{color:var(--muted2);width:150px}
-.mr-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.mr-light{position:absolute;inset:0;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;z-index:5;cursor:zoom-out;padding:20px}
-.mr-light img{max-width:100%;max-height:100%;border-radius:8px}
-</style>
+
 <style id="ed-css">
 .ed-modal{width:min(1100px,96vw);height:min(88vh,860px);background:var(--panel);border:1px solid var(--line2);border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
 .ed-head{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line)}
@@ -179,6 +119,7 @@
 .file-row td.fname{cursor:default}
 .file-row.dir td.fname{cursor:pointer}
 </style>
+<link rel="stylesheet" href="/core/ui/modrinth-ui.css">
 </head>
 <body>
 <div class="app">
@@ -322,25 +263,8 @@
         </div>
         <div class="hint" style="padding:10px 4px">Changes only take effect after a server restart.</div>
         </div>
-        <div id="modsBrowse" style="display:none">
-          <div class="settings-toolbar"><div><div class="card-title">Modrinth</div><div class="settings-status" id="mrNote">—</div></div>
-            <div class="settings-actions"><select class="compact-select" id="mrKindSel" aria-label="What are you looking for?"></select><input class="compact-input" id="mrQuery" placeholder="Search Modrinth..." style="width:260px"><select class="compact-select" id="mrSort"><option value="relevance">Relevance</option><option value="downloads">Most downloaded</option><option value="follows">Most followed</option><option value="newest">Newest</option><option value="updated">Recently updated</option></select></div>
-          </div>
-          <div class="mr-note" id="mrKindNote" style="display:none"></div>
-          <div id="mrResults" class="mr-grid"></div>
-          <div class="hint" id="mrEmpty" style="display:none;padding:10px 4px">Nothing found.</div>
-          <div style="padding:10px 0"><button class="btn" id="mrMore" style="display:none">Load more</button></div>
-          <div class="hint" style="padding:6px 4px">Changes only take effect after a server restart. Required dependencies are installed automatically. Downloads come from Modrinth and are checked against their SHA-512.</div>
-        </div>
-        <div id="modsUpdates" style="display:none">
-          <div class="settings-toolbar"><div><div class="card-title">Updates</div><div class="settings-status" id="mrUpdStatus">—</div></div>
-            <div class="settings-actions"><button class="btn" id="mrUpdRefresh">Check again</button> <button class="btn primary" id="mrUpdAll" style="display:none">Update all</button></div>
-          </div>
-          <article class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Mod</th><th>Installed</th><th>Latest</th><th></th></tr></thead><tbody id="mrUpdRows"></tbody></table></div></article>
-          <div id="mrIncompat" style="display:none;margin-top:14px"><article class="card"><div class="card-head"><div class="card-title">No compatible version</div></div><div class="card-body hint" id="mrIncompatList"></div></article></div>
-          <div class="hint" id="mrUnknown" style="padding:10px 4px"></div>
-          <div class="hint" style="padding:6px 4px">Old files are moved to the mods-old (or plugins-old) folder instead of being deleted.</div>
-        </div>
+        <div id="modsBrowse" style="display:none"></div>
+        <div id="modsUpdates" style="display:none"></div>
       </section>
 
       <section class="page" id="page-files">
@@ -2333,12 +2257,6 @@ updateHistoryModeUi();
   </div>
   <div class="modal-actions"><button class="btn" id="tkCancel">Cancel</button><button class="btn primary" id="tkSave">Save</button></div>
 </div></div>
-<div class="modal-back" id="mrDetBack"><div class="modal mr-det" role="dialog" aria-modal="true" style="position:relative"><div id="mrDet"></div></div></div>
-<div class="modal-back" id="mrVersBack"><div class="modal" role="dialog" aria-modal="true" style="width:480px">
-  <h3 class="modal-title" id="mrVersTitle">Versions</h3>
-  <div id="mrVersList" style="max-height:50vh;overflow:auto;margin:6px 0 16px;display:grid;gap:6px"></div>
-  <div class="modal-actions"><button class="btn" id="mrVersClose">Close</button></div>
-</div></div>
 <div class="modal-back" id="upgBack"><div class="modal" role="dialog" aria-modal="true" style="width:460px">
   <h3 class="modal-title" id="upgTitle">Upgrade server software</h3>
   <div id="upgForm" style="display:grid;gap:10px;margin:6px 0 16px">
@@ -2477,282 +2395,23 @@ loadSchedule();
 setInterval(() => { if (currentPage === 'schedule') loadSchedule(); }, 15000);
 
 // --- Modrinth ---
-let mrReq = 0;
-let mrInfo = null, mrOffset = 0, mrTimer = null, mrUpdates = null, mrKind = 'mod';
-let mrCtx = { installable: true, kind: 'mod' };
+const MR = MeowModrinth.mount({
+  browseEl: $('modsBrowse'),
+  updatesEl: $('modsUpdates'),
+  base: () => `${window.__BASE || ''}/api/modrinth`,
+  t, esc, toast,
+  onInstalled: () => loadMods(),
+  onUpdateCount: (n) => { $('modsUpdateCount').style.display = n ? '' : 'none'; $('modsUpdateCount').textContent = n; },
+});
 function showModsTab(tab) {
   document.querySelectorAll('[data-mods-tab]').forEach((b) => b.classList.toggle('primary', b.dataset.modsTab === tab));
   $('modsInstalled').style.display = tab === 'installed' ? '' : 'none';
   $('modsBrowse').style.display = tab === 'browse' ? '' : 'none';
   $('modsUpdates').style.display = tab === 'updates' ? '' : 'none';
-  if (tab === 'browse') mrSearch(true);
-  if (tab === 'updates') mrLoadUpdates();
+  if (tab === 'browse') MR.search(true);
+  if (tab === 'updates') MR.loadUpdates();
 }
 document.querySelectorAll('[data-mods-tab]').forEach((b) => b.addEventListener('click', () => showModsTab(b.dataset.modsTab)));
-async function mrEnsureInfo() {
-  if (!mrInfo) mrInfo = await (await fetch('/api/modrinth/info')).json();
-  return mrInfo;
-}
-const MR_KIND_LABELS = () => [['mod', t(mrInfo && mrInfo.kind === 'plugin' ? 'Plugins' : 'Mods')], ['datapack', t('Datapacks')], ['resourcepack', t('Resource packs')], ['shader', t('Shaders')], ['modpack', t('Modpacks')]];
-function mrRenderKinds() {
-  $('mrKindSel').innerHTML = MR_KIND_LABELS().map(([k, label]) => `<option value="${k}"${k === mrKind ? ' selected' : ''}>${esc(label)}</option>`).join('');
-}
-const MR_KIND_NOTES = () => ({
-  datapack: t('Datapacks are installed into the world folder and load after a restart or /reload.'),
-  resourcepack: t('Resource packs are used by players, not by the server. You can look at them here and open them on Modrinth.'),
-  shader: t('Shaders are used by players, not by the server. You can look at them here and open them on Modrinth.'),
-  modpack: t('Modpacks are used by players to set up their game. You can look at them here and open them on Modrinth.'),
-});
-async function mrSearch(reset) {
-  const my = ++mrReq;
-  const info = await mrEnsureInfo();
-  if (my !== mrReq) return;
-  if (reset) { mrOffset = 0; $('mrResults').innerHTML = ''; }
-  mrRenderKinds();
-  const note = MR_KIND_NOTES()[mrKind];
-  $('mrKindNote').style.display = note ? '' : 'none';
-  $('mrKindNote').textContent = note || '';
-  if (!(info.kinds && info.kinds[mrKind])) { $('mrNote').textContent = mrKind === 'mod' ? t('This server type has no mods or plugins on Modrinth.') : t('This server has no Minecraft version set.'); $('mrMore').style.display = 'none'; return; }
-  $('mrNote').textContent = mrKind === 'mod'
-    ? t('Showing {kind} for Minecraft {mc} ({loader}).', { kind: t(info.kind === 'plugin' ? 'plugins' : 'mods'), mc: info.mcVersion, loader: info.loader })
-    : t('Showing {kind} for Minecraft {mc}.', { kind: MR_KIND_LABELS().find(([k]) => k === mrKind)[1].toLowerCase(), mc: info.mcVersion });
-  const r = await fetch(`/api/modrinth/search?q=${encodeURIComponent($('mrQuery').value)}&offset=${mrOffset}&sort=${encodeURIComponent($('mrSort').value)}&kind=${encodeURIComponent(mrKind)}`);
-  const d = await r.json();
-  if (my !== mrReq) return;
-  if (!r.ok) { $('mrNote').textContent = t(d.error || 'Could not reach Modrinth'); return; }
-  mrCtx = { installable: d.installable !== false, kind: d.kind || mrKind };
-  $('mrResults').insertAdjacentHTML('beforeend', d.hits.map((h) => mrCard(h, mrCtx)).join(''));
-  mrOffset += d.hits.length;
-  $('mrEmpty').style.display = !mrOffset ? '' : 'none';
-  $('mrMore').style.display = d.total > mrOffset ? '' : 'none';
-}
-$('mrQuery').addEventListener('input', () => { clearTimeout(mrTimer); mrTimer = setTimeout(() => mrSearch(true), 350); });
-$('mrMore').addEventListener('click', () => mrSearch(false));
-$('mrSort').addEventListener('change', () => mrSearch(true));
-$('mrKindSel').addEventListener('change', () => { mrKind = $('mrKindSel').value; mrSearch(true); });
-function mrReport(d) {
-  if (!d.ok) { toast(t(d.error || 'Failed'), 'error'); return; }
-  const files = d.installed.filter((x) => x.file);
-  const warns = d.installed.filter((x) => x.warning);
-  toast(files.length ? t('Installed {n} file(s), restart the server to load them', { n: files.length }) : t('Already up to date'));
-  warns.forEach((w) => toast(w.warning, 'error'));
-  loadMods();
-}
-async function mrInstall(projectId, versionId) {
-  const r = await fetch('/api/modrinth/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, versionId, kind: mrKind }) });
-  const d = await r.json();
-  mrReport(d);
-  if (d.ok) {
-    document.querySelectorAll(`[data-mr-install="${CSS.escape(projectId)}"]`).forEach((btn) => {
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = t('Installed');
-      btn.replaceWith(tag);
-    });
-  } else {
-    document.querySelectorAll(`[data-mr-install="${CSS.escape(projectId)}"]`).forEach((btn) => { btn.disabled = false; });
-  }
-}
-async function mrLoadUpdates() {
-  const info = await mrEnsureInfo();
-  if (!info.supported) { $('mrUpdStatus').textContent = t('This server type has no mods or plugins on Modrinth.'); return; }
-  $('mrUpdStatus').textContent = t('Checking...');
-  const r = await fetch('/api/modrinth/updates');
-  const d = await r.json();
-  if (!r.ok) { $('mrUpdStatus').textContent = t(d.error || 'Could not reach Modrinth'); return; }
-  mrUpdates = d;
-  $('mrUpdStatus').textContent = d.updates.length ? t('{n} update(s) available', { n: d.updates.length }) : t('Everything is up to date');
-  $('mrUpdAll').style.display = d.updates.length ? '' : 'none';
-  $('modsUpdateCount').style.display = d.updates.length ? '' : 'none';
-  $('modsUpdateCount').textContent = d.updates.length;
-  $('mrUpdRows').innerHTML = d.updates.map((u) => `<tr><td>${esc(u.title)}</td><td>${esc(u.current)}</td><td>${esc(u.latest)}</td><td style="text-align:right"><button class="btn" data-mr-update="${esc(u.file)}">Update</button></td></tr>`).join('');
-  $('mrIncompat').style.display = d.incompatible.length ? '' : 'none';
-  $('mrIncompatList').textContent = d.incompatible.map((x) => `${x.title} ${x.current}`).join(', ');
-  $('mrUnknown').textContent = d.unknown.length ? t('{n} file(s) are not on Modrinth and are not checked: {names}', { n: d.unknown.length, names: d.unknown.join(', ') }) : '';
-}
-async function mrApplyUpdate(body) {
-  const r = await fetch('/api/modrinth/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  mrReport(await r.json());
-  mrLoadUpdates();
-}
-$('mrUpdRefresh').addEventListener('click', mrLoadUpdates);
-$('mrUpdAll').addEventListener('click', () => mrApplyUpdate({ all: true }));
-
-// --- Modrinth cards and project details ---
-const MR_IMG = (u) => `${window.__BASE || ''}/api/modrinth/img?u=${encodeURIComponent(u)}`;
-const mrNum = (n) => {
-  n = Number(n) || 0;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '')}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '')}k`;
-  return String(n);
-};
-const mrAgo = (iso) => {
-  const days = (Date.now() - new Date(iso).getTime()) / 864e5;
-  if (!Number.isFinite(days)) return '';
-  if (days < 1) return t('today');
-  if (days < 30) return t('{n}d ago', { n: Math.floor(days) });
-  if (days < 365) return t('{n}mo ago', { n: Math.floor(days / 30) });
-  return t('{n}y ago', { n: Math.floor(days / 365) });
-};
-const mrIcon = (icon, title, cls = '') => (icon ? `<img class="mr-icon ${cls}" alt="" loading="lazy" src="${MR_IMG(icon)}">` : `<div class="mr-icon ${cls}">${esc((title || '?').slice(0, 1).toUpperCase())}</div>`);
-const MR_LOW_DOWNLOADS = 50000;
-const mrLow = (n) => Number(n) < MR_LOW_DOWNLOADS;
-const mrChips = (list) => (list || []).map((c) => `<span class="mr-chip">${esc(c)}</span>`).join('');
-function mrCard(h, ctx) {
-  const canInstall = !ctx || ctx.installable !== false;
-  return `<article class="mr-card" data-mr-open="${esc(h.projectId)}" tabindex="0">
-    ${mrIcon(h.icon, h.title)}
-    <div class="mr-main">
-      <div class="mr-title"><b>${esc(h.title)}</b><span class="mr-by">${esc(t('by'))} ${esc(h.author)}</span></div>
-      <div class="mr-desc">${esc(h.description)}</div>
-      <div class="mr-meta"><span>${mrNum(h.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(h.follows)} ${esc(t('followers'))}</span>${h.updated ? `<span>${esc(mrAgo(h.updated))}</span>` : ''}${mrLow(h.downloads) ? `<span class="mr-chip warn" title="${esc(t('Fewer than 50,000 downloads. Fewer people have tried it, so check it before you install.'))}">${esc(t('Under 50k downloads'))}</span>` : ''}${mrChips(h.categories.slice(0, 3))}</div>
-    </div>
-    <div class="mr-act">${h.installed ? `<span class="tag">${t('Installed')}</span>` : canInstall ? `<button class="btn primary" data-mr-install="${esc(h.projectId)}">${t('Install')}</button>` : `<a class="btn" href="https://modrinth.com/${esc(ctx.kind)}/${esc(h.slug)}" target="_blank" rel="noopener noreferrer">${t('Open on Modrinth')}</a>`}</div>
-  </article>`;
-}
-
-// Modrinth descriptions are Markdown with HTML mixed in: tags are dropped, text is escaped, only https links and Modrinth CDN images survive.
-function mrMd(src) {
-  const text = String(src || '').replace(/\r/g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(?:p|div|h[1-6]|li|tr)>/gi, '\n').replace(/<[^>]*>/g, '');
-  const unesc = (v) => v.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-  const inline = (raw) => esc(raw)
-    .replace(/!\[([^\]]*)\]\((https:\/\/cdn\.modrinth\.com\/[^\s)]+)\)/g, (_, alt, u) => `<img class="mr-md-img" loading="lazy" alt="${alt}" src="${MR_IMG(unesc(u))}">`)
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[\s(])\*([^*\s][^*]*)\*(?=[\s).,!?]|$)/g, '$1<em>$2</em>');
-  const out = [];
-  let list = null;
-  let code = null;
-  let para = [];
-  const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; } };
-  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
-  for (const line of text.split('\n')) {
-    if (/^\s*```/.test(line)) {
-      if (code) { out.push(`<pre>${esc(code.join('\n'))}</pre>`); code = null; } else { flushPara(); closeList(); code = []; }
-      continue;
-    }
-    if (code) { code.push(line); continue; }
-    let m;
-    if (!line.trim()) { flushPara(); closeList(); continue; }
-    if ((m = /^(#{1,4})\s+(.*)$/.exec(line))) { flushPara(); closeList(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); continue; }
-    if (/^\s*(?:-{3,}|\*{3,})\s*$/.test(line)) { flushPara(); closeList(); out.push('<hr>'); continue; }
-    if ((m = /^\s*(?:[-*+]|(\d+)[.)])\s+(.*)$/.exec(line))) {
-      flushPara();
-      const kind = m[1] ? 'ol' : 'ul';
-      if (list !== kind) { closeList(); out.push(`<${kind}>`); list = kind; }
-      out.push(`<li>${inline(m[2])}</li>`);
-      continue;
-    }
-    if ((m = /^>\s?(.*)$/.exec(line))) { flushPara(); closeList(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); continue; }
-    closeList();
-    para.push(line.trim());
-  }
-  if (code) out.push(`<pre>${esc(code.join('\n'))}</pre>`);
-  flushPara();
-  closeList();
-  return out.join('') || `<p class="hint">${t('No description.')}</p>`;
-}
-
-const mrEnv = (v) => t({ required: 'required', optional: 'optional', unsupported: 'unsupported' }[v] || 'unknown');
-let mrDet = null;
-function mrCloseDetail() { $('mrDetBack').classList.remove('open'); mrDet = null; }
-async function mrOpenDetail(projectId) {
-  $('mrDet').innerHTML = `<div class="mr-dbody"><div class="hint">${t('Loading...')}</div></div>`;
-  $('mrDetBack').classList.add('open');
-  const token = projectId;
-  mrDet = { id: token };
-  let p, versions;
-  try {
-    const [pr, vr] = await Promise.all([fetch(`/api/modrinth/project?id=${encodeURIComponent(projectId)}`), fetch(`/api/modrinth/versions?project=${encodeURIComponent(projectId)}&kind=${encodeURIComponent(mrKind)}`)]);
-    p = await pr.json();
-    if (!pr.ok) throw new Error(p.error || 'Could not reach Modrinth');
-    versions = ((await vr.json()).versions) || [];
-  } catch (err) {
-    if (mrDet && mrDet.id === token) $('mrDet').innerHTML = `<div class="mr-dbody"><div class="hint">${esc(t(err.message))}</div><div class="mr-links"><button class="btn" data-mr-close>${t('Close')}</button></div></div>`;
-    return;
-  }
-  if (!mrDet || mrDet.id !== token) return;
-  const info = await mrEnsureInfo();
-  const tabs = ['description', 'gallery', 'versions', 'info'];
-  const labels = { description: t('Description'), gallery: t('Gallery'), versions: t('Versions'), info: t('Info') };
-  const authors = p.team.map((m) => m.name).filter(Boolean);
-  const ext = (href, label) => (href ? `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>` : '');
-  const panes = {
-    description: `<div class="mr-md">${mrMd(p.body)}</div>`,
-    gallery: p.gallery.length
-      ? `<div class="mr-gal">${p.gallery.map((g) => `<figure data-mr-light="${esc(g.url)}"><img loading="lazy" alt="${esc(g.title || '')}" src="${MR_IMG(g.url)}">${g.title ? `<figcaption>${esc(g.title)}</figcaption>` : ''}</figure>`).join('')}</div>`
-      : `<div class="hint">${t('No images.')}</div>`,
-    versions: versions.length
-      ? `<div class="hint" style="margin-bottom:10px">${esc(t('Compatible versions for Minecraft {mc}', { mc: info.mcVersion }))}</div>${versions.map((v) => `<div class="mr-ver"><div style="min-width:0"><b>${esc(v.name || v.number)}</b> <span class="mr-chip ${v.channel === 'release' ? 'rel' : v.channel}">${esc(v.channel)}</span>
-          <div class="hint" style="margin-top:3px">${esc(v.number)} · ${esc((v.gameVersions || []).join(', '))} · ${esc(mrAgo(v.published))} · ${mrNum(v.downloads)} ${esc(t('downloads'))}${v.size ? ` · ${(v.size / 1048576).toFixed(1)} MB` : ''}</div></div>
-          ${p.installable === false ? '' : `<button class="btn" data-mr-pick="${esc(v.id)}" data-mr-project="${esc(p.projectId)}">${t('Install')}</button>`}</div>`).join('')}`
-      : `<div class="hint">${t('No compatible versions.')}</div>`,
-    info: `<table class="mr-info"><tbody>
-      <tr><td>${t('License')}</td><td>${esc(p.license ? (p.license.name || p.license.id || '-') : '-')}</td></tr>
-      <tr><td>${t('Loaders')}</td><td>${mrChips(p.loaders) || '-'}</td></tr>
-      <tr><td>${t('Environment')}</td><td>${esc(t('Client'))}: ${esc(mrEnv(p.environment.client))} · ${esc(t('Server'))}: ${esc(mrEnv(p.environment.server))}</td></tr>
-      <tr><td>${t('Minecraft versions')}</td><td>${esc(p.gameVersions.join(', ') || '-')}</td></tr>
-      <tr><td>${t('Published')}</td><td>${esc(p.published ? new Date(p.published).toLocaleDateString() : '-')}</td></tr>
-      <tr><td>${t('Updated')}</td><td>${esc(p.updated ? new Date(p.updated).toLocaleDateString() : '-')}</td></tr>
-      <tr><td>${t('Team')}</td><td>${esc(p.team.map((m) => `${m.name}${m.role ? ` (${m.role})` : ''}`).join(', ') || '-')}</td></tr>
-      </tbody></table>
-      <div class="mr-links">${ext(p.links.site, t('Open on Modrinth'))}${ext(p.links.source, t('Source code'))}${ext(p.links.issues, t('Issues'))}${ext(p.links.wiki, t('Wiki'))}${ext(p.links.discord, 'Discord')}</div>`,
-  };
-  $('mrDet').innerHTML = `<div class="mr-dhead">${mrIcon(p.icon, p.title)}
-      <div style="min-width:0;flex:1"><div class="mr-dtitle">${esc(p.title)}</div>
-        <div class="mr-dsub">${esc(p.description)}</div>
-        <div class="mr-dstats"><span>${authors.length ? `${esc(t('by'))} ${esc(authors.join(', '))}` : ''}</span><span>${mrNum(p.downloads)} ${esc(t('downloads'))}</span><span>${mrNum(p.followers)} ${esc(t('followers'))}</span>${p.updated ? `<span>${esc(t('Updated'))} ${esc(mrAgo(p.updated))}</span>` : ''}</div>
-        <div class="mr-meta">${mrChips(p.categories)}</div></div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${p.installed ? `<span class="tag">${t('Installed')}</span>` : p.installable === false ? `<a class="btn primary" href="${esc(p.links.site)}" target="_blank" rel="noopener noreferrer">${t('Open on Modrinth')}</a>` : `<button class="btn primary" data-mr-install="${esc(p.projectId)}">${t('Install')}</button>`}<button class="btn" data-mr-close>${t('Close')}</button></div></div>
-    ${mrLow(p.downloads) ? `<div class="mr-warn" style="margin-top:12px">${esc(t('This project has fewer than 50,000 downloads. Fewer people have tried it, so read the description, look at the source code and be careful with the files you install.'))}</div>` : ''}
-    <div class="mr-tabs">${tabs.map((k, i) => `<button data-mr-tab="${k}"${i ? '' : ' class="on"'}>${esc(labels[k])}</button>`).join('')}</div>
-    <div class="mr-dbody" id="mrDetBody">${panes.description}</div>`;
-  mrDet.panes = panes;
-}
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('mrDetBack').classList.contains('open')) mrCloseDetail(); });
-$('mrDetBack').addEventListener('click', (e) => { if (e.target === $('mrDetBack')) mrCloseDetail(); });
-document.addEventListener('click', (e) => {
-  if (e.target.closest('[data-mr-close]')) { mrCloseDetail(); return; }
-  const tab = e.target.closest('[data-mr-tab]');
-  if (tab && mrDet && mrDet.panes) {
-    document.querySelectorAll('[data-mr-tab]').forEach((b) => b.classList.toggle('on', b === tab));
-    $('mrDetBody').innerHTML = mrDet.panes[tab.dataset.mrTab];
-    return;
-  }
-  const light = e.target.closest('[data-mr-light]');
-  if (light) {
-    const box = document.createElement('div');
-    box.className = 'mr-light';
-    box.innerHTML = `<img alt="" src="${MR_IMG(light.dataset.mrLight)}">`;
-    box.addEventListener('click', () => box.remove());
-    $('mrDet').parentNode.appendChild(box);
-    return;
-  }
-  const card = e.target.closest('[data-mr-open]');
-  if (card && !e.target.closest('button, a')) mrOpenDetail(card.dataset.mrOpen);
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-mr-open]')) mrOpenDetail(e.target.dataset.mrOpen);
-});
-$('mrVersClose').addEventListener('click', () => $('mrVersBack').classList.remove('open'));
-document.addEventListener('click', async (e) => {
-  const inst = e.target.closest('[data-mr-install]');
-  const vers = e.target.closest('[data-mr-versions]');
-  const upd = e.target.closest('[data-mr-update]');
-  const pick = e.target.closest('[data-mr-pick]');
-  if (inst) { inst.disabled = true; await mrInstall(inst.dataset.mrInstall); }
-  if (upd) { upd.disabled = true; await mrApplyUpdate({ files: [upd.dataset.mrUpdate] }); }
-  if (vers) {
-    $('mrVersTitle').textContent = vers.dataset.mrTitle;
-    $('mrVersList').innerHTML = `<div class="hint">${t('Loading...')}</div>`;
-    $('mrVersBack').classList.add('open');
-    const d = await (await fetch(`/api/modrinth/versions?project=${encodeURIComponent(vers.dataset.mrVersions)}`)).json();
-    $('mrVersList').innerHTML = (d.versions || []).map((v) => `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 10px"><div><b>${esc(v.number)}</b> <span class="tag">${esc(v.channel)}</span><div class="hint">${esc(v.file || '')}</div></div><button class="btn" data-mr-pick="${esc(v.id)}" data-mr-project="${esc(vers.dataset.mrVersions)}">Install</button></div>`).join('') || `<div class="hint">${t('No compatible versions.')}</div>`;
-  }
-  if (pick) { pick.disabled = true; $('mrVersBack').classList.remove('open'); await mrInstall(pick.dataset.mrProject, pick.dataset.mrPick); }
-});
 
 // --- Server software upgrade ---
 const CTRL = location.origin + '/_meta';

@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "c2ed7b877e7dc3659b9521a045317bf9a39dbd57",
+  "commit": "133f5cac91b64be3e997a71a6b52997e3311e084",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -23,6 +23,8 @@
     "panel/core/modules/runtime-contract.js",
     "panel/core/modules/safety.js",
     "panel/core/modules/scheduler.js",
-    "panel/core/ui/loaders.js"
+    "panel/core/ui/loaders.js",
+    "panel/core/ui/modrinth-ui.css",
+    "panel/core/ui/modrinth-ui.js"
   ]
 }
