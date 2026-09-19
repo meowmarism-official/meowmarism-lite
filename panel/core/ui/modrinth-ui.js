@@ -283,7 +283,14 @@
     if (pick) { pick.disabled = true; $('mrDetBack').classList.remove('open'); await mrInstall(pick.dataset.mrProject, pick.dataset.mrPick); }
   });
 
-    return { search: mrSearch, loadUpdates: mrLoadUpdates };
+    // Another instance is shown: forget what was loaded for the previous one.
+    function mrReset() {
+      mrInfo = null; mrOffset = 0; mrKind = 'mod'; mrUpdates = null; mrReq++;
+      $('mrResults').innerHTML = ''; $('mrQuery').value = ''; $('mrUpdRows').innerHTML = '';
+      $('mrDetBack').classList.remove('open');
+    }
+
+    return { search: mrSearch, loadUpdates: mrLoadUpdates, reset: mrReset };
   }
   window.MeowModrinth = { mount };
 })();
