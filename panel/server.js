@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const cfg = require('./lib/config');
 const launchLib = require('./runtime/launch');
 const scheduler = require('./core/modules/scheduler');
+const { runTask } = require('./core/modules/schedule-run');
 const { createModrinth, fetchImage } = require('./core/modules/modrinth');
 const {
   SERVER_DIR, LOG_FILE, PROPERTIES_FILE, WORLD_DIR, BACKUP_DIR, CONFIG_FILE,
@@ -731,27 +732,12 @@ function checkAutoRestart() {
 setInterval(checkAutoRestart, 30000).unref();
 
 function runScheduledTask(task) {
-  const a = task.action;
-  let result = 'done';
-  const running = runtime.isRunning();
-  if (a.type === 'backup') {
-    Promise.resolve(createBackup('scheduled')).catch((err) => pushAudit('schedule.error', 'server', `${task.name} · ${err.message}`));
-    result = 'backup started';
-  } else if (a.type === 'start') {
-    result = running ? 'skipped (already running)' : (runtime.start() ? 'started' : 'could not start');
-  } else if (!running) {
-    result = 'skipped (server not running)';
-  } else if (a.type === 'restart') {
-    scheduleRestart(a.warnSec || 0, `Scheduled: ${task.name}`, true);
-    result = 'restart scheduled';
-  } else if (a.type === 'stop') {
-    if (a.warnSec > 0) { runtime.command(`say Server stops in ${a.warnSec}s`); setTimeout(() => runtime.stop('scheduled'), a.warnSec * 1000); }
-    else runtime.stop('scheduled');
-    result = 'stop requested';
-  } else if (a.type === 'command') {
-    runtime.command(a.command);
-    result = 'command sent';
-  }
+  const result = runTask(task, {
+    runtime,
+    createBackup,
+    restart: (warnSec, reason) => scheduleRestart(warnSec, reason, true),
+    onError: (err) => pushAudit('schedule.error', 'server', `${task.name} · ${err.message}`),
+  });
   task.lastRunAt = Date.now();
   task.lastResult = result;
   savePanelConfig();
