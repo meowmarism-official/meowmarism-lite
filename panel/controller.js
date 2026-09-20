@@ -9,7 +9,14 @@
 // process lifecycle (start/stop/restart a worker). Once an instance is
 // running, its full dashboard lives at the worker's own port - the
 // controller just links you there.
-try { require('./lib/updateguard').bootCheck(__dirname); } catch (_) {}
+const updater = require('./core/modules/updater').createUpdater({
+  repo: 'meowmarism-official/meowmarism-lite',
+  panelDir: __dirname,
+  statePrefix: '.meowmarism',
+  probePath: '/auth/status',
+  hooks: { stop: stopServersForUpdate, restore: restoreAfterFailedUpdate },
+});
+try { updater.bootCheck(); } catch (_) {}
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -23,11 +30,9 @@ const launchLib = require('./runtime/launch');
 const net = require('net');
 const { checkDeletableDir } = require('./core/modules/safety');
 const { parseCookies, currentSession, createSession, deleteSession, sessions, SESSION_COOKIE, SESSION_MAX_AGE_MS } = require('./lib/auth');
-const updateGuard = require('./lib/updateguard');
 const { createLoginLimiter } = require('./core/modules/ratelimit');
 const loginLimiter = createLoginLimiter();
 
-const RELEASES_REPO = 'meowmarism-official/meowmarism-lite';
 const DATA_ROOT = process.env.MEOWMARISM_DATA_DIR || path.join(os.homedir(), 'meowmarism');
 const INSTANCES_ROOT = path.join(DATA_ROOT, 'instances');
 const CONTROLLER_PORT = Number(process.env.CONTROLLER_PORT) || 8090;
@@ -378,9 +383,7 @@ async function installServerSoftware(loader, mcVersion, loaderVersion, ramMB, di
 const workers = new Map(); // instanceId -> { proc, port, logs: [] }
 const panelCrashes = new Map(); // instanceId -> { code, signal, at, logs } - last time the worker process itself died on/right after start
 let instanceCreateInProgress = false;
-let versionCache = null; // { at, tag } - GitHub latest-release lookup, refreshed every 10 min
 const RESTART_FILE = path.join(os.homedir(), '.meowmarism-restart.json');
-const updateState = { running: false, error: null, step: null };
 const panelSettings = createPanelSettings({ file: path.join(os.homedir(), '.meowmarism-controller-settings.json') });
 const { load: loadSettings, save: saveSettings, clientIp, isHttps } = panelSettings;
 function instanceAutoStarts(inst) {
@@ -396,80 +399,8 @@ async function runningInstanceNames() {
   return names;
 }
 
-async function fetchLatestTag() {
-  const tags = JSON.parse(await httpsGetText(`https://api.github.com/repos/${RELEASES_REPO}/tags?per_page=100`));
-  const parse = (t) => (/^v?(\d+)\.(\d+)\.(\d+)$/.exec(t) || []).slice(1).map(Number);
-  const valid = tags.map((t) => t.name).filter((n) => parse(n).length === 3);
-  valid.sort((a, b) => { const x = parse(a), y = parse(b); return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]); });
-  return valid[0] || null;
-}
-
-async function refreshVersionCache() {
-  const cache = { at: Date.now(), tag: null, publishedAt: null, url: null };
-  cache.tag = await fetchLatestTag();
-  if (cache.tag) {
-    cache.url = `https://github.com/${RELEASES_REPO}/releases/tag/${cache.tag}`;
-    try {
-      const r = JSON.parse(await httpsGetText(`https://api.github.com/repos/${RELEASES_REPO}/releases/tags/${cache.tag}`));
-      cache.publishedAt = r.published_at || null;
-    } catch (_) {}
-  }
-  versionCache = cache;
-}
-
-function probeNewVersion(panelDir) {
-  return new Promise((resolve) => {
-    const port = 21000 + Math.floor(Math.random() * 20000);
-    const child = spawn(process.execPath, [path.join(panelDir, 'controller.js')], {
-      env: { ...process.env, MEOW_PROBE: '1', CONTROLLER_PORT: String(port), MEOWMARISM_HOST: '127.0.0.1' },
-      stdio: 'ignore',
-    });
-    let done = false;
-    const finish = (ok) => {
-      if (done) return;
-      done = true;
-      clearInterval(poll);
-      clearTimeout(limit);
-      try { child.kill('SIGTERM'); } catch (_) {}
-      resolve(ok);
-    };
-    child.on('exit', () => finish(false));
-    const poll = setInterval(() => {
-      http.get({ host: '127.0.0.1', port, path: '/auth/status', timeout: 1500 }, (res) => { res.resume(); if (res.statusCode === 200) finish(true); }).on('error', () => {});
-    }, 500);
-    const limit = setTimeout(() => finish(false), 25000);
-  });
-}
-
-function checkSyntax(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) checkSyntax(full);
-    else if (entry.name.endsWith('.js')) execFileSync(process.execPath, ['--check', full], { stdio: 'ignore' });
-  }
-}
-
-async function selfUpdate() {
-  updateState.step = 'Looking up the latest release';
-  const tag = process.env.MEOW_UPDATE_TAG || await fetchLatestTag();
-  if (!tag) throw new Error('no release found');
-  const installDir = path.resolve(__dirname, '..');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meowmarism-update-'));
-  const tarball = path.join(tmp, 'release.tar.gz');
-  updateState.step = 'Downloading';
-  if (process.env.MEOW_UPDATE_TARBALL) fs.copyFileSync(process.env.MEOW_UPDATE_TARBALL, tarball);
-  else await downloadFile(`https://github.com/${RELEASES_REPO}/archive/refs/tags/${tag}.tar.gz`, tarball);
-  updateState.step = 'Checking the download';
-  await new Promise((resolve, reject) => {
-    const p = spawn('tar', ['-xzf', tarball, '-C', tmp]);
-    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('could not extract the release'))));
-    p.on('error', reject);
-  });
-  const extracted = fs.readdirSync(tmp).find((n) => n.startsWith('meowmarism-') && fs.statSync(path.join(tmp, n)).isDirectory());
-  if (!extracted || !fs.existsSync(path.join(tmp, extracted, 'panel', 'controller.js'))) throw new Error('unexpected release layout');
-  try { checkSyntax(path.join(tmp, extracted, 'panel')); } catch (_) { throw new Error('the downloaded release failed its syntax check'); }
-
-  updateState.step = 'Stopping servers';
+// Update hooks: servers are stopped before the panel files are swapped and started again if the swap fails.
+async function stopServersForUpdate() {
   const running = await runningInstanceNames();
   fs.writeFileSync(RESTART_FILE, JSON.stringify(running));
   for (const inst of loadInstances()) if (running.includes(inst.name)) await workerAction(inst.panelPort, '/stop');
@@ -480,48 +411,12 @@ async function selfUpdate() {
     w.proc.once('exit', () => { clearTimeout(t); resolve(); });
     w.proc.kill('SIGTERM');
   })));
-
-  updateState.step = 'Installing';
-  const livePanel = path.join(installDir, 'panel');
-  const newPanel = path.join(installDir, 'panel.new');
-  const oldPanel = path.join(installDir, 'panel.old');
-  let fromVersion = null;
-  try { fromVersion = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf8')).version; } catch (_) {}
-  const restoreWorkers = () => {
-    for (const inst of loadInstances()) startWorker(inst);
-    setTimeout(() => { for (const inst of loadInstances()) if (running.includes(inst.name)) workerAction(inst.panelPort, '/start'); }, 3000);
-    try { fs.unlinkSync(RESTART_FILE); } catch (_) {}
-  };
-  try {
-    fs.rmSync(newPanel, { recursive: true, force: true });
-    fs.rmSync(oldPanel, { recursive: true, force: true });
-    fs.cpSync(path.join(tmp, extracted, 'panel'), newPanel, { recursive: true });
-    fs.renameSync(livePanel, oldPanel);
-    try {
-      fs.renameSync(newPanel, livePanel);
-    } catch (err) {
-      fs.renameSync(oldPanel, livePanel);
-      throw err;
-    }
-    try { fs.copyFileSync(path.join(installDir, 'package.json'), path.join(installDir, 'package.json.old')); } catch (_) {}
-    fs.copyFileSync(path.join(tmp, extracted, 'package.json'), path.join(installDir, 'package.json'));
-  } catch (err) {
-    restoreWorkers();
-    throw new Error(`installing failed, the old version is still active (${err.message})`);
-  }
-
-  updateState.step = 'Testing the new version';
-  if (!(await probeNewVersion(livePanel))) {
-    updateGuard.rollbackInstall(installDir, 'the new version failed its start test', fromVersion, tag);
-    fs.rmSync(path.join(installDir, 'panel.failed'), { recursive: true, force: true });
-    restoreWorkers();
-    throw new Error('the new version failed its start test, the old version is still active');
-  }
-  updateGuard.clearResult();
-  updateGuard.writeMarker(fromVersion, tag);
-  fs.rmSync(tmp, { recursive: true, force: true });
-  updateState.step = 'Restarting';
-  process.exit(0);
+  return running;
+}
+function restoreAfterFailedUpdate(running) {
+  for (const inst of loadInstances()) startWorker(inst);
+  setTimeout(() => { for (const inst of loadInstances()) if (running.includes(inst.name)) workerAction(inst.panelPort, '/start'); }, 3000);
+  try { fs.unlinkSync(RESTART_FILE); } catch (_) {}
 }
 
 // Live view of the instance currently being created, so the wizard can show
@@ -769,39 +664,18 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/update' && req.method === 'POST') {
     if (!canPanel(req, 'update')) { sendJson(res, 403, { error: 'not allowed to update' }); return; }
-    if (updateState.running) { sendJson(res, 409, { error: 'an update is already running' }); return; }
-    updateState.running = true;
-    updateState.error = null;
+    if (!updater.start()) { sendJson(res, 409, { error: 'an update is already running' }); return; }
     sendJson(res, 202, { ok: true });
-    selfUpdate().catch((err) => { updateState.running = false; updateState.step = null; updateState.error = err.message || 'update failed'; });
     return;
   }
   if (url.pathname === '/api/update-status' && req.method === 'GET') {
-    sendJson(res, 200, { ...updateState, lastResult: updateGuard.lastResult() });
+    sendJson(res, 200, updater.status());
     return;
   }
 
   if ((url.pathname === '/api/version' || url.pathname === '/_meta/version') && req.method === 'GET') {
-    let localVersion = null;
-    try { localVersion = require(path.join(__dirname, '..', 'package.json')).version; } catch (_) {}
-    const force = url.searchParams.get('refresh') === '1' && (!versionCache || Date.now() - versionCache.at > 30 * 1000);
-    let checkError = null;
-    if (force || !versionCache || Date.now() - versionCache.at > 5 * 60 * 1000) {
-      try { await refreshVersionCache(); } catch (err) { checkError = err.message || 'could not reach GitHub'; }
-    }
-    const latestTag = versionCache?.tag || null;
-    const latestVersion = latestTag ? latestTag.replace(/^v/, '') : null;
-    sendJson(res, 200, {
-      version: localVersion,
-      latestVersion,
-      publishedAt: versionCache?.publishedAt || null,
-      releaseUrl: versionCache?.url || `https://github.com/${RELEASES_REPO}/releases/latest`,
-      checkedAt: versionCache?.at || null,
-      checkError,
-      updateAvailable: !!(localVersion && latestVersion && latestVersion !== localVersion),
-      canUpdate: canPanel(req, 'update'),
-      running: await runningInstanceNames(),
-    });
+    const info = await updater.versionInfo(url.searchParams.get('refresh') === '1');
+    sendJson(res, 200, { ...info, canUpdate: canPanel(req, 'update'), running: await runningInstanceNames() });
     return;
   }
 
@@ -1111,7 +985,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(CONTROLLER_PORT, process.env.MEOWMARISM_HOST || '0.0.0.0', () => {
   console.log(`controller listening on :${CONTROLLER_PORT}`);
   if (process.env.MEOW_PROBE) return;
-  updateGuard.confirmHealthy(__dirname);
+  updater.confirmHealthy();
   // Workers always start; the MC server starts only for autoStart or pre-update running instances.
   for (const inst of loadInstances()) startWorker(inst);
   let names = [];
