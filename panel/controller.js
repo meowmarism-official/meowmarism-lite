@@ -45,6 +45,7 @@ const CONTROLLER_USERS_FILE = path.join(os.homedir(), '.meowmarism-controller-us
 const { createUserStore, effectiveCaps, hasPanelCap } = require('./lib/db');
 const { createUsersApi } = require('./core/modules/users-api');
 const { createPanelSettings } = require('./core/modules/panel-settings');
+const systemInfo = require('./core/modules/system-info');
 const controllerUsers = createUserStore(CONTROLLER_USERS_FILE);
 const usersApi = createUsersApi({ store: controllerUsers, session: (req) => currentSession(req) });
 
@@ -679,6 +680,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/system-info' && req.method === 'GET') {
+    if (!canPanel(req, 'users')) { sendJson(res, 403, { error: 'not allowed' }); return; }
+    sendJson(res, 200, systemInfo.collect({ dir: __dirname }));
+    return;
+  }
+
   if (url.pathname === '/api/settings' && req.method === 'GET') {
     if (!canPanel(req, 'users')) { sendJson(res, 403, { error: 'not allowed to change settings' }); return; }
     sendJson(res, 200, loadSettings());
@@ -712,7 +719,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (['/', '/server', '/users', '/update', '/settings'].includes(url.pathname) && req.method === 'GET') {
+  if (['/', '/server', '/users', '/update', '/settings', '/system'].includes(url.pathname) && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(path.join(__dirname, 'controller.html')));
     return;

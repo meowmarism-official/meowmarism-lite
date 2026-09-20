@@ -1,6 +1,6 @@
 // The panel frame every product shares: sidebar, Settings and Update pages, page switching and the version indicator.
 // cfg: { edition, repo, serverLabel, brandSub?, logoutHref?, updateHint, paths? (page -> URL path, enables history),
-//   urls: { version, update, updateStatus, settings }, t, esc, confirm(title, message, label), pagesEl,
+//   urls: { version, update, updateStatus, settings, system? }, t, esc, confirm(title, message, label), pagesEl,
 //   onPage(page), onLogout?() }
 (function () {
   function mount(cfg) {
@@ -34,6 +34,10 @@
     <button class="side-item" data-page="settings" id="navSettings" style="display:none" title="Settings">
       <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
       <span class="side-label">Settings</span>
+    </button>
+    <button class="side-item" data-page="system" id="navSystem" style="display:none" title="System">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+      <span class="side-label">System</span>
     </button>
     <button class="side-item" data-page="update" id="navUpdate" title="Update">
       <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -84,6 +88,16 @@
     </div>
   </section>
 
+  <section class="page" id="page-system">
+    <div class="topbar">
+      <div>
+        <h1>System</h1>
+        <p class="sub">The machine running this panel.</p>
+      </div>
+    </div>
+    <div id="systemRoot"></div>
+  </section>
+
   <section class="page" id="page-update">
     <div class="topbar">
       <div>
@@ -120,13 +134,15 @@
     });
     if (cfg.onLogout) $('navLogout').addEventListener('click', cfg.onLogout);
 
-    const PAGES = ['server', 'users', 'settings', 'update'];
+    const PAGES = ['server', 'users', 'settings', 'system', 'update'];
+    const system = cfg.urls.system && window.MeowSystem ? MeowSystem.mount({ el: $('systemRoot'), load: async () => (await fetch(cfg.urls.system)).json(), t, esc }) : null;
     function showPage(page, { push = true } = {}) {
-      if (!PAGES.includes(page) || ((page === 'users' || page === 'settings') && !panel.users)) page = 'server';
+      if (!PAGES.includes(page) || ((page === 'users' || page === 'settings' || page === 'system') && (!panel.users || (page === 'system' && !system)))) page = 'server';
       document.querySelectorAll('.side-item[data-page]').forEach((b) => b.classList.toggle('active', b.dataset.page === page));
       document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `page-${page}`));
       if (cfg.paths && push && location.pathname !== cfg.paths[page]) history.pushState({}, '', cfg.paths[page]);
       if (page === 'settings') loadSettingsPage();
+      if (page === 'system') system.load();
       if (page === 'update') loadUpdatePage();
       if (cfg.onPage) cfg.onPage(page);
     }
@@ -220,6 +236,7 @@
       $('sideAvatar').textContent = account.username ? account.username.slice(0, 1) : '?';
       $('navUsers').style.display = panel.users ? '' : 'none';
       $('navSettings').style.display = panel.users ? '' : 'none';
+      $('navSystem').style.display = panel.users && system ? '' : 'none';
       refreshUpdateIndicator();
     }
 

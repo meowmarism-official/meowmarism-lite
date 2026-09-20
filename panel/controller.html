@@ -12,6 +12,7 @@
 <script src="/i18n.js"></script>
 <script src="/core/ui/loaders.js"></script>
 <script src="/core/ui/instances-ui.js"></script>
+<script src="/core/ui/system-ui.js"></script>
 <script src="/core/ui/shell.js"></script>
 <script src="/core/ui/wizard-ui.js"></script>
 <script src="/core/ui/users-ui.js"></script>
@@ -97,8 +98,8 @@ const SHELL = MeowShell.mount({
   brandSub: 'Official version',
   logoutHref: '/auth/logout',
   updateHint: 'Updating stops running servers briefly, installs the newest release, and starts the ones that were running again.',
-  paths: { server: '/server', users: '/users', settings: '/settings', update: '/update' },
-  urls: { version: '/api/version', update: '/api/update', updateStatus: '/api/update-status', settings: '/api/settings' },
+  paths: { server: '/server', users: '/users', settings: '/settings', system: '/system', update: '/update' },
+  urls: { version: '/api/version', update: '/api/update', updateStatus: '/api/update-status', settings: '/api/settings', system: '/api/system-info' },
   t: window.t, esc,
   confirm: (title, message, label) => modalConfirm(title, message, label),
   pagesEl: document.querySelector('.wrap'),

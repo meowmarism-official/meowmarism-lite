@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "91eeb3b8e271f5605a6531cafa335c7cb9e4c371",
+  "commit": "414f51384a8c680b2109eca01fcec7b33bb3176c",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -30,6 +30,7 @@
     "panel/core/modules/safety.js",
     "panel/core/modules/schedule-run.js",
     "panel/core/modules/scheduler.js",
+    "panel/core/modules/system-info.js",
     "panel/core/modules/updater.js",
     "panel/core/modules/users-api.js",
     "panel/core/modules/users.js",
@@ -59,6 +60,7 @@
     "panel/core/ui/settings-ui.js",
     "panel/core/ui/shell.js",
     "panel/core/ui/sidebar.css",
+    "panel/core/ui/system-ui.js",
     "panel/core/ui/users-ui.css",
     "panel/core/ui/users-ui.js",
     "panel/core/ui/wizard-ui.js",
