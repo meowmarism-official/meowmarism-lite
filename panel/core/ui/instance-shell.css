@@ -80,3 +80,4 @@
 .side-meta a:hover{color:var(--text)}
 .side-dot{position:absolute;top:9px;left:15px;width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 0 2px var(--panel)}
 .back-link.gh svg{fill:currentColor;stroke:none}
+.nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
