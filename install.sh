@@ -136,10 +136,24 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
 fi
 ok "Using $(node -v)"
 
+# Latest vX.Y.Z tag. git and the tags page have no API rate limit; the GitHub API is the last resort.
+latest_tag() {
+  local t=""
+  if command -v git >/dev/null 2>&1; then
+    t="$(git ls-remote --tags --refs "https://github.com/${REPO}.git" 2>/dev/null | sed -E 's#.*refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+  fi
+  if [ -z "$t" ]; then
+    t="$(curl -fsSL "https://github.com/${REPO}/tags" 2>/dev/null | grep -oE '/releases/tag/v[0-9]+\.[0-9]+\.[0-9]+' | sed 's#.*/##' | sort -V | tail -1 || true)"
+  fi
+  if [ -z "$t" ]; then
+    t="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=100" 2>/dev/null | grep '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+  fi
+  printf '%s' "$t"
+}
+
 step "Finding the latest release"
-TAGS_JSON="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=100")"
-TAG="$(echo "$TAGS_JSON" | grep '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
-[ -n "$TAG" ] || die "could not determine the latest release tag from GitHub. Check https://github.com/${REPO}/releases manually."
+TAG="$(latest_tag)"
+[ -n "$TAG" ] || die "could not find the latest release (GitHub may be limiting requests from this address, try again in a few minutes). See https://github.com/${REPO}/tags"
 info "latest release: $TAG"
 
 LATEST_VERSION="${TAG#v}"
