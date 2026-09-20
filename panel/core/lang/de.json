@@ -762,7 +762,21 @@
   "Running": "Läuft",
   "Memory in use": "Speicher in Benutzung",
   "CPU in use": "CPU in Benutzung",
-  "No instances yet - create your first server with the + button.": "Noch keine Instanzen - erstelle deinen ersten Server mit dem +-Knopf."
+  "No instances yet - create your first server with the + button.": "Noch keine Instanzen - erstelle deinen ersten Server mit dem +-Knopf.",
+  "Custom access": "Eigener Zugriff",
+  "Enter a password": "Gib ein Passwort ein",
+  "Failed to add user": "Benutzer konnte nicht hinzugefügt werden",
+  "Failed to change the password": "Passwort konnte nicht geändert werden",
+  "Failed to save": "Speichern fehlgeschlagen",
+  "Leave blank to keep the current one": "Leer lassen, um das aktuelle zu behalten",
+  "No accounts yet.": "Noch keine Konten.",
+  "No default access": "Kein Standardzugriff",
+  "Not allowed.": "Nicht erlaubt.",
+  "Panel": "Panel",
+  "Password must be at least 8 characters": "Das Passwort muss mindestens 8 Zeichen haben",
+  "Passwords don't match": "Die Passwörter stimmen nicht überein",
+  "Username: 3-32 letters, digits, . _ -": "Benutzername: 3-32 Buchstaben, Ziffern, . _ -",
+  "will not be able to log in anymore.": "kann sich nicht mehr anmelden."
  },
  "patterns": [
   [

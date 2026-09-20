@@ -144,7 +144,21 @@
   "Filter mods...": "Filtrar mods...",
   "Server settings saved": "Ajustes del servidor guardados",
   "Server restart requested": "Reinicio del servidor solicitado",
-  "Online now": "Conectados ahora"
+  "Online now": "Conectados ahora",
+  "Custom access": "Acceso personalizado",
+  "Enter a password": "Introduce una contraseña",
+  "Failed to add user": "No se pudo añadir el usuario",
+  "Failed to change the password": "No se pudo cambiar la contraseña",
+  "Failed to save": "No se pudo guardar",
+  "Leave blank to keep the current one": "Déjalo vacío para mantener el actual",
+  "No accounts yet.": "Aún no hay cuentas.",
+  "No default access": "Sin acceso predeterminado",
+  "Not allowed.": "No permitido.",
+  "Panel": "Panel",
+  "Password must be at least 8 characters": "La contraseña debe tener al menos 8 caracteres",
+  "Passwords don't match": "Las contraseñas no coinciden",
+  "Username: 3-32 letters, digits, . _ -": "Usuario: 3-32 letras, dígitos, . _ -",
+  "will not be able to log in anymore.": "ya no podrá iniciar sesión."
  },
  "patterns": []
 }
