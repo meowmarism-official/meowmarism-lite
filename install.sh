@@ -140,13 +140,13 @@ ok "Using $(node -v)"
 latest_tag() {
   local t=""
   if command -v git >/dev/null 2>&1; then
-    t="$(git ls-remote --tags --refs "https://github.com/${REPO}.git" 2>/dev/null | sed -E 's#.*refs/tags/##' | grep -E '^v[0-9]+(.[0-9]+){2,3}$' | sort -V | tail -1 || true)"
+    t="$(git ls-remote --tags --refs "https://github.com/${REPO}.git" 2>/dev/null | sed -E 's#.*refs/tags/##' | grep -E '^v[0-9]+(\.[0-9]+){2,3}$' | sort -V | tail -1 || true)"
   fi
   if [ -z "$t" ]; then
-    t="$(curl -fsSL "https://github.com/${REPO}/tags" 2>/dev/null | grep -oE '/releases/tag/v[0-9]+(.[0-9]+){2,3}' | sed 's#.*/##' | sort -V | tail -1 || true)"
+    t="$(curl -fsSL "https://github.com/${REPO}/tags" 2>/dev/null | grep -oE '/releases/tag/v[0-9]+(\.[0-9]+){2,3}' | sed 's#.*/##' | sort -V | tail -1 || true)"
   fi
   if [ -z "$t" ]; then
-    t="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=100" 2>/dev/null | grep '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/' | grep -E '^v[0-9]+(.[0-9]+){2,3}$' | sort -V | tail -1 || true)"
+    t="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=100" 2>/dev/null | grep '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/' | grep -E '^v[0-9]+(\.[0-9]+){2,3}$' | sort -V | tail -1 || true)"
   fi
   printf '%s' "$t"
 }
