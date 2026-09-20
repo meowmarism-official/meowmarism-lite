@@ -64,7 +64,7 @@
       const type = e.isDir ? 'DIR' : (extOf(e.name) || 'FILE');
       const editable = !e.isDir && !EDIT_BLOCKED.test(e.name);
       return `<tr class="file-row${e.isDir ? ' dir' : ''}"${e.isDir ? ` data-nav-path="${esc(childPath)}"` : ''}>
-        <td class="fname"><span class="tag" style="margin-right:8px;font-size:10px;padding:2px 6px">${esc(type)}</span>${esc(e.name)}</td>
+        <td class="fname">${e.isDir ? '<svg class="file-ico" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' : `<span class="tag" style="margin-right:8px;font-size:10px;padding:2px 6px">${esc(type)}</span>`}${esc(e.name)}</td>
         <td>${e.isDir ? '-' : fmtFileSize(e.sizeMB)}</td>
         <td>${e.mtime ? new Date(e.mtime).toLocaleString() : '-'}</td>
         <td style="text-align:right;white-space:nowrap">${e.isDir ? '' : `<button class="btn" data-edit-file="${esc(childPath)}"${editable ? '' : ' disabled title="' + esc(t('This kind of file cannot be edited here')) + '"'}>${t('Edit')}</button> <a class="btn" href="${base()}/download?path=${encodeURIComponent(childPath)}" download>${t('Download')}</a> `}<button class="btn danger" data-del-file="${esc(childPath)}" data-is-dir="${e.isDir}">Delete</button></td>
@@ -81,7 +81,7 @@
       const parts = data.path === '.' ? [] : data.path.split('/');
       const crumbHtml = [`<a href="#" data-nav-path=".">${esc(cfg.rootName() || 'files')}</a>`]
         .concat(parts.map((part, i) => `<a href="#" data-nav-path="${parts.slice(0, i + 1).join('/')}">${part}</a>`))
-        .join(' / ');
+        .join('<span class="crumb-sep">/</span>');
       $('filesBreadcrumb').innerHTML = crumbHtml;
       filesEntries = data.entries;
       renderFiles();

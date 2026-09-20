@@ -1,68 +1,96 @@
-// Stacked line charts with a range selector. Shared by every product.
-// cfg: { el, load(rangeMs) -> { points: [{ t, ... }] }, charts: [{ key, title, color, format(v), max?, minMax? }], t, esc, isVisible() }
+// History line charts in the panel look: card with legend and range buttons, hover crosshair shared across charts. Shared by every product.
+// cfg: { el, load(rangeMs) -> { points: [{ t, ... }] }, charts: [{ title, series: [{ key, label, color, format(v) }], max?, minMax?, hint? }], t, esc, isVisible() }
 (function () {
   const RANGES = [['1m', 60e3], ['5m', 300e3], ['15m', 900e3], ['1h', 3600e3], ['24h', 86400e3], ['7d', 604800e3]];
+  const PAD = { l: 48, r: 10, t: 10, b: 27 };
+  const MONO = '"Cascadia Mono",Consolas,monospace';
+  let hoverRatio = null;
+  const instances = new Set();
 
-  function draw(canvas, pts, chart, rangeMs) {
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return;
-    canvas.width = w * dpr; canvas.height = h * dpr;
+  const niceMax = (v) => { v = Math.max(1, Number(v) || 1); const p = 10 ** Math.floor(Math.log10(v)), n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+  const clock = (ts, sec, long) => (long
+    ? new Date(ts).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(sec ? { second: '2-digit' } : {}) }));
+
+  function draw(canvas, pts, chart, range, t) {
+    const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (!r.width || !r.height) return;
+    const w = Math.floor(r.width * dpr), h = Math.floor(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     const g = canvas.getContext('2d');
-    g.scale(dpr, dpr);
-    const css = getComputedStyle(canvas);
-    const muted = css.getPropertyValue('--muted').trim() || 'rgba(255,255,255,.45)';
-    const now = Date.now(), from = now - rangeMs;
-    const vals = pts.map((p) => p[chart.key]);
-    const max = chart.max || Math.max(chart.minMax || 1, ...vals) * 1.15;
-    g.font = '11px system-ui,sans-serif';
-    const labels = [0, 1, 2, 3].map((i) => (chart.format ? chart.format((max / 3) * i) : String(Math.round((max / 3) * i))));
-    const padL = Math.ceil(Math.max(...labels.map((l) => g.measureText(l).width))) + 14, padB = 18, padT = 6;
-    const X = (t) => padL + ((t - from) / rangeMs) * (w - padL - 6);
-    const Y = (v) => padT + (1 - Math.min(v, max) / max) * (h - padT - padB);
-    g.font = '11px system-ui,sans-serif';
-    g.fillStyle = muted; g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1;
-    for (let i = 0; i <= 3; i++) {
-      const v = (max / 3) * i, y = Y(v);
-      g.beginPath(); g.moveTo(padL, y); g.lineTo(w - 6, y); g.stroke();
-      g.textAlign = 'right'; g.fillText(chart.format ? chart.format(v) : String(Math.round(v)), padL - 6, y + 4);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+    const cw = Math.max(1, r.width - PAD.l - PAD.r), ch = Math.max(1, r.height - PAD.t - PAD.b);
+    const info = (text) => { g.font = '11px system-ui,sans-serif'; g.fillStyle = '#68707b'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t(text), PAD.l + cw / 2, PAD.t + ch / 2); };
+    if (!pts.length) return info('Waiting for samples…');
+    const tMax = pts[pts.length - 1].t, tMin = Math.max(pts[0].t, tMax - range), span = Math.max(1, tMax - tMin);
+    const shown = pts.filter((p) => p.t >= tMin);
+    const max = chart.max || niceMax(Math.max(chart.minMax || 1, ...chart.series.flatMap((s) => shown.map((p) => Number(p[s.key]) || 0))) * 1.1);
+    const fmt = chart.series[0].format || ((v) => String(Math.round(v)));
+    g.font = `9px ${MONO}`; g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.t + (ch * i) / 4;
+      g.strokeStyle = '#24282d'; g.beginPath(); g.moveTo(PAD.l, y + .5); g.lineTo(PAD.l + cw, y + .5); g.stroke();
+      g.fillStyle = '#68707b'; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(fmt(max - (max * i) / 4), PAD.l - 7, y);
     }
-    g.textAlign = 'left'; g.fillText(`-${RANGES.find((r) => r[1] === rangeMs)?.[0] || ''}`, padL, h - 4);
-    g.textAlign = 'right'; g.fillText('now', w - 6, h - 4);
-    if (!pts.length) return;
-    g.beginPath();
-    pts.forEach((p, i) => (i ? g.lineTo(X(p.t), Y(p[chart.key])) : g.moveTo(X(p.t), Y(p[chart.key]))));
-    g.strokeStyle = chart.color; g.lineWidth = 2; g.stroke();
-    g.lineTo(X(pts[pts.length - 1].t), Y(0)); g.lineTo(X(pts[0].t), Y(0)); g.closePath();
-    g.globalAlpha = 0.12; g.fillStyle = chart.color; g.fill(); g.globalAlpha = 1;
+    for (let i = 0; i <= 4; i++) {
+      const x = PAD.l + (cw * i) / 4;
+      g.strokeStyle = '#202328'; g.beginPath(); g.moveTo(x + .5, PAD.t); g.lineTo(x + .5, PAD.t + ch); g.stroke();
+      g.fillStyle = '#68707b'; g.textAlign = i === 0 ? 'left' : i === 4 ? 'right' : 'center'; g.textBaseline = 'top';
+      g.fillText(clock(tMin + (span * i) / 4, span <= 900e3, span > 86400e3), x, PAD.t + ch + 8);
+    }
+    if (shown.length < 2) return info('Collecting samples…');
+    const X = (ts) => PAD.l + ((ts - tMin) / span) * cw;
+    const Y = (v) => PAD.t + ch - (Math.max(0, Math.min(max, Number(v) || 0)) / max) * ch;
+    for (const s of chart.series) {
+      g.strokeStyle = s.color; g.lineWidth = 1.4; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath();
+      let started = false;
+      for (const p of shown) { const v = Number(p[s.key]); if (!Number.isFinite(v)) continue; if (started) g.lineTo(X(p.t), Y(v)); else { g.moveTo(X(p.t), Y(v)); started = true; } }
+      g.stroke();
+      const last = shown[shown.length - 1];
+      g.fillStyle = s.color; g.beginPath(); g.arc(X(last.t), Y(last[s.key]), 2.4, 0, Math.PI * 2); g.fill();
+    }
+    if (hoverRatio == null) return;
+    const target = tMin + hoverRatio * span;
+    const p = shown.reduce((a, b) => (Math.abs(b.t - target) < Math.abs(a.t - target) ? b : a));
+    const x = X(p.t);
+    g.strokeStyle = '#626b76'; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x, PAD.t); g.lineTo(x, PAD.t + ch); g.stroke(); g.setLineDash([]);
+    const lines = [clock(p.t, true), ...chart.series.map((s) => `${t(s.label)}  ${(s.format || fmt)(Number(p[s.key]) || 0)}`)];
+    g.font = `10px ${MONO}`;
+    const bw = Math.max(...lines.map((l) => g.measureText(l).width)) + 20, bh = 10 + lines.length * 16;
+    const bx = Math.min(Math.max(PAD.l + 4, x - bw / 2), r.width - bw - 5), by = PAD.t + 5;
+    g.fillStyle = 'rgba(12,13,15,.96)'; g.strokeStyle = '#3a4048'; g.fillRect(bx, by, bw, bh); g.strokeRect(bx + .5, by + .5, bw - 1, bh - 1);
+    lines.forEach((l, i) => { g.fillStyle = i === 0 ? '#9299a3' : chart.series[i - 1].color; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(l, bx + 10, by + 7 + i * 16); });
   }
 
   function mount(cfg) {
     const { t, esc } = cfg;
     let range = RANGES[1][1];
     let points = [];
-    cfg.el.innerHTML = `<div class="ch-bar">${RANGES.map(([l, ms]) => `<button class="btn ${ms === range ? 'primary' : ''}" data-ch-range="${ms}">${l}</button>`).join('')}</div>
-      ${cfg.charts.map((c) => `<div class="card ch-card"><div class="ch-head"><span>${esc(t(c.title))}</span><span class="ch-now" data-ch-now="${c.key}">—</span></div><canvas class="ch-canvas" data-ch-canvas="${c.key}"></canvas></div>`).join('')}`;
+    const ranges = () => `<div class="chart-range">${RANGES.map(([l, ms]) => `<button class="range-btn${ms === range ? ' active' : ''}" data-ch-range="${ms}">${l}</button>`).join('')}</div>`;
+    cfg.el.innerHTML = `<div class="grid">${cfg.charts.map((c, i) => `
+      <article class="card span-12"><div class="card-head"><div class="card-title">${esc(t(c.title))}</div><div class="chart-head-right">
+        <div class="chart-legend">${c.series.map((s) => `<span><i class="legend-dot" style="background:${s.color}"></i>${esc(t(s.label))}</span>`).join('')}</div>${ranges()}</div></div>
+        <div class="card-body"><div class="chart-host"><canvas class="chart" data-ch-canvas="${i}"></canvas></div>${c.hint ? `<div class="chart-hint">${esc(t(c.hint))}</div>` : ''}</div></article>`).join('')}</div>`;
+    const canvases = [...cfg.el.querySelectorAll('[data-ch-canvas]')];
 
-    function render() {
-      for (const c of cfg.charts) {
-        const canvas = cfg.el.querySelector(`[data-ch-canvas="${c.key}"]`);
-        draw(canvas, points, c, range);
-        const last = points[points.length - 1];
-        cfg.el.querySelector(`[data-ch-now="${c.key}"]`).textContent = last ? (c.format ? c.format(last[c.key]) : String(Math.round(last[c.key]))) : '—';
-      }
-    }
+    function render() { canvases.forEach((cv, i) => draw(cv, points, cfg.charts[i], range, t)); }
     async function load() { try { points = (await cfg.load(range)).points || []; } catch (_) { points = []; } render(); }
+    canvases.forEach((cv) => {
+      cv.addEventListener('mousemove', (e) => { const r = cv.getBoundingClientRect(); hoverRatio = Math.max(0, Math.min(1, (e.clientX - r.left - PAD.l) / Math.max(1, r.width - PAD.l - PAD.r))); instances.forEach((i) => i.render()); });
+      cv.addEventListener('mouseleave', () => { hoverRatio = null; instances.forEach((i) => i.render()); });
+    });
     cfg.el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-ch-range]');
       if (!b) return;
       range = Number(b.dataset.chRange);
-      cfg.el.querySelectorAll('[data-ch-range]').forEach((x) => x.classList.toggle('primary', x === b));
+      cfg.el.querySelectorAll('[data-ch-range]').forEach((x) => x.classList.toggle('active', Number(x.dataset.chRange) === range));
       load();
     });
-    window.addEventListener('resize', () => { if (cfg.isVisible()) render(); });
+    const self = { load, render: () => { if (cfg.isVisible()) render(); } };
+    instances.add(self);
+    window.addEventListener('resize', self.render);
     setInterval(() => { if (cfg.isVisible()) load(); }, 5000);
-    return { load };
+    return self;
   }
   window.MeowCharts = { mount };
 })();

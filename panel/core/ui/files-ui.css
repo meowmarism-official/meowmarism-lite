@@ -16,3 +16,12 @@
 .hl-c{color:#6b7683}.hl-k{color:#ff9edd}.hl-s{color:#9ccc9c}.hl-n{color:#e2bd6c}.hl-b{color:#8ab4f8}.hl-p{color:#7d8590}
 .file-row td.fname{cursor:default}
 .file-row.dir td.fname{cursor:pointer}
+#filesBreadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+#filesBreadcrumb a{color:var(--muted);text-decoration:none;padding:2px 6px;border-radius:4px}
+#filesBreadcrumb a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+#filesBreadcrumb a:last-of-type{color:var(--text)}
+.crumb-sep{color:var(--muted2)}
+.file-row:hover td{background:rgba(255,255,255,.03)}
+.file-ico{width:15px;height:15px;margin-right:8px;vertical-align:-3px;fill:none;stroke:#7d9fd0;stroke-width:1.8;stroke-linejoin:round}
+.ed-actions a.btn,a.btn{text-decoration:none}
+.file-row .tag{display:inline-block;min-width:40px;text-align:center}
