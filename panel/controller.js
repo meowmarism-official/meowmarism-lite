@@ -9,6 +9,7 @@
 // process lifecycle (start/stop/restart a worker). Once an instance is
 // running, its full dashboard lives at the worker's own port - the
 // controller just links you there.
+const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (_) { return String(s); } };
 const updater = require('./core/modules/updater').createUpdater({
   repo: 'meowmarism-official/meowmarism-lite',
   panelDir: __dirname,
@@ -47,7 +48,7 @@ const { createUsersApi } = require('./core/modules/users-api');
 const { createPanelSettings } = require('./core/modules/panel-settings');
 const systemInfo = require('./core/modules/system-info');
 const controllerUsers = createUserStore(CONTROLLER_USERS_FILE);
-const usersApi = createUsersApi({ store: controllerUsers, session: (req) => currentSession(req) });
+const usersApi = createUsersApi({ store: controllerUsers, session: (req) => currentSession(req), revokeSessions: (u) => require('./lib/auth').revokeUser(u) });
 
 // Always looked up fresh (never cached on the session) so a permission
 // change applies on the user's very next request.
@@ -514,7 +515,7 @@ function proxyToWorker(req, res, port, targetPath, caps) {
 // that triggered them.
 function resolveInstanceProxy(req, url) {
   const prefixed = url.pathname.match(/^\/instance\/([^/]+)(\/.*)?$/);
-  if (prefixed) return { name: decodeURIComponent(prefixed[1]), targetPath: (prefixed[2] || '/') + url.search };
+  if (prefixed) return { name: safeDecode(prefixed[1]), targetPath: (prefixed[2] || '/') + url.search };
   const isNavigation = req.headers['sec-fetch-mode'] === 'navigate' || (req.headers.accept || '').includes('text/html');
   const ref = req.headers.referer;
   if (!ref || isNavigation) return null;
@@ -522,7 +523,7 @@ function resolveInstanceProxy(req, url) {
     const refUrl = new URL(ref);
     const m = refUrl.pathname.match(/^\/instance\/([^/]+)\//);
     if (!m) return null;
-    return { name: decodeURIComponent(m[1]), targetPath: url.pathname + url.search };
+    return { name: safeDecode(m[1]), targetPath: url.pathname + url.search };
   } catch (_) { return null; }
 }
 
@@ -544,7 +545,8 @@ function fetchWorkerStatus(port) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch (_) { res.writeHead(400); res.end('bad request'); return; }
   res.setHeader('X-Content-Type-Options', 'nosniff');
   // /_meta/... reaches controller routes from an instance page without the Referer-based worker proxy.
   const isMeta = url.pathname.startsWith('/_meta/');
@@ -775,6 +777,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
     req.on('end', async () => {
       if (instanceCreateInProgress) { sendJson(res, 409, { ok: false, error: 'another instance is already being created' }); return; }
+      instanceCreateInProgress = true;
       try {
         const data = JSON.parse(body || '{}');
         const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
@@ -827,6 +830,7 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           console.error(`[create:${name}] failed: ${err.message}`);
           creationLog.error = err.message;
+          if (!instances.some((i) => i.name === name)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
         } finally {
           instanceCreateInProgress = false;
           creationLog.done = true;
@@ -843,7 +847,7 @@ const server = http.createServer(async (req, res) => {
   // id only matters for the workers/panelCrashes maps below.
   const upgradeMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/(upgrade|upgrade\/rollback|upgrade-status)$/);
   if (upgradeMatch) {
-    const inst = loadInstances().find((i) => i.name === decodeURIComponent(upgradeMatch[1]));
+    const inst = loadInstances().find((i) => i.name === safeDecode(upgradeMatch[1]));
     if (!inst) { sendJson(res, 404, { ok: false, error: 'not found' }); return; }
     const caps = capsFor(req, inst.name);
     const state = upgrades.get(inst.name);
@@ -892,7 +896,7 @@ const server = http.createServer(async (req, res) => {
 
   const javaMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/(java|java-status)$/);
   if (javaMatch) {
-    const inst = loadInstances().find((i) => i.name === decodeURIComponent(javaMatch[1]));
+    const inst = loadInstances().find((i) => i.name === safeDecode(javaMatch[1]));
     if (!inst) { sendJson(res, 404, { ok: false, error: 'not found' }); return; }
     const caps = capsFor(req, inst.name);
     const job = javaJobs.get(inst.name);
@@ -923,7 +927,7 @@ const server = http.createServer(async (req, res) => {
 
   const idMatch = url.pathname.match(/^\/api\/instances\/([^/]+)(\/(start|stop|restart))?$/);
   if (idMatch && (req.method === 'POST' || req.method === 'DELETE')) {
-    const name = decodeURIComponent(idMatch[1]);
+    const name = safeDecode(idMatch[1]);
     const action = idMatch[3];
     const instances = loadInstances();
     const inst = instances.find((i) => i.name === name);
@@ -977,7 +981,8 @@ const server = http.createServer(async (req, res) => {
 
   const logMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/log$/);
   if (logMatch && req.method === 'GET') {
-    const logInst = loadInstances().find((i) => i.name === decodeURIComponent(logMatch[1]));
+    const logInst = loadInstances().find((i) => i.name === safeDecode(logMatch[1]));
+    if (!logInst || !capsFor(req, logInst.name).includes('console')) { sendJson(res, 403, { error: 'not allowed' }); return; }
     const w = logInst && workers.get(logInst.id);
     if (w) { sendJson(res, 200, { lines: w.logs }); return; }
     const crash = logInst && panelCrashes.get(logInst.id);

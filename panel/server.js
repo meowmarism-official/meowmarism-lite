@@ -1,3 +1,4 @@
+const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (_) { return String(s); } };
 const http = require('http');
 const https = require('https');
 const net = require('net');
@@ -435,6 +436,8 @@ function broadcast(line) {
 
   const data = JSON.stringify(entry);
   for (const res of clients) {
+    if (res.view && !res.view.console) continue;
+    if (dropSlowClient(res)) continue;
     res.write(`event: console\ndata: ${data}\n\n`);
   }
   for (const listener of tailListeners) listener(line);
@@ -516,9 +519,17 @@ setInterval(() => {
   for (const task of panelConfig.schedule || []) if (scheduler.isDue(task)) runScheduledTask(task);
 }, 20000).unref();
 
+function dropSlowClient(res) {
+  if (res.writableLength <= 2 * 1024 * 1024) return false;
+  clients.delete(res);
+  res.destroy();
+  return true;
+}
+
 function broadcastEvent(name, payload) {
   const data = JSON.stringify(payload);
   for (const res of clients) {
+    if (dropSlowClient(res)) continue;
     res.write(`event: ${name}\ndata: ${data}\n\n`);
   }
 }
@@ -580,18 +591,23 @@ function sleepPort() {
   return Number(props['server-port']) || 25565;
 }
 
+const SLEEP_MAX_PACKET = 8 * 1024;
+const SLEEP_MAX_BUFFER = 16 * 1024;
 function startSleepProxy() {
   if (sleepProxy) return;
   const port = sleepPort();
   const server = net.createServer((socket) => {
+    socket.setTimeout(5000, () => socket.destroy());
     let buf = Buffer.alloc(0);
     let state = 0; // 0 = handshake, 1 = status, 2 = login
     let clientProtocol = -1;
     socket.on('data', (chunk) => {
+      if (buf.length + chunk.length > SLEEP_MAX_BUFFER) { socket.destroy(); return; }
       buf = Buffer.concat([buf, chunk]);
       try {
         for (;;) {
           const len = mcReadVarInt(buf, 0);
+          if (len && (len.value < 0 || len.value > SLEEP_MAX_PACKET)) { socket.destroy(); return; }
           if (!len || buf.length < len.next + len.value) return;
           const packet = buf.slice(len.next, len.next + len.value);
           buf = buf.slice(len.next + len.value);
@@ -1259,7 +1275,7 @@ function publishAggregatedStats() {
   }
 }
 
-function buildSnapshot() {
+function buildSnapshot(view = FULL_VIEW) {
   trimRawSampleCache();
   trimRecentConsole();
   if (!latestStats) latestStats = buildAggregatedStats([decorateFastSample(fastSystemSample())]);
@@ -1283,10 +1299,10 @@ function buildSnapshot() {
     history,
     historyTiers: { oneSecond: history, fiveSecond: history5s, oneMinute: history1m, tenMinute: history10m },
     recentSamples,
-    console,
+    console: view.console ? console : [],
     settings: buildSettingsState(),
     timeline: timelineEvents.slice(-500),
-    audit: auditEntries.slice(-500),
+    audit: view.audit ? auditEntries.slice(-500) : [],
     restartPlan: currentRestartPlanState(),
     crash: lastCrash,
     sleeping: sleeping(),
@@ -1319,7 +1335,16 @@ function serveIndex(res) {
   res.end(html);
 }
 
+const FULL_VIEW = { console: true, audit: true };
+function viewOf(req) {
+  const h = req.headers['x-meow-caps'];
+  if (h === undefined) return FULL_VIEW;
+  const caps = String(h).split(',');
+  return { console: caps.includes('console'), audit: caps.includes('settings') };
+}
+
 function requiredCap(method, p) {
+  if (method === 'GET' && (p === '/log' || p === '/api/player-history')) return 'console';
   if (p.startsWith('/api/modrinth')) return 'mods';
   if (p.startsWith('/api/files')) return 'files';
   if (p.startsWith('/api/backups/') && method === 'GET') return 'backups';
@@ -1334,7 +1359,8 @@ function requiredCap(method, p) {
 const PAGE_ROUTES = new Set(['/', '/overview', '/manage', '/schedule', '/performance', '/players', '/console', '/settings', '/mods', '/files', '/access', '/backups', '/automation', '/events', '/system']);
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch (_) { res.writeHead(400); res.end('bad request'); return; }
 
   // The controller sends the caller's capabilities for this instance in
   // x-meow-caps. Only the controller can reach this worker (127.0.0.1), so
@@ -1362,7 +1388,8 @@ const server = http.createServer((req, res) => {
       'X-Accel-Buffering': 'no',
     });
 
-    res.write(`event: snapshot\ndata: ${JSON.stringify(buildSnapshot())}\n\n`);
+    res.view = viewOf(req);
+    res.write(`event: snapshot\ndata: ${JSON.stringify(buildSnapshot(res.view))}\n\n`);
     clients.add(res);
 
     const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
@@ -1374,7 +1401,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/snapshot' && req.method === 'GET') {
-    sendJson(res, 200, buildSnapshot());
+    sendJson(res, 200, buildSnapshot(viewOf(req)));
     return;
   }
 
@@ -1420,7 +1447,8 @@ const server = http.createServer((req, res) => {
     const sampleTruncated = afterSampleSeq > 0 && afterSampleSeq < rawFromSeq - 1;
     const consoleTruncated = afterConsoleSeq > 0 && afterConsoleSeq < consoleFromSeq - 1;
     const samples = rawSampleCache.filter((sample) => sample.seq > afterSampleSeq);
-    const console = recentConsole.filter((entry) => entry.seq > afterConsoleSeq);
+    const view = viewOf(req);
+    const console = view.console ? recentConsole.filter((entry) => entry.seq > afterConsoleSeq) : [];
     sendJson(res, 200, {
       instanceId: INSTANCE_ID,
       serverTime: Date.now(),
@@ -1432,7 +1460,7 @@ const server = http.createServer((req, res) => {
       historyTiers: { oneSecond: history, fiveSecond: history5s, oneMinute: history1m, tenMinute: history10m },
       lifecycle: { running: !!child, startedAt, lastExitAt, restartCount, phase: serverPhase, readyAt, startupDurationMs, lastReadyAt, lastStartupDurationMs },
       timeline: timelineEvents.slice(-500),
-      audit: auditEntries.slice(-500),
+      audit: view.audit ? auditEntries.slice(-500) : [],
       restartPlan: currentRestartPlanState(),
       crash: lastCrash,
       features: scanFeatures(),
@@ -1441,7 +1469,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/timeline' && req.method === 'GET') {
-    sendJson(res, 200, { timeline: timelineEvents.slice(-1000), audit: auditEntries.slice(-1000) });
+    sendJson(res, 200, { timeline: timelineEvents.slice(-1000), audit: viewOf(req).audit ? auditEntries.slice(-1000) : [] });
     return;
   }
 
@@ -1759,19 +1787,11 @@ const server = http.createServer((req, res) => {
       if (url.pathname === '/api/files/upload' && req.method === 'POST') {
         const name = url.searchParams.get('name') || '';
         const dest = filesApi.uploadTarget(rel, name);
-        let size = 0;
-        const out = fs.createWriteStream(dest);
-        req.on('data', (chunk) => {
-          size += chunk.length;
-          if (size > filesApi.MAX_UPLOAD_BYTES) { req.destroy(); out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} }
-        });
-        req.on('error', () => { out.destroy(); try { fs.unlinkSync(dest); } catch (_) {} });
-        req.pipe(out);
-        out.on('finish', () => {
+        filesApi.receiveUpload(req, dest, (err, size) => {
+          if (err) { sendJson(res, err.status || 500, { ok: false, error: err.message }); return; }
           pushAudit('files.upload', name, rel);
           sendJson(res, 200, { ok: true, name, sizeMB: +(size / 1024 / 1024).toFixed(2) });
         });
-        out.on('error', (err) => { sendJson(res, 500, { ok: false, error: err.message }); });
         return;
       }
       if (url.pathname === '/api/files' && req.method === 'DELETE') {
@@ -1925,7 +1945,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/backup-sync' && req.method === 'POST') {
-    if (!fs.existsSync(WORLD_DIR)) { sendJson(res, 200, { ok: true, name: null, skipped: 'no world yet' }); return; }
+    if (!backupLib.worldDirNames().length) { sendJson(res, 200, { ok: true, name: null, skipped: 'no world yet' }); return; }
     createBackup('pre-upgrade').then((ok) => {
       const newest = listBackups()[0];
       if (!ok || !newest) sendJson(res, 500, { ok: false, error: backupState.lastBackupError || 'the backup failed' });
@@ -1941,7 +1961,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname.match(/^\/api\/backups\/[^/]+\/restore$/) && req.method === 'POST') {
-    const name = decodeURIComponent(url.pathname.split('/')[3]);
+    const name = safeDecode(url.pathname.split('/')[3]);
     if (!BACKUP_NAME_RE.test(name)) { sendJson(res, 400, { ok: false, error: 'invalid backup name' }); return; }
     if (!fs.existsSync(path.join(BACKUP_DIR, name))) { sendJson(res, 404, { ok: false, error: 'backup not found' }); return; }
     if (backupState.backupInProgress) { sendJson(res, 409, { ok: false, error: 'a backup is currently running' }); return; }
@@ -1969,7 +1989,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname.startsWith('/api/backups/') && req.method === 'GET') {
-    const name = decodeURIComponent(url.pathname.slice('/api/backups/'.length));
+    const name = safeDecode(url.pathname.slice('/api/backups/'.length));
     if (!BACKUP_NAME_RE.test(name)) {
       res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('invalid backup name');
@@ -1991,7 +2011,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname.startsWith('/api/backups/') && req.method === 'DELETE') {
-    const name = decodeURIComponent(url.pathname.slice('/api/backups/'.length));
+    const name = safeDecode(url.pathname.slice('/api/backups/'.length));
     if (!BACKUP_NAME_RE.test(name)) {
       res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('invalid backup name');

@@ -38,10 +38,28 @@ function ensureBackupDir() {
 // zstd -T0 uses all cores and, at level 6, is both faster and smaller than
 // gzip for a Minecraft world (already-compressed region files benefit little
 // from higher levels, so we don't pay for those diminishing returns).
-function tarCreateArgs(dest) {
+function tarCreateArgs(dest, names = ['world']) {
   const common = ['--warning=no-file-changed', '--warning=no-file-removed'];
-  if (ZSTD_AVAILABLE) return [...common, '--use-compress-program=zstd -T0 -6', '-cf', dest, '-C', SERVER_DIR, 'world'];
-  return [...common, '-czf', dest, '-C', SERVER_DIR, 'world'];
+  if (ZSTD_AVAILABLE) return [...common, '--use-compress-program=zstd -T0 -6', '-cf', dest, '-C', SERVER_DIR, ...names];
+  return [...common, '-czf', dest, '-C', SERVER_DIR, ...names];
+}
+
+// The world folder is the level-name from server.properties; Paper and Purpur keep Nether and End in sibling folders.
+function levelName() {
+  try {
+    const m = /^level-name=(.*)$/m.exec(fs.readFileSync(path.join(SERVER_DIR, 'server.properties'), 'utf8'));
+    const name = m ? m[1].trim() : '';
+    return name && /^[\w .-]+$/.test(name) && name !== '.' && name !== '..' ? name : 'world';
+  } catch (_) { return 'world'; }
+}
+function worldDirNames() {
+  const level = levelName();
+  return [level, `${level}_nether`, `${level}_the_end`].filter((n) => fs.existsSync(path.join(SERVER_DIR, n)));
+}
+function archiveTopLevel(file) {
+  const args = file.endsWith('.tar.zst') ? ['--use-compress-program=zstd -d', '-tf', file] : ['-tzf', file];
+  const out = execFileSync('tar', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return [...new Set(out.split('\n').map((l) => l.split('/')[0]).filter((n) => n && n !== '.' && n !== '..'))];
 }
 function tarExtractArgs(file, destDir) {
   if (file.endsWith('.tar.zst')) return ['--use-compress-program=zstd -d', '-xf', file, '-C', destDir];
@@ -140,13 +158,14 @@ function createBackup(reason, deps) {
 
 function runBackup(reason, deps) {
   return (async () => {
-    if (!fs.existsSync(WORLD_DIR)) {
-      deps.broadcast(`--- backup skipped: no world/ directory found ---`);
+    const names = worldDirNames();
+    if (!names.length) {
+      deps.broadcast(`--- backup skipped: no ${levelName()}/ directory found ---`);
       return false;
     }
     const freeGB = diskFreeGB();
     const reserveGB = Number.isFinite(panelConfig.backupMinFreeGB) ? panelConfig.backupMinFreeGB : MIN_FREE_DISK_GB_FOR_BACKUP;
-    const worldGB = dirSizeBytes(WORLD_DIR) / 1024 ** 3;
+    const worldGB = names.reduce((sum, n) => sum + dirSizeBytes(path.join(SERVER_DIR, n)), 0) / 1024 ** 3;
     if (freeGB != null && freeGB - worldGB < reserveGB) {
       const msg = `not enough disk space (${freeGB.toFixed(1)} GB free, world ~${worldGB.toFixed(1)} GB, ${reserveGB} GB must stay free)`;
       deps.broadcast(`--- backup skipped: ${msg} ---`);
@@ -167,7 +186,7 @@ function runBackup(reason, deps) {
 
     deps.broadcast(`--- backing up world -> backups/${file} (${reason}, ${ZSTD_AVAILABLE ? 'zstd -T0' : 'gzip'}) ---`);
     const ok = await new Promise((resolve) => {
-      const tar = spawn('tar', tarCreateArgs(dest));
+      const tar = spawn('tar', tarCreateArgs(dest, names));
       tar.on('error', (err) => {
         state.lastBackupError = String(err);
         deps.broadcast(`--- backup failed: ${err} ---`);
@@ -215,14 +234,13 @@ const MAX_PRE_RESTORE_DIRS = 3;
 // would quietly eat tens of GB over time.
 function prunePreRestoreDirs() {
   try {
-    const base = path.basename(WORLD_DIR);
-    const dirName = path.dirname(WORLD_DIR);
-    const dirs = fs.readdirSync(dirName)
-      .filter((f) => f.startsWith(`${base}.pre-restore-`))
-      .sort()
-      .reverse(); // ISO timestamps in the name sort chronologically
-    for (const d of dirs.slice(MAX_PRE_RESTORE_DIRS)) {
-      fs.rmSync(path.join(dirName, d), { recursive: true, force: true });
+    const groups = new Map();
+    for (const f of fs.readdirSync(SERVER_DIR)) {
+      const at = f.indexOf('.pre-restore-');
+      if (at > 0) groups.set(f.slice(0, at), [...(groups.get(f.slice(0, at)) || []), f]);
+    }
+    for (const dirs of groups.values()) {
+      for (const d of dirs.sort().reverse().slice(MAX_PRE_RESTORE_DIRS)) fs.rmSync(path.join(SERVER_DIR, d), { recursive: true, force: true });
     }
   } catch (_) {}
 }
@@ -244,13 +262,16 @@ async function restoreBackup(name, deps) {
   state.backupInProgress = true;
   deps.broadcast(`--- restoring world from backups/${name} ---`);
   deps.pushTimeline('restore', 'World restore started', name, 'warn', { name });
-  let asidePath = null;
+  const aside = [];
   try {
-    if (fs.existsSync(WORLD_DIR)) {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      asidePath = `${WORLD_DIR}.pre-restore-${stamp}`;
-      fs.renameSync(WORLD_DIR, asidePath);
-      deps.broadcast(`--- previous world moved aside to ${path.basename(asidePath)} ---`);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    for (const n of archiveTopLevel(file)) {
+      const from = path.join(SERVER_DIR, n);
+      if (!fs.existsSync(from)) continue;
+      const to = `${from}.pre-restore-${stamp}`;
+      fs.renameSync(from, to);
+      aside.push([from, to]);
+      deps.broadcast(`--- previous ${n} moved aside to ${path.basename(to)} ---`);
     }
     await new Promise((resolve, reject) => {
       const ex = spawn('tar', tarExtractArgs(file, SERVER_DIR));
@@ -265,13 +286,13 @@ async function restoreBackup(name, deps) {
     // Extraction failed (or didn't fully succeed) - roll back to the world
     // we moved aside instead of leaving a missing/partial world/ in place.
     try {
-      if (fs.existsSync(WORLD_DIR)) fs.rmSync(WORLD_DIR, { recursive: true, force: true });
-      if (asidePath && fs.existsSync(asidePath)) {
-        fs.renameSync(asidePath, WORLD_DIR);
-        deps.broadcast(`--- restore failed, rolled back to the previous world ---`);
+      for (const [from, to] of aside) {
+        if (fs.existsSync(from)) fs.rmSync(from, { recursive: true, force: true });
+        if (fs.existsSync(to)) fs.renameSync(to, from);
       }
+      if (aside.length) deps.broadcast(`--- restore failed, rolled back to the previous world ---`);
     } catch (rollbackErr) {
-      deps.broadcast(`--- restore failed AND rollback failed: ${rollbackErr.message} - previous world is at ${asidePath ? path.basename(asidePath) : '?'} ---`);
+      deps.broadcast(`--- restore failed AND rollback failed: ${rollbackErr.message} - previous worlds are in ${aside.map(([, to]) => path.basename(to)).join(', ')} ---`);
     }
     deps.broadcast(`--- restore failed: ${err.message} ---`);
     deps.pushTimeline('restore', 'World restore failed', err.message, 'error', { name });
@@ -287,17 +308,24 @@ function rescheduleAutoBackup(deps) {
   const ms = Math.max(0.25, Number(panelConfig.backupIntervalHours) || 6) * 60 * 60 * 1000;
   autoBackupTimer = setInterval(() => { if (deps.runtime.isRunning()) createBackup('auto', deps); }, ms).unref();
 }
+let pruneTimer = null;
 function startPruneTimer(deps) {
+  if (pruneTimer) clearInterval(pruneTimer);
   // Only prune alongside an active server - while stopped or asleep nothing
   // is writing to world/, so there's nothing new to make room for.
-  setInterval(() => { if (!state.backupInProgress && deps.runtime.isRunning()) pruneBackups(); }, 30 * 60000).unref();
+  pruneTimer = setInterval(() => { if (!state.backupInProgress && deps.runtime.isRunning()) pruneBackups(); }, 30 * 60000).unref();
+}
+function dispose() {
+  if (autoBackupTimer) clearInterval(autoBackupTimer);
+  if (pruneTimer) clearInterval(pruneTimer);
+  autoBackupTimer = pruneTimer = null;
 }
 
 return {
   BACKUP_EXT, BACKUP_NAME_RE, MIN_FREE_DISK_GB_FOR_BACKUP,
   state, ensureBackupDir, listBackups, pruneBackups,
   tarCreateArgs, tarExtractArgs, tarCreateSucceeded, tarExtractSucceeded,
-  createBackup, restoreBackup, rescheduleAutoBackup, startPruneTimer,
+  createBackup, restoreBackup, rescheduleAutoBackup, startPruneTimer, dispose, worldDirNames, levelName,
 };
 }
 

@@ -1,6 +1,7 @@
 // File access inside one instance folder: listing, reading and saving text, uploads and deletes. Every path is checked against the root.
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
@@ -97,6 +98,34 @@ function createFiles({ root }) {
     return dest;
   }
 
+  // Streams the request into a temp file next to dest and renames it when complete, so a failed upload never damages an existing file.
+  function receiveUpload(req, dest, done) {
+    const tmp = `${dest}.${crypto.randomBytes(4).toString('hex')}.part`;
+    const out = fs.createWriteStream(tmp, { flags: 'wx' });
+    let size = 0;
+    let finished = false;
+    const end = (err) => {
+      if (finished) return;
+      finished = true;
+      if (err) { out.destroy(); try { fs.unlinkSync(tmp); } catch (_) {} }
+      done(err, size);
+    };
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_UPLOAD_BYTES) { req.unpipe(out); end(fail(413, 'file is too large')); }
+    });
+    req.on('aborted', () => end(fail(400, 'upload interrupted')));
+    req.on('error', (err) => end(err));
+    out.on('error', (err) => end(err));
+    out.on('finish', () => {
+      if (finished) return;
+      try { fs.renameSync(tmp, dest); } catch (err) { return end(err); }
+      finished = true;
+      done(null, size);
+    });
+    req.pipe(out);
+  }
+
   function fileInfo(rel) {
     const resolved = safePath(rel);
     if (!resolved) throw fail(400, 'invalid path');
@@ -106,7 +135,7 @@ function createFiles({ root }) {
     return { resolved, size: st.size, name: path.basename(resolved) };
   }
 
-  return { safePath, list, read, write, remove, uploadTarget, fileInfo, MAX_EDIT_BYTES, MAX_UPLOAD_BYTES };
+  return { safePath, list, read, write, remove, uploadTarget, receiveUpload, fileInfo, MAX_EDIT_BYTES, MAX_UPLOAD_BYTES };
 }
 
 module.exports = { createFiles };

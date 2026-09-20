@@ -55,7 +55,7 @@ panel/
 └── lib/               config, accounts, sessions, update safety net
 ```
 
-You only ever run the controller directly. It spawns a `server.js` worker per running instance automatically, each with its own port, own console, own stats, nothing shared between instances. Open the controller's port to see the instance list, and click into any running instance to reach its own full dashboard at its own port.
+You only ever run the controller directly. It spawns a `server.js` worker per running instance automatically, each with its own port, own console, own stats, nothing shared between instances. Open the controller's port to see the instance list, and click into any running instance to open its full dashboard. The controller proxies each instance, so only the controller's port needs to be reachable.
 
 ---
 

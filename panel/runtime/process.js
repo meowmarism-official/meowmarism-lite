@@ -112,8 +112,9 @@ function createProcessRuntime(ctx) {
     },
     stopAndWait: () => new Promise((resolve) => {
       if (!child) { resolve(); return; }
-      child.once('exit', () => resolve());
-      stop();
+      const forceTimer = setTimeout(() => kill(), 90000);
+      child.once('exit', () => { clearTimeout(forceTimer); resolve(); });
+      if (!stop()) kill();
     }),
   };
 }

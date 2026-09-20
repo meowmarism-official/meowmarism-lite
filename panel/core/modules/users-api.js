@@ -1,8 +1,8 @@
 // HTTP routes for account management on top of the user store (see users.js).
 const { hasPanelCap, INSTANCE_CAPS } = require('./users');
 
-// store: createUserStore(...); session(req) -> { username, role } | null
-function createUsersApi({ store, session }) {
+// store: createUserStore(...); session(req) -> { username, role } | null; revokeSessions(username) ends that account's logins
+function createUsersApi({ store, session, revokeSessions = () => {} }) {
   const send = (res, status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(body));
@@ -44,11 +44,13 @@ function createUsersApi({ store, session }) {
     }
     const m = url.pathname.match(/^\/api\/users\/([^/]+)(\/(password|access))?$/);
     if (!m) return false;
-    const target = decodeURIComponent(m[1]);
+    let target;
+    try { target = decodeURIComponent(m[1]); } catch (_) { return (send(res, 400, { error: 'invalid request' }), true); }
     const action = m[3];
     if (!isOwner && hasPanelCap(store.findUser(target), 'users')) { send(res, 403, { error: 'only the owner can change this account' }); return true; }
     if (req.method === 'DELETE' && !action) {
       if (!store.deleteMember(target)) return (send(res, 400, { error: 'cannot remove that account' }), true);
+      revokeSessions(target);
       send(res, 200, reply());
       return true;
     }
@@ -57,6 +59,7 @@ function createUsersApi({ store, session }) {
         const password = String(data.password || '');
         if (password.length < 8) return send(res, 400, { error: 'password must be at least 8 characters' });
         if (!store.setPassword(target, password)) return send(res, 400, { error: 'cannot change that account' });
+        revokeSessions(target);
         send(res, 200, reply());
       });
       return true;

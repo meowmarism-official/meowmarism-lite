@@ -29,7 +29,7 @@ function parseCookies(req) {
   for (const part of header.split(';')) {
     const idx = part.indexOf('=');
     if (idx === -1) continue;
-    out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    try { out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim()); } catch (_) {}
   }
   return out;
 }
@@ -61,4 +61,9 @@ setInterval(() => {
   for (const [key, s] of sessions) if (now - s.createdAt > SESSION_MAX_AGE_MS) sessions.delete(key);
 }, 10 * 60000).unref();
 
-module.exports = { sessions, SESSION_COOKIE, SESSION_MAX_AGE_MS, parseCookies, currentSession, createSession, deleteSession };
+function revokeUser(username) {
+  for (const [key, s] of sessions) if (s.username === username) sessions.delete(key);
+  persist();
+}
+
+module.exports = { revokeUser, sessions, SESSION_COOKIE, SESSION_MAX_AGE_MS, parseCookies, currentSession, createSession, deleteSession };

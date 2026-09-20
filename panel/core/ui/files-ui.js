@@ -80,7 +80,7 @@
       filesCurrentPath = data.path;
       const parts = data.path === '.' ? [] : data.path.split('/');
       const crumbHtml = [`<a href="#" data-nav-path=".">${esc(cfg.rootName() || 'files')}</a>`]
-        .concat(parts.map((part, i) => `<a href="#" data-nav-path="${parts.slice(0, i + 1).join('/')}">${part}</a>`))
+        .concat(parts.map((part, i) => `<a href="#" data-nav-path="${esc(parts.slice(0, i + 1).join('/'))}">${esc(part)}</a>`))
         .join('<span class="crumb-sep">/</span>');
       $('filesBreadcrumb').innerHTML = crumbHtml;
       filesEntries = data.entries;

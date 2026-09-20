@@ -77,6 +77,8 @@ function downloadVerified(url, dest, sha512, size) {
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const imageCache = new Map();
+let imageCacheBytes = 0;
+const MAX_IMAGE_CACHE_BYTES = 48 * 1024 * 1024;
 
 // Fetches an image from Modrinth's CDN so the browser never talks to a third party. Small in-memory cache.
 function fetchImage(rawUrl) {
@@ -99,7 +101,12 @@ function fetchImage(rawUrl) {
       res.on('end', () => {
         const entry = { type, buf: Buffer.concat(chunks) };
         imageCache.set(u.href, entry);
-        while (imageCache.size > 150) imageCache.delete(imageCache.keys().next().value);
+        imageCacheBytes += entry.buf.length;
+        while (imageCache.size > 150 || imageCacheBytes > MAX_IMAGE_CACHE_BYTES) {
+          const oldest = imageCache.keys().next().value;
+          imageCacheBytes -= imageCache.get(oldest).buf.length;
+          imageCache.delete(oldest);
+        }
         resolve(entry);
       });
       res.on('error', reject);

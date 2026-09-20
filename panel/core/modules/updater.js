@@ -38,8 +38,13 @@ function downloadFile(url, dest) {
   });
 }
 
-const parseTag = (t) => (/^v?(\d+)\.(\d+)\.(\d+)$/.exec(t) || []).slice(1).map(Number);
-const newestFirst = (a, b) => { const x = parseTag(a), y = parseTag(b); return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]); };
+// Versions have three or four numbers: 0.1.8 and 0.1.8.1 (a fix of that release).
+const parseTag = (t) => {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?$/.exec(t);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4] || 0)] : [];
+};
+const newestFirst = (a, b) => { const x = parseTag(a), y = parseTag(b); return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]) || (y[3] - x[3]); };
+const isNewer = (latest, current) => parseTag(latest).length > 0 && parseTag(current).length > 0 && newestFirst(current, latest) > 0;
 
 function checkSyntax(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -64,12 +69,18 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
   async function fetchLatestTag() {
     let names = [];
     try {
-      names = JSON.parse(await getText(`https://api.github.com/repos/${repo}/tags?per_page=100`)).map((t) => t.name);
-    } catch (_) {
-      const html = await getText(`https://github.com/${repo}/tags`);
-      names = [...html.matchAll(/\/releases\/tag\/(v\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+      const releases = JSON.parse(await getText(`https://api.github.com/repos/${repo}/releases?per_page=30`));
+      names = releases.filter((r) => !r.draft && !r.prerelease).map((r) => r.tag_name);
+    } catch (_) {}
+    if (!names.length) {
+      try {
+        names = JSON.parse(await getText(`https://api.github.com/repos/${repo}/tags?per_page=100`)).map((t) => t.name);
+      } catch (_) {
+        const html = await getText(`https://github.com/${repo}/tags`);
+        names = [...html.matchAll(/\/releases\/tag\/(v\d+(?:\.\d+){2,3})/g)].map((m) => m[1]);
+      }
     }
-    return names.filter((n) => parseTag(n).length === 3).sort(newestFirst)[0] || null;
+    return names.filter((n) => parseTag(n).length === 4).sort(newestFirst)[0] || null;
   }
 
   async function refreshVersionCache() {
@@ -97,7 +108,7 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
       releaseUrl: versionCache?.url || `https://github.com/${repo}/releases/latest`,
       checkedAt: versionCache?.at || null,
       checkError,
-      updateAvailable: !!(version && latestVersion && latestVersion !== version),
+      updateAvailable: !!(version && latestVersion && isNewer(latestVersion, version)),
     };
   }
 
@@ -244,4 +255,4 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
   return { versionInfo, start, status: () => ({ ...state, lastResult: lastResult() }), bootCheck, confirmHealthy };
 }
 
-module.exports = { createUpdater };
+module.exports = { createUpdater, parseTag, newestFirst, isNewer };
