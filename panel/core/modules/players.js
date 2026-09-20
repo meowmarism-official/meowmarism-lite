@@ -147,7 +147,13 @@ function createPlayerTracker(hooks = {}) {
     return { ...h, totalPlaySec: Math.floor((h.totalPlayMs + (h.activeSince ? Date.now() - h.activeSince : 0)) / 1000), online: players.has(h.name) };
   }
 
-  return { players, history, getHistory, join, leave, parseLine, reset, stats, detail };
+  const snapshot = () => [...history.entries()];
+  function restore(entries) {
+    if (!Array.isArray(entries)) return;
+    for (const [name, h] of entries) if (NAME_RE.test(name) && h && typeof h === 'object') history.set(name, { ...h, activeSince: null });
+  }
+
+  return { players, history, getHistory, join, leave, parseLine, reset, stats, detail, snapshot, restore };
 }
 
 module.exports = { createPlayerTracker, buildPlayerCommand, playerName };
