@@ -26,6 +26,10 @@ Commercial use of the Software is permitted. This includes internal business use
 
 ## 2. Private and Commercial Use
 
+Subject to compliance with this License, each recipient is granted a worldwide, royalty-free, non-exclusive right to use, run, copy, inspect, study, modify, self-host, and commercially use the Software, and to distribute the Software or Modified Versions only as expressly permitted by this License.
+
+No ownership is transferred by this grant.
+
 ### Private use
 
 You may privately:
@@ -171,7 +175,9 @@ Calling Meowmarism "free" does not make an arrangement compliant if the price is
 
 ### 6.8 The official project
 
-Nothing in this License gives the Licensor or any future maintainer the right to sell or separately license the Software itself, to commercially relicense community Contributions, to convert them into proprietary software, or to place them behind paid access.
+No maintainer or successor may rely on this License, project control, or possession of project infrastructure as authority to sell or separately license contributor-owned material, commercially relicense community Contributions, convert such Contributions into proprietary software, or place them behind paid access. Any such use requires whatever rights and approvals are required from the affected rights holders and under the Contributor & Governance Agreement.
+
+Official project releases distributed under this License remain subject to the Software Monetization restrictions in this Section. A later maintainer cannot avoid those restrictions for an existing licensed release merely by taking control of the project.
 
 This does not restrict operating a commercial service that merely uses Meowmarism as a tool or component.
 
@@ -199,7 +205,7 @@ Where a contributor's work remains materially represented in the project, their 
 
 The official project maintains a CONTRIBUTORS.md file or equivalent public contributor record.
 
-Redistributions and Modified Versions must preserve the contributor record included with the version from which they derive.
+Every distributed copy of the Software, and every Modified Version that is distributed or publicly offered, must preserve the contributor record included with the version from which it derives.
 
 A distributor may add contributors for new original work, but may not:
 
@@ -245,6 +251,8 @@ Adding a separate disclaimer below such a title does not make the title complian
 The "Unofficial" designation must be at least as prominent as the "Meowmarism" portion of the derivative project's name.
 
 Names that use "Meowmarism" to present a version as better, improved, newer, or a successor of Meowmarism are not permitted, with or without "Unofficial". This includes names such as "Better Meowmarism", "Meowmarism Pro", "Meowmarism Plus", "Meowmarism Enhanced", "Meowmarism 2", "New Meowmarism", "Meowmarism Ultimate", and "Meowmarism Next". The official editions of the Meowmarism Project, such as meowmarism LITE and meowmarism PROFESSIONAL, are not affected. Competing products are allowed, but they may not borrow the Meowmarism name to promote themselves or to suggest that they are the official, next, or improved Meowmarism.
+
+To the extent this License requires or permits a factual reference to Meowmarism, you are granted a limited, non-exclusive permission to use the name "Meowmarism" solely as reasonably necessary to comply with Sections 10 to 13 or to truthfully describe origin, compatibility, or relationship. This permission does not extend to logos or other brand assets and does not permit any implication of official status, sponsorship, approval, or endorsement.
 
 ## 12. Mandatory Non-Affiliation Notice
 
@@ -298,7 +306,7 @@ A rebranded Modified Version may not conceal its origin from Meowmarism or prese
 
 ## 14. Modification Disclosure
 
-Modified Versions must clearly state that modifications have been made and provide a reasonable description of the major changes or differences from the official version.
+Modified Versions that are distributed or publicly offered must clearly state that modifications have been made and provide a reasonable description of the major changes or differences from the official version.
 
 The disclosure must not imply that third-party modifications were made by HexedMaya or the official Meowmarism Project.
 
@@ -307,6 +315,8 @@ The disclosure must not imply that third-party modifications were made by HexedM
 Public distribution rights under this License are conditional on compliance with the Project Rules that apply to the release being distributed.
 
 Project Rules may contain reasonable conduct, safety, distribution, branding, and community requirements.
+
+Project Rules may not modify the core licensing model established by this License. In particular, they may not expand the Software Monetization restriction, require relicensing under a different software license, impose additional source-code licensing terms, or retroactively change the conditions attached to a copy already received. If a Project Rule conflicts with this License, this License controls.
 
 Only the version of the Project Rules expressly identified by version number, release identifier, or immutable commit reference for the applicable release applies. A reference to a file or page that can be changed later is not sufficient.
 
@@ -395,7 +405,19 @@ To the extent permitted by applicable law, this License is governed by the laws 
 
 Mandatory provisions of applicable law remain unaffected.
 
-## 24. Entire License
+## 24. License Versions and Future Releases
+
+This version is the Meowmarism License 1.0.
+
+A copy or release of the Software is governed by the license version expressly distributed with that copy or release.
+
+The Licensor may publish later versions of the Meowmarism License and may distribute future material solely owned by the Licensor under different terms. A later license version does not automatically reduce, revoke, or alter rights already validly granted for a copy received under an earlier version.
+
+Future releases containing contributor-owned material may be distributed under different or additional terms only to the extent the project has the necessary rights and approvals under the Contributor & Governance Agreement and applicable contributor grants.
+
+Nothing in this Section grants the Licensor, a maintainer, or a successor rights in contributor-owned material beyond the rights actually granted by the applicable contributor.
+
+## 25. Entire License
 
 No README, issue, pull request, Discord message, email, conversation, documentation page, source comment, or other informal statement creates an exception unless it is a valid written permission issued by the Licensor with every approval and right required by this License and the Contributor & Governance Agreement.
 
