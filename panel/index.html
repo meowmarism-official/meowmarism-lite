@@ -12,6 +12,7 @@
 <script src="/core/ui/settings-ui.js"></script>
 <script src="/core/ui/access-ui.js"></script>
 <script src="/core/ui/backups-ui.js"></script>
+<script src="/core/ui/mods-ui.js"></script>
 <script>
 (() => {
   const m = location.pathname.match(/^\/instance\/[^/]+/);
@@ -127,29 +128,7 @@
 
       <section class="page" id="page-backups"><div id="backupsRoot"></div></section>
 
-      <section class="page" id="page-mods">
-        <div class="mods-tabs" style="display:flex;gap:6px;margin-bottom:14px">
-          <button class="btn primary" data-mods-tab="installed">Installed</button>
-          <button class="btn" data-mods-tab="browse">Browse Modrinth</button>
-          <button class="btn" data-mods-tab="updates">Updates <span class="tag" id="modsUpdateCount" style="display:none">0</span></button>
-        </div>
-        <div id="modsInstalled">
-        <div class="settings-toolbar"><div><div class="card-title">Installed mods</div><div class="settings-status" id="modsStatus">—</div></div>
-          <div class="settings-actions"><input class="compact-input" id="modsSearch" placeholder="Filter mods..."></div>
-        </div>
-        <div class="grid">
-          <article class="card span-6"><div class="card-head"><div class="card-title">Enabled</div><div class="card-meta" id="modsEnabledCount">0</div></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th data-mods-sort="name" style="cursor:pointer">File</th><th data-mods-sort="sizeMB" style="cursor:pointer">Size</th><th data-mods-sort="addedAt" style="cursor:pointer">Added</th><th></th></tr></thead><tbody id="modsEnabledRows"></tbody></table></div>
-          </article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Disabled</div><div class="card-meta" id="modsDisabledCount">0</div></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th data-mods-sort="name" style="cursor:pointer">File</th><th data-mods-sort="sizeMB" style="cursor:pointer">Size</th><th data-mods-sort="addedAt" style="cursor:pointer">Added</th><th></th></tr></thead><tbody id="modsDisabledRows"></tbody></table></div>
-          </article>
-        </div>
-        <div class="hint" style="padding:10px 4px">Changes only take effect after a server restart.</div>
-        </div>
-        <div id="modsBrowse" style="display:none"></div>
-        <div id="modsUpdates" style="display:none"></div>
-      </section>
+      <section class="page" id="page-mods"><div id="modsRoot"></div></section>
 
       <section class="page" id="page-files"><div id="filesRoot"></div></section>
 
@@ -1573,59 +1552,17 @@ loadBackups();
 setInterval(loadBackups, 30000);
 
 // --- Mods ---
-let modsEnabledList = [], modsDisabledList = [];
-let modsSortKey = 'name', modsSortDir = 1;
-function sortMods(list) {
-  return list.slice().sort((a, b) => {
-    let av = a[modsSortKey], bv = b[modsSortKey];
-    if (modsSortKey === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
-    if (av == null) av = modsSortKey === 'name' ? '' : -1;
-    if (bv == null) bv = modsSortKey === 'name' ? '' : -1;
-    return av < bv ? -1 * modsSortDir : av > bv ? 1 * modsSortDir : 0;
-  });
-}
-function renderMods() {
-  const q = ($('modsSearch')?.value || '').toLowerCase();
-  const render = (rowsId, countId, list, enable) => {
-    const el = $(rowsId);
-    if (!el) return;
-    const filtered = sortMods(list.filter((m) => !q || m.name.toLowerCase().includes(q)));
-    $(countId).textContent = `${filtered.length}/${list.length}`;
-    el.innerHTML = filtered.map((m) => `<tr><td>${esc(m.name)}</td><td>${m.sizeMB} MB</td><td class="hint">${m.addedAt ? new Date(m.addedAt).toLocaleString() : '—'}</td><td style="text-align:right"><button class="btn ${enable ? '' : 'warn'}" data-mod-toggle="${esc(m.name)}" data-mod-enable="${enable}">${enable ? 'Enable' : 'Disable'}</button></td></tr>`).join('')
-      || `<tr><td colspan="4" class="hint">${q ? 'No mods match.' : 'None.'}</td></tr>`;
-  };
-  render('modsEnabledRows', 'modsEnabledCount', modsEnabledList, false);
-  render('modsDisabledRows', 'modsDisabledCount', modsDisabledList, true);
-  $('modsStatus').textContent = `${modsEnabledList.length} enabled - ${modsDisabledList.length} disabled`;
-}
-async function loadMods() {
-  try {
-    const r = await fetch('/api/mods');
-    const data = await r.json();
-    modsEnabledList = data.enabled;
-    modsDisabledList = data.disabled;
-    renderMods();
-  } catch (err) { console.error(err); }
-}
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-mod-toggle]');
-  if (!btn) return;
-  const name = btn.dataset.modToggle;
-  const enable = btn.dataset.modEnable === 'true';
-  btn.disabled = true;
-  fetch('/api/mods/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, enable }) })
-    .then(() => loadMods()).finally(() => { btn.disabled = false; });
+const MODS = MeowMods.mount({
+  el: $('modsRoot'),
+  load: async () => (await fetch('/api/mods')).json(),
+  toggle: (name, enable) => fetch('/api/mods/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, enable }) }),
+  modrinthBase: () => `${window.__BASE || ''}/api/modrinth`,
+  t, esc, toast,
+  refreshMs: 15000, isVisible: () => currentPage === 'mods',
 });
-$('modsSearch')?.addEventListener('input', renderMods);
-document.addEventListener('click', (e) => {
-  const th = e.target.closest('[data-mods-sort]');
-  if (!th) return;
-  const key = th.dataset.modsSort;
-  if (modsSortKey === key) modsSortDir *= -1; else { modsSortKey = key; modsSortDir = 1; }
-  renderMods();
-});
+const loadMods = () => MODS.load();
+const MR = MODS.modrinth;
 loadMods();
-setInterval(() => { if (currentPage === 'mods') loadMods(); }, 15000);
 
 // --- Files ---
 const FILES = MeowFiles.mount({
@@ -1811,24 +1748,6 @@ const SCHEDULE = MeowSchedule.mount({
 });
 SCHEDULE.load();
 
-// --- Modrinth ---
-const MR = MeowModrinth.mount({
-  browseEl: $('modsBrowse'),
-  updatesEl: $('modsUpdates'),
-  base: () => `${window.__BASE || ''}/api/modrinth`,
-  t, esc, toast,
-  onInstalled: () => loadMods(),
-  onUpdateCount: (n) => { $('modsUpdateCount').style.display = n ? '' : 'none'; $('modsUpdateCount').textContent = n; },
-});
-function showModsTab(tab) {
-  document.querySelectorAll('[data-mods-tab]').forEach((b) => b.classList.toggle('primary', b.dataset.modsTab === tab));
-  $('modsInstalled').style.display = tab === 'installed' ? '' : 'none';
-  $('modsBrowse').style.display = tab === 'browse' ? '' : 'none';
-  $('modsUpdates').style.display = tab === 'updates' ? '' : 'none';
-  if (tab === 'browse') MR.search(true);
-  if (tab === 'updates') MR.loadUpdates();
-}
-document.querySelectorAll('[data-mods-tab]').forEach((b) => b.addEventListener('click', () => showModsTab(b.dataset.modsTab)));
 
 // --- Server software upgrade ---
 const CTRL = location.origin + '/_meta';
