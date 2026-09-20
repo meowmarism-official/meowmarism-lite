@@ -39,6 +39,7 @@ const WORKER_PORT_BASE = Number(process.env.WORKER_PORT_BASE) || 9090;
 const CONTROLLER_USERS_FILE = path.join(os.homedir(), '.meowmarism-controller-users.json');
 const { createUserStore, effectiveCaps, hasPanelCap } = require('./lib/db');
 const { createUsersApi } = require('./core/modules/users-api');
+const { createPanelSettings } = require('./core/modules/panel-settings');
 const controllerUsers = createUserStore(CONTROLLER_USERS_FILE);
 const usersApi = createUsersApi({ store: controllerUsers, session: (req) => currentSession(req) });
 
@@ -380,31 +381,8 @@ let instanceCreateInProgress = false;
 let versionCache = null; // { at, tag } - GitHub latest-release lookup, refreshed every 10 min
 const RESTART_FILE = path.join(os.homedir(), '.meowmarism-restart.json');
 const updateState = { running: false, error: null, step: null };
-const SETTINGS_FILE = path.join(os.homedir(), '.meowmarism-controller-settings.json');
-let settingsCache = null;
-function loadSettings() {
-  if (!settingsCache) {
-    let saved = {};
-    try { saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); } catch (_) {}
-    settingsCache = { trustProxy: saved.trustProxy === true };
-  }
-  return { ...settingsCache };
-}
-function saveSettings(next) {
-  settingsCache = { ...next };
-  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(next, null, 2)); } catch (_) {}
-}
-function trustProxy() { return process.env.MEOWMARISM_TRUST_PROXY === '1' || loadSettings().trustProxy; }
-function clientIp(req) {
-  if (trustProxy()) {
-    const parts = String(req.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
-    if (parts.length) return parts[parts.length - 1];
-  }
-  return req.socket.remoteAddress || 'unknown';
-}
-function isHttps(req) {
-  return !!req.socket.encrypted || (trustProxy() && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');
-}
+const panelSettings = createPanelSettings({ file: path.join(os.homedir(), '.meowmarism-controller-settings.json') });
+const { load: loadSettings, save: saveSettings, clientIp, isHttps } = panelSettings;
 function instanceAutoStarts(inst) {
   try { return JSON.parse(fs.readFileSync(path.join(inst.dir, 'panel-config.json'), 'utf8')).autoStart === true; }
   catch (_) { return false; }
