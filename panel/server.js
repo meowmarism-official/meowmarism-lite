@@ -174,6 +174,11 @@ const propertiesApi = require('./core/modules/properties').createProperties({
   isRunning: () => !!child,
   command: (text) => sendCommand(text),
 });
+const accessApi = require('./core/modules/access').createAccess({
+  dir: SERVER_DIR,
+  isRunning: () => !!child,
+  command: (text) => sendCommand(text),
+});
 const readServerProperties = () => propertiesApi.read();
 const buildSettingsState = () => propertiesApi.state();
 function applySettingsPatch(patch) {
@@ -1994,12 +1999,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/access' && req.method === 'GET') {
-    const readJsonSafe = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return []; } };
-    sendJson(res, 200, {
-      whitelist: readJsonSafe(WHITELIST_FILE),
-      ops: readJsonSafe(OPS_FILE),
-      banned: readJsonSafe(BANNED_PLAYERS_FILE),
-    });
+    sendJson(res, 200, accessApi.list());
     return;
   }
 
@@ -2009,20 +2009,9 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const data = JSON.parse(body || '{}');
-        const actionMap = {
-          whitelist: { add: 'whitelist-add', remove: 'whitelist-remove' },
-          ops: { add: 'op', remove: 'deop' },
-          banned: { add: 'ban', remove: 'pardon' },
-        };
-        const group = actionMap[data.list];
-        if (!group) throw new Error('invalid list');
-        const cmdAction = group[data.action];
-        if (!cmdAction) throw new Error('invalid action');
-        if (!child) throw new Error('server is not running');
-        const cmd = buildPlayerCommand(cmdAction, data.name, null, data.reason);
-        if (!sendCommand(cmd)) throw new Error('server is not running');
-        pushAudit(`access.${data.list}.${data.action}`, normalizePlayerName(data.name));
-        pushTimeline('access', `${data.list} ${data.action}`, normalizePlayerName(data.name), 'info', { list: data.list, action: data.action, name: data.name });
+        const player = accessApi.act(data.list, data.action, data.name, data.reason);
+        pushAudit(`access.${data.list}.${data.action}`, player);
+        pushTimeline('access', `${data.list} ${data.action}`, player, 'info', { list: data.list, action: data.action, name: player });
         sendJson(res, 200, { ok: true });
       } catch (err) { sendJson(res, 400, { ok: false, error: err.message || 'invalid access action' }); }
     });

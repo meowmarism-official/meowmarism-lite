@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "f6018ed7f40a1b01163731111e3e44d5701d5bf9",
+  "commit": "4a53425eb8a213a471f801d1c4ca597ee832b2ec",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -16,6 +16,7 @@
     "panel/core/brand/server-icon.png",
     "panel/core/tokens/tokens.css",
     "panel/core/tokens/tokens.json",
+    "panel/core/modules/access.js",
     "panel/core/modules/backup.js",
     "panel/core/modules/files.js",
     "panel/core/modules/modrinth.js",
@@ -26,6 +27,8 @@
     "panel/core/modules/safety.js",
     "panel/core/modules/schedule-run.js",
     "panel/core/modules/scheduler.js",
+    "panel/core/ui/access-ui.css",
+    "panel/core/ui/access-ui.js",
     "panel/core/ui/files-ui.css",
     "panel/core/ui/files-ui.js",
     "panel/core/ui/loaders.js",

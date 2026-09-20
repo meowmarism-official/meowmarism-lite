@@ -9,6 +9,7 @@
 <script src="/core/ui/files-ui.js"></script>
 <script src="/core/ui/schedule-ui.js"></script>
 <script src="/core/ui/settings-ui.js"></script>
+<script src="/core/ui/access-ui.js"></script>
 <script>
 (() => {
   const m = location.pathname.match(/^\/instance\/[^/]+/);
@@ -93,6 +94,7 @@
 <link rel="stylesheet" href="/core/ui/modrinth-ui.css">
 <link rel="stylesheet" href="/core/ui/files-ui.css">
 <link rel="stylesheet" href="/core/ui/settings-ui.css">
+<link rel="stylesheet" href="/core/ui/access-ui.css">
 </head>
 <body>
 <div class="app">
@@ -239,23 +241,7 @@
 
       <section class="page" id="page-files"><div id="filesRoot"></div></section>
 
-      <section class="page" id="page-access">
-        <div class="grid">
-          <article class="card span-4"><div class="card-head"><div class="card-title">Whitelist</div></div><div class="card-body">
-            <div class="cmd-row"><input class="compact-input" id="accessWhitelistInput" placeholder="Player name"><button class="btn primary" id="accessWhitelistAdd">Add</button></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th></th></tr></thead><tbody id="accessWhitelistRows"></tbody></table></div>
-          </div></article>
-          <article class="card span-4"><div class="card-head"><div class="card-title">Operators</div></div><div class="card-body">
-            <div class="cmd-row"><input class="compact-input" id="accessOpsInput" placeholder="Player name"><button class="btn primary" id="accessOpsAdd">Add</button></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th></th></tr></thead><tbody id="accessOpsRows"></tbody></table></div>
-          </div></article>
-          <article class="card span-4"><div class="card-head"><div class="card-title">Bans</div></div><div class="card-body">
-            <div class="cmd-row"><input class="compact-input" id="accessBannedInput" placeholder="Player name"><button class="btn danger" id="accessBannedAdd">Ban</button></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th></th></tr></thead><tbody id="accessBannedRows"></tbody></table></div>
-          </div></article>
-        </div>
-        <div class="hint" style="padding:10px 4px" id="accessHint">Changes require a running server (they're sent as console commands).</div>
-      </section>
+      <section class="page" id="page-access"><div id="accessRoot"></div></section>
 
       <section class="page" id="page-schedule"><div id="scheduleRoot"></div></section>
 
@@ -1781,35 +1767,15 @@ document.querySelector('[data-page="files"]')?.addEventListener('click', () => F
 $('backToController').href = '/';
 
 // --- Access (whitelist / ops / bans) ---
-async function loadAccess() {
-  try {
-    const r = await fetch('/api/access');
-    const data = await r.json();
-    const renderList = (rowsId, list, list2) => {
-      const el = $(rowsId);
-      if (!el) return;
-      const names = list.map((x) => x.name || x.user || x);
-      el.innerHTML = names.map((n) => `<tr><td>${esc(n)}</td><td style="text-align:right"><button class="btn danger" data-access-remove="${esc(list2)}" data-access-name="${esc(n)}">Remove</button></td></tr>`).join('') || '<tr><td colspan="2" class="hint">empty</td></tr>';
-    };
-    renderList('accessWhitelistRows', data.whitelist, 'whitelist');
-    renderList('accessOpsRows', data.ops, 'ops');
-    renderList('accessBannedRows', data.banned, 'banned');
-  } catch (err) { console.error(err); }
-}
-function accessAction(list, action, name) {
-  if (!name) return;
-  return fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ list, action, name }) })
-    .then((r) => r.json()).then((d) => { if (!d.ok) modalAlert('Error', d.error || 'Action failed'); loadAccess(); });
-}
-document.addEventListener('click', (e) => {
-  const rm = e.target.closest('[data-access-remove]');
-  if (rm) accessAction(rm.dataset.accessRemove, 'remove', rm.dataset.accessName);
+const ACCESS = MeowAccess.mount({
+  el: $('accessRoot'),
+  load: async () => (await fetch(`${window.__BASE || ''}/api/access`)).json(),
+  act: (list, action, name) => post('/api/access', { list, action, name }),
+  t, esc, toast,
+  isVisible: () => currentPage === 'access',
 });
-$('accessWhitelistAdd')?.addEventListener('click', () => { const el = $('accessWhitelistInput'); accessAction('whitelist', 'add', el.value.trim()); el.value = ''; });
-$('accessOpsAdd')?.addEventListener('click', () => { const el = $('accessOpsInput'); accessAction('ops', 'add', el.value.trim()); el.value = ''; });
-$('accessBannedAdd')?.addEventListener('click', () => { const el = $('accessBannedInput'); accessAction('banned', 'add', el.value.trim()); el.value = ''; });
-loadAccess();
-setInterval(() => { if (currentPage === 'access') loadAccess(); }, 15000);
+ACCESS.load();
+document.querySelector('[data-page="access"]')?.addEventListener('click', () => ACCESS.load());
 
 // --- Startup (memory, JVM flags, Java, limits, autostart) ---
 async function loadStartup() {
