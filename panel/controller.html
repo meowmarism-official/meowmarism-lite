@@ -13,6 +13,7 @@
 <script src="/core/ui/loaders.js"></script>
 <script src="/core/ui/instances-ui.js"></script>
 <script src="/core/ui/shell.js"></script>
+<script src="/core/ui/wizard-ui.js"></script>
 <script src="/core/ui/users-ui.js"></script>
 </head>
 <body>
@@ -49,69 +50,6 @@
   </div>
 </div>
 
-<div class="wizard-back" id="wizardBack">
-  <div class="wizard">
-    <div class="steps"><span id="stepDot1"></span><span id="stepDot2"></span><span id="stepDot3"></span></div>
-
-    <div id="step1">
-      <h2>Create instance</h2>
-      <p class="step-hint">Name it and pick what it runs.</p>
-      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
-      <div class="field-row">
-        <div class="field"><label for="w-loader">Loader</label>
-          <select id="w-loader">
-            <option value="vanilla" selected>Vanilla</option>
-            <option value="paper">Paper</option>
-            <option value="purpur">Purpur</option>
-            <option value="fabric">Fabric</option>
-            <option value="forge">Forge</option>
-            <option value="neoforge">NeoForge</option>
-          </select>
-        </div>
-        <div class="field"><label for="w-mc">Minecraft version</label><select id="w-mc"><option value="">Loading...</option></select></div>
-      </div>
-      <div class="field" id="w-loaderVersionField"><label for="w-loaderVersion">Loader version</label><select id="w-loaderVersion" disabled><option value="">Pick a Minecraft version first</option></select></div>
-      <p class="hint" id="w1-error" style="color:var(--red);display:none"></p>
-      <div class="wizard-actions"><button class="btn" id="w-cancel1">Cancel</button><button class="btn primary" id="w-next1">Next</button></div>
-    </div>
-
-    <div id="step2" style="display:none">
-      <h2>Resources</h2>
-      <p class="step-hint">How much of this machine the instance may use.</p>
-      <div class="field-row">
-        <div class="field"><label for="w-port">Server port</label><input id="w-port" type="number" value="25565"><div class="hint" id="w-portHint" style="margin-top:4px"></div></div>
-        <div class="field"><label for="w-ram">Memory (MB)</label><input id="w-ram" type="number" value="4096" step="512" min="1024" max="32768"></div>
-      </div>
-      <p class="hint" style="margin-top:-6px">Handed to the JVM as -Xmx. Leave headroom for the OS and other instances on this host.</p>
-      <label class="toggle-row" style="margin-top:10px"><span class="toggle"><input type="checkbox" id="w-autostart" /><span class="toggle-track"></span><span class="toggle-thumb"></span></span><span>Start automatically when meowmarism starts</span></label>
-      <p class="hint" id="w2-error" style="color:var(--red);display:none"></p>
-      <div class="wizard-actions"><button class="btn" id="w-back2">Back</button><button class="btn primary" id="w-next2">Next</button></div>
-    </div>
-
-    <div id="step3" style="display:none">
-      <h2>Backups</h2>
-      <p class="step-hint">Automatic world backups for this instance.</p>
-      <div class="field-row">
-        <div class="field"><label for="w-backupInterval">Every (hours)</label><input id="w-backupInterval" type="number" value="6" min="1" max="168"></div>
-        <div class="field"><label for="w-maxBackups">Keep at most</label><input id="w-maxBackups" type="number" value="10" min="1" max="100"></div>
-      </div>
-      <div class="wizard-actions"><button class="btn" id="w-back3">Back</button><button class="btn primary" id="w-create">Create instance</button></div>
-      <p class="hint" id="createStatus"></p>
-    </div>
-
-    <div id="step4" style="display:none">
-      <h2 id="creatingTitle">Creating instance&hellip;</h2>
-      <p class="step-hint" id="creatingHint">Downloading and installing the server software - this can take a few minutes.</p>
-      <div class="progress-track"><div class="progress-fill" id="creatingBar" style="width:5%"></div></div>
-      <div class="console" id="creatingConsole"></div>
-      <div class="wizard-actions">
-        <span></span>
-        <a class="btn primary" id="creatingOpen" style="display:none">Open instance</a>
-        <button class="btn" id="creatingClose" style="display:none">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -244,130 +182,72 @@ async function suggestPort(start) {
     $('w-portHint').textContent = d.taken ? window.t(`Port ${start} is in use, ${d.port} is free.`) : '';
   } catch (_) {}
 }
+
+// --- create wizard ---
+function fieldError(id, msg) { const el = $(id); if (!msg) { el.style.display = 'none'; el.textContent = ''; return false; } el.textContent = msg; el.style.display = ''; return true; }
+const WIZ = MeowWizard.mount({
+  t: window.t, esc,
+  createLabel: 'Create instance',
+  steps: [
+    { title: 'Create instance', hint: 'Name it and pick what it runs.', html: `      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
+      <div class="field-row">
+        <div class="field"><label for="w-loader">Loader</label>
+          <select id="w-loader">
+            <option value="vanilla" selected>Vanilla</option>
+            <option value="paper">Paper</option>
+            <option value="purpur">Purpur</option>
+            <option value="fabric">Fabric</option>
+            <option value="forge">Forge</option>
+            <option value="neoforge">NeoForge</option>
+          </select>
+        </div>
+        <div class="field"><label for="w-mc">Minecraft version</label><select id="w-mc"><option value="">Loading...</option></select></div>
+      </div>
+      <div class="field" id="w-loaderVersionField"><label for="w-loaderVersion">Loader version</label><select id="w-loaderVersion" disabled><option value="">Pick a Minecraft version first</option></select></div>`,
+      validate: () => {
+        if (!$('w-name').value.trim()) return 'Pick an instance name';
+        if (!$('w-mc').value) return 'Pick a Minecraft version';
+        if ($('w-loader').value !== 'vanilla' && !$('w-loaderVersion').value) return 'Pick a loader version';
+        return null;
+      } },
+    { title: 'Resources', hint: 'How much of this machine the instance may use.', html: `      <div class="field-row">
+        <div class="field"><label for="w-port">Server port</label><input id="w-port" type="number" value="25565"><div class="hint" id="w-portHint" style="margin-top:4px"></div></div>
+        <div class="field"><label for="w-ram">Memory (MB)</label><input id="w-ram" type="number" value="4096" step="512" min="1024" max="32768"></div>
+      </div>
+      <p class="hint" style="margin-top:-6px">Handed to the JVM as -Xmx. Leave headroom for the OS and other instances on this host.</p>
+      <label class="toggle-row" style="margin-top:10px"><span class="toggle"><input type="checkbox" id="w-autostart" /><span class="toggle-track"></span><span class="toggle-thumb"></span></span><span>Start automatically when meowmarism starts</span></label>`,
+      validate: () => {
+        const port = Number($('w-port').value);
+        const ram = Number($('w-ram').value);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) return 'Enter a valid port (1-65535)';
+        if (!ram || ram < 1024) return 'Give it at least 1024 MB';
+        return null;
+      } },
+    { title: 'Backups', hint: 'Automatic world backups for this instance.', html: `      <div class="field-row">
+        <div class="field"><label for="w-backupInterval">Every (hours)</label><input id="w-backupInterval" type="number" value="6" min="1" max="168"></div>
+        <div class="field"><label for="w-maxBackups">Keep at most</label><input id="w-maxBackups" type="number" value="10" min="1" max="100"></div>
+      </div>` },
+  ],
+  onOpen: () => { suggestPort(25565); if ($('w-mc').options.length <= 1) loadMcVersions($('w-loader').value); },
+  create: async () => {
+    const body = {
+      name: $('w-name').value.trim(), loader: $('w-loader').value, mcVersion: $('w-mc').value, loaderVersion: $('w-loaderVersion').value,
+      port: Number($('w-port').value), ramMB: Number($('w-ram').value),
+      backupIntervalHours: Number($('w-backupInterval').value), maxBackups: Number($('w-maxBackups').value), autoStart: $('w-autostart').checked,
+    };
+    const r = await fetch('/api/instances', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Failed to create');
+    return body.name;
+  },
+  progress: async () => (await fetch('/api/create-log')).json(),
+  openHref: (name) => `/instance/${encodeURIComponent(name)}/`,
+  onFinished: () => { $('w-name').value = ''; loadInstances(); },
+});
 $('w-port').addEventListener('change', (e) => suggestPort(Number(e.target.value) || 25565));
 $('w-loader').addEventListener('change', (e) => loadMcVersions(e.target.value));
 $('w-mc').addEventListener('change', (e) => { if (e.target.value) loadLoaderVersions($('w-loader').value, e.target.value); });
-
-// --- wizard flow ---
-let creating = false;
-function showStep(n) {
-  $('step1').style.display = n === 1 ? '' : 'none';
-  $('step2').style.display = n === 2 ? '' : 'none';
-  $('step3').style.display = n === 3 ? '' : 'none';
-  $('step4').style.display = n === 4 ? '' : 'none';
-  $('stepDot1').classList.toggle('done', n >= 1);
-  $('stepDot2').classList.toggle('done', n >= 2);
-  $('stepDot3').classList.toggle('done', n >= 3);
-}
-function openWizard() {
-  $('wizardBack').classList.add('open');
-  suggestPort(25565);
-  showStep(1);
-  $('createStatus').textContent = '';
-  fieldError('w1-error', null);
-  fieldError('w2-error', null);
-  if ($('w-mc').options.length <= 1) loadMcVersions($('w-loader').value);
-}
-function closeWizard() { if (creating) return; $('wizardBack').classList.remove('open'); }
-$('openWizard').addEventListener('click', openWizard);
-$('w-cancel1').addEventListener('click', closeWizard);
-
-function fieldError(id, msg) {
-  const el = $(id);
-  if (!msg) { el.style.display = 'none'; el.textContent = ''; return false; }
-  el.textContent = msg; el.style.display = ''; return true;
-}
-$('w-next1').addEventListener('click', () => {
-  const name = $('w-name').value.trim();
-  const mcVersion = $('w-mc').value;
-  const loaderVersion = $('w-loaderVersion').value;
-  const loader = $('w-loader').value;
-  if (!name) { fieldError('w1-error', 'Pick an instance name'); return; }
-  if (!mcVersion) { fieldError('w1-error', 'Pick a Minecraft version'); return; }
-  if (loader !== 'vanilla' && !loaderVersion) { fieldError('w1-error', 'Pick a loader version'); return; }
-  fieldError('w1-error', null);
-  showStep(2);
-});
-$('w-back2').addEventListener('click', () => showStep(1));
-$('w-next2').addEventListener('click', () => {
-  const port = Number($('w-port').value);
-  const ram = Number($('w-ram').value);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) { fieldError('w2-error', 'Enter a valid port (1-65535)'); return; }
-  if (!ram || ram < 1024) { fieldError('w2-error', 'Give it at least 1024 MB'); return; }
-  fieldError('w2-error', null);
-  showStep(3);
-});
-$('w-back3').addEventListener('click', () => showStep(2));
-
-$('w-create').addEventListener('click', async () => {
-  const body = {
-    name: $('w-name').value.trim(),
-    loader: $('w-loader').value,
-    mcVersion: $('w-mc').value,
-    loaderVersion: $('w-loaderVersion').value,
-    port: Number($('w-port').value),
-    ramMB: Number($('w-ram').value),
-    backupIntervalHours: Number($('w-backupInterval').value),
-    maxBackups: Number($('w-maxBackups').value),
-    autoStart: $('w-autostart').checked,
-  };
-  $('w-create').disabled = true;
-  const r = await fetch('/api/instances', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json();
-  $('w-create').disabled = false;
-  if (!d.ok) { $('createStatus').textContent = d.error || 'Failed to create'; return; }
-  startCreationView(body.name);
-});
-
-function startCreationView(name) {
-  creating = true;
-  showStep(4);
-  $('creatingTitle').textContent = `Creating "${name}"…`;
-  $('creatingHint').textContent = 'Downloading and installing the server software - this can take a few minutes.';
-  $('creatingBar').style.width = '5%';
-  $('creatingBar').className = 'progress-fill';
-  $('creatingConsole').innerHTML = '';
-  $('creatingOpen').style.display = 'none';
-  $('creatingClose').style.display = 'none';
-  let shownLines = 0;
-  const box = $('creatingConsole');
-  const poll = setInterval(async () => {
-    const s = await (await fetch('/api/create-log')).json();
-    const lines = s.lines || [];
-    if (lines.length > shownLines) {
-      for (let i = shownLines; i < lines.length; i++) {
-        const div = document.createElement('div');
-        div.textContent = lines[i];
-        box.appendChild(div);
-      }
-      shownLines = lines.length;
-      box.scrollTop = box.scrollHeight;
-    }
-    $('creatingBar').style.width = `${s.progress || 0}%`;
-    if (s.done) {
-      clearInterval(poll);
-      creating = false;
-      if (s.error) {
-        $('creatingTitle').textContent = `Failed to create "${name}"`;
-        $('creatingHint').textContent = s.error;
-        $('creatingBar').className = 'progress-fill err';
-      } else {
-        $('creatingTitle').textContent = `"${s.name || name}" is ready`;
-        $('creatingHint').textContent = 'Installed and registered - start it whenever you want.';
-        $('creatingBar').style.width = '100%';
-        $('creatingBar').className = 'progress-fill done';
-        if (s.name) {
-          $('creatingOpen').href = `/instance/${encodeURIComponent(s.name)}/`;
-          $('creatingOpen').style.display = '';
-        }
-      }
-      $('creatingClose').style.display = '';
-      $('w-name').value = '';
-      loadInstances();
-    }
-  }, 1000);
-}
-$('creatingClose').addEventListener('click', closeWizard);
+$('openWizard').addEventListener('click', () => WIZ.open());
 
 // --- account / users ---
 async function loadAccount() {

@@ -15,7 +15,9 @@
     const now = Date.now(), from = now - rangeMs;
     const vals = pts.map((p) => p[chart.key]);
     const max = chart.max || Math.max(chart.minMax || 1, ...vals) * 1.15;
-    const padL = 44, padB = 18, padT = 6;
+    g.font = '11px system-ui,sans-serif';
+    const labels = [0, 1, 2, 3].map((i) => (chart.format ? chart.format((max / 3) * i) : String(Math.round((max / 3) * i))));
+    const padL = Math.ceil(Math.max(...labels.map((l) => g.measureText(l).width))) + 14, padB = 18, padT = 6;
     const X = (t) => padL + ((t - from) / rangeMs) * (w - padL - 6);
     const Y = (v) => padT + (1 - Math.min(v, max) / max) * (h - padT - padB);
     g.font = '11px system-ui,sans-serif';
