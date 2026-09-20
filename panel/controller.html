@@ -6,6 +6,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2026%2024%22%20fill%3D%22none%22%20stroke%3D%22%23ff6fc4%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20role%3D%22img%22%20aria-label%3D%22meowmarism%22%3E%3Cpath%20d%3D%22M3.2%204.7%20C3.2%203.29%204.82%202.5%205.94%203.36%20L13%208.83%20L20.06%203.36%20C21.18%202.5%2022.8%203.29%2022.8%204.7%20L22.8%2018.4%20C22.8%2020.58%2020.28%2021.79%2018.57%2020.42%20L13%2015.96%20L7.43%2020.42%20C5.72%2021.79%203.2%2020.58%203.2%2018.4%20Z%22%2F%3E%3Cpath%20d%3D%22M12.08%2014.59%20C12.08%2014.26%2012.35%2014.06%2012.74%2014.06%20H13.26%20C13.65%2014.06%2013.92%2014.26%2013.92%2014.59%20C13.92%2014.85%2013.79%2015.04%2013.59%2015.24%20L13%2015.83%20L12.41%2015.24%20C12.21%2015.04%2012.08%2014.85%2012.08%2014.59%20Z%22%20fill%3D%22%23ff6fc4%22%20stroke%3D%22none%22%2F%3E%3Cpath%20d%3D%22M6.3%2012.7%20L9.6%2013.7%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M6.3%2015.5%20L9.6%2014.9%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M19.7%2012.7%20L16.4%2013.7%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M19.7%2015.5%20L16.4%2014.9%22%20stroke-width%3D%221.3%22%2F%3E%3C%2Fsvg%3E">
 <title>meowmarism LITE</title>
 <link rel="stylesheet" href="/core/tokens/tokens.css">
+<link rel="stylesheet" href="/core/ui/users-ui.css">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 Inter, ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
@@ -175,6 +176,7 @@
 </style>
 <script src="/i18n.js"></script>
 <script src="/core/ui/loaders.js"></script>
+<script src="/core/ui/users-ui.js"></script>
 </head>
 <body>
 
@@ -249,21 +251,7 @@
     <div class="inst-grid" id="instGrid"></div>
   </section>
 
-  <section class="page" id="page-users">
-    <div class="topbar">
-      <div>
-        <h1>Manage users</h1>
-        <p class="sub">Who can log in, and exactly what each account may do.</p>
-      </div>
-      <button class="addbtn" id="openUserModal" title="Add user" aria-label="Add user">+</button>
-    </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>Username</th><th>Access</th><th></th></tr></thead>
-        <tbody id="userRows"></tbody>
-      </table>
-    </div>
-  </section>
+  <section class="page" id="page-users"><div id="usersRoot"></div></section>
 
   <section class="page" id="page-settings">
     <div class="topbar">
@@ -311,42 +299,6 @@
 </div>
 </div>
 
-<div class="modal-back" id="userBack">
-  <div class="modal wide">
-    <div class="modal-title" id="userModalTitle">Add user</div>
-    <div class="field-row" id="userNameRow">
-      <div class="field"><label for="um-username">Username</label><input id="um-username" autocomplete="off"></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label for="um-password">Password</label><input id="um-password" type="password" autocomplete="new-password"></div>
-      <div class="field"><label for="um-password2">Repeat password</label><input id="um-password2" type="password" autocomplete="new-password"></div>
-    </div>
-    <div class="field">
-      <label for="um-preset">Preset</label>
-      <select id="um-preset">
-        <option value="administrator">Administrator</option>
-        <option value="manager">Manager</option>
-        <option value="operator">Operator</option>
-        <option value="viewer">Viewer</option>
-        <option value="custom">Custom</option>
-      </select>
-    </div>
-    <div class="perm-title">Panel</div>
-    <div class="perm-grid" id="um-panel"></div>
-    <div class="perm-title">Default access to every instance</div>
-    <div class="perm-grid" id="um-global"></div>
-    <div class="perm-title">Per-instance overrides</div>
-    <table>
-      <thead><tr><th>Instance</th><th>Access</th></tr></thead>
-      <tbody id="um-instances"></tbody>
-    </table>
-    <p class="hint" id="um-status" style="color:var(--red)"></p>
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn" id="um-cancel">Cancel</button>
-      <button class="btn primary" id="um-save">Save</button>
-    </div>
-  </div>
-</div>
 
 <div class="modal-back" id="modalBack">
   <div class="modal">
@@ -809,149 +761,16 @@ async function loadAccount() {
   refreshUpdateIndicator();
 }
 let currentPanel = {};
-let knownUsers = [];
-let instanceCapList = [];
-const CAP_LABELS = { view: 'View', console: 'Console & players', power: 'Start / stop', files: 'Files', mods: 'Mods', backups: 'Backups', settings: 'Settings', remove: 'Remove instance' };
-const PANEL_LABELS = { users: 'Manage users', create: 'Create instances', update: 'Update the panel' };
-const PRESET_CAPS = {
-  viewer: ['view'],
-  operator: ['view', 'console', 'power'],
-  manager: ['view', 'console', 'power', 'files', 'mods', 'backups', 'settings'],
-  administrator: ['view', 'console', 'power', 'files', 'mods', 'backups', 'settings', 'remove'],
-};
-const PRESET_PANEL = {
-  administrator: { users: true, create: true, update: true },
-  manager: { users: false, create: true, update: false },
-  operator: { users: false, create: false, update: false },
-  viewer: { users: false, create: false, update: false },
-};
-const sameCaps = (a, b) => a.length === b.length && a.every((c) => b.includes(c));
-function presetOfCaps(caps) {
-  if (!caps.length) return 'none';
-  for (const [name, list] of Object.entries(PRESET_CAPS)) if (sameCaps(caps, list)) return name;
-  return 'custom';
-}
-function describeUser(u) {
-  if (u.role === 'owner') return 'Owner';
-  const p = presetOfCaps(u.access.global);
-  const isAdmin = u.panel.users && u.panel.create && u.panel.update && p === 'administrator';
-  const base = isAdmin ? 'Administrator' : p === 'none' ? 'No default access' : p === 'custom' ? 'Custom access' : p[0].toUpperCase() + p.slice(1);
-  const extra = Object.keys(u.access.instances).length;
-  return extra ? base + ' + ' + extra + ' override' + (extra > 1 ? 's' : '') : base;
-}
-
-async function loadUsers() {
-  const r = await fetch('/api/users');
-  if (!r.ok) { $('userRows').innerHTML = '<tr><td colspan="3" class="hint">Not allowed.</td></tr>'; return; }
-  const d = await r.json();
-  knownUsers = d.users;
-  instanceCapList = d.instanceCaps;
-  $('userRows').innerHTML = d.users.map((u) => `<tr>
-      <td>${esc(u.username)}</td>
-      <td>${esc(describeUser(u))}</td>
-      <td style="text-align:right;white-space:nowrap">${u.role === 'owner' ? '' : `<button class="btn" data-user-edit="${esc(u.username)}">Edit</button> <button class="btn danger" data-user-remove="${esc(u.username)}">Remove</button>`}</td>
-    </tr>`).join('') || '<tr><td colspan="3" class="hint">No accounts yet.</td></tr>';
-}
-document.addEventListener('click', async (e) => {
-  const removeBtn = e.target.closest('[data-user-remove]');
-  if (removeBtn) {
-    const username = removeBtn.dataset.userRemove;
-    const ok = await modalConfirm('Remove this user?', '"' + username + '" will not be able to log in anymore.', 'Remove');
-    if (!ok) return;
-    const r = await fetch('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
-    if (!r.ok) await modalAlert('Not removed', (await r.json()).error || 'Failed');
-    loadUsers();
-    return;
-  }
-  const editBtn = e.target.closest('[data-user-edit]');
-  if (editBtn) openUserModal(editBtn.dataset.userEdit);
+const USERS = MeowUsers.mount({
+  el: $('usersRoot'),
+  base: '/api/users',
+  instances: async () => { const r = await fetch('/api/instances'); return r.ok ? (await r.json()).instances.map((i) => i.name) : []; },
+  role: () => currentRole,
+  t: window.t, esc,
+  toast: (m) => modalAlert('Error', m),
+  confirm: (title, message, label) => modalConfirm(title, message, label),
 });
-
-// --- add / edit user modal ---
-let editingUser = null;
-const capBox = (group, cap, label, checked, disabled) => '<label class="perm-item"><input type="checkbox" data-' + group + '="' + cap + '" ' + (checked ? 'checked' : '') + ' ' + (disabled ? 'disabled' : '') + '>' + esc(label) + '</label>';
-function renderCaps(access, panel) {
-  $('um-panel').innerHTML = Object.keys(PANEL_LABELS).map((c) => capBox('panelcap', c, PANEL_LABELS[c], panel[c], c === 'users' && currentRole !== 'owner')).join('');
-  $('um-global').innerHTML = instanceCapList.map((c) => capBox('gcap', c, CAP_LABELS[c], access.global.includes(c))).join('');
-}
-function readCaps() {
-  const panel = {};
-  document.querySelectorAll('[data-panelcap]').forEach((b) => { panel[b.dataset.panelcap] = b.checked; });
-  const global = [...document.querySelectorAll('[data-gcap]')].filter((b) => b.checked).map((b) => b.dataset.gcap);
-  const instances = {};
-  document.querySelectorAll('[data-inst-preset]').forEach((sel) => {
-    if (sel.value === 'default' || sel.value === 'custom') return;
-    instances[sel.dataset.instPreset] = sel.value === 'none' ? [] : PRESET_CAPS[sel.value] || [];
-  });
-  return { panel, access: { global, instances } };
-}
-async function openUserModal(username) {
-  editingUser = username || null;
-  const user = username ? knownUsers.find((u) => u.username === username) : null;
-  $('userModalTitle').textContent = user ? 'Edit ' + user.username : 'Add user';
-  $('userNameRow').style.display = user ? 'none' : '';
-  $('um-username').value = '';
-  $('um-password').value = ''; $('um-password2').value = '';
-  $('um-password').placeholder = user ? 'Leave blank to keep the current one' : '';
-  $('um-status').textContent = '';
-  const access = user ? user.access : { global: PRESET_CAPS.viewer, instances: {} };
-  const panel = user ? user.panel : PRESET_PANEL.viewer;
-  const gp = presetOfCaps(access.global);
-  $('um-preset').value = !user ? 'viewer' : gp === 'administrator' && panel.users ? 'administrator' : gp === 'none' ? 'custom' : gp;
-  renderCaps(access, panel);
-  const inst = await fetch('/api/instances');
-  const list = inst.ok ? (await inst.json()).instances : [];
-  $('um-instances').innerHTML = list.map((i) => {
-    const cur = access.instances[i.name];
-    const custom = cur !== undefined && presetOfCaps(cur) === 'custom';
-    return '<tr><td>' + esc(i.name) + '</td><td><select data-inst-preset="' + esc(i.name) + '">'
-      + '<option value="default">Use default</option><option value="none">No access</option>'
-      + '<option value="viewer">Viewer</option><option value="operator">Operator</option>'
-      + '<option value="manager">Manager</option><option value="administrator">Full</option>'
-      + (custom ? '<option value="custom" selected disabled>Custom</option>' : '')
-      + '</select></td></tr>';
-  }).join('') || '<tr><td colspan="2" class="hint">No instances yet.</td></tr>';
-  list.forEach((i) => {
-    const cur = access.instances[i.name];
-    if (cur === undefined) return;
-    const p = presetOfCaps(cur);
-    const sel = document.querySelector('[data-inst-preset="' + CSS.escape(i.name) + '"]');
-    if (sel && p !== 'custom') sel.value = p;
-  });
-  $('userBack').classList.add('open');
-}
-$('openUserModal').addEventListener('click', () => openUserModal(null));
-$('um-cancel').addEventListener('click', () => $('userBack').classList.remove('open'));
-$('um-preset').addEventListener('change', (e) => {
-  const v = e.target.value;
-  if (v === 'custom') return;
-  const p = PRESET_PANEL[v];
-  renderCaps({ global: PRESET_CAPS[v], instances: {} }, currentRole === 'owner' ? p : { ...p, users: false });
-});
-$('um-save').addEventListener('click', async () => {
-  const say = (m) => { $('um-status').textContent = m; };
-  const password = $('um-password').value;
-  if (password && password.length < 8) { say('Password must be at least 8 characters'); return; }
-  if (password !== $('um-password2').value) { say("Passwords don't match"); return; }
-  const settings = readCaps();
-  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!editingUser) {
-    const username = $('um-username').value.trim();
-    if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username)) { say('Username: 3-32 letters, digits, . _ -'); return; }
-    if (!password) { say('Enter a password'); return; }
-    const r = await post('/api/users', { username, password, panel: settings.panel, access: settings.access });
-    if (!r.ok) { say((await r.json()).error || 'Failed to add user'); return; }
-  } else {
-    if (password) {
-      const rp = await post('/api/users/' + encodeURIComponent(editingUser) + '/password', { password });
-      if (!rp.ok) { say((await rp.json()).error || 'Failed to change the password'); return; }
-    }
-    const ra = await post('/api/users/' + encodeURIComponent(editingUser) + '/access', settings);
-    if (!ra.ok) { say((await ra.json()).error || 'Failed to save'); return; }
-  }
-  $('userBack').classList.remove('open');
-  loadUsers();
-});
+const loadUsers = () => USERS.load();
 
 loadInstances();
 loadAccount().then(() => showPage(pageFromPath(), { push: false }));

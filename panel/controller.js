@@ -37,8 +37,10 @@ const WORKER_PORT_BASE = Number(process.env.WORKER_PORT_BASE) || 9090;
 // through it (workers bind to 127.0.0.1 only), so login belongs here, not
 // per-instance. A controller account exists independently of any instance.
 const CONTROLLER_USERS_FILE = path.join(os.homedir(), '.meowmarism-controller-users.json');
-const { createUserStore, effectiveCaps, hasPanelCap, INSTANCE_CAPS } = require('./lib/db');
+const { createUserStore, effectiveCaps, hasPanelCap } = require('./lib/db');
+const { createUsersApi } = require('./core/modules/users-api');
 const controllerUsers = createUserStore(CONTROLLER_USERS_FILE);
+const usersApi = createUsersApi({ store: controllerUsers, session: (req) => currentSession(req) });
 
 // Always looked up fresh (never cached on the session) so a permission
 // change applies on the user's very next request.
@@ -845,69 +847,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Manage users. Only the owner may touch accounts that can manage users.
-  const readJson = (limit, onData) => {
-    let body = '';
-    req.on('data', (c) => { body += c; if (body.length > limit) req.destroy(); });
-    req.on('end', () => {
-      let data;
-      try { data = JSON.parse(body || '{}'); } catch (_) { sendJson(res, 400, { error: 'invalid request' }); return; }
-      onData(data);
-    });
-  };
-  const isOwner = (r) => currentSession(r)?.role === 'owner';
-  const targetLocked = (r, username) => !isOwner(r) && hasPanelCap(controllerUsers.findUser(username), 'users');
-  const limitSettings = (r, settings) => {
-    if (!isOwner(r) && settings?.panel) settings.panel.users = false;
-    return settings;
-  };
-  const usersReply = () => ({ ok: true, users: controllerUsers.listUsers(), instanceCaps: INSTANCE_CAPS });
-
-  if (url.pathname === '/api/users' && req.method === 'GET') {
-    if (!canPanel(req, 'users')) { sendJson(res, 403, { error: 'not allowed to manage users' }); return; }
-    sendJson(res, 200, usersReply());
-    return;
-  }
-  if (url.pathname === '/api/users' && req.method === 'POST') {
-    if (!canPanel(req, 'users')) { sendJson(res, 403, { error: 'not allowed to manage users' }); return; }
-    readJson(8192, (data) => {
-      const username = String(data.username || '').trim();
-      const password = String(data.password || '');
-      if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username)) { sendJson(res, 400, { error: 'username: 3-32 letters, digits, . _ -' }); return; }
-      if (password.length < 8) { sendJson(res, 400, { error: 'password must be at least 8 characters' }); return; }
-      if (!controllerUsers.createMember(username, password, limitSettings(req, data))) { sendJson(res, 400, { error: 'that username is already taken' }); return; }
-      sendJson(res, 200, usersReply());
-    });
-    return;
-  }
-  const userMatch = url.pathname.match(/^\/api\/users\/([^/]+)(\/(password|access))?$/);
-  if (userMatch) {
-    const target = decodeURIComponent(userMatch[1]);
-    const action = userMatch[3];
-    if (!canPanel(req, 'users')) { sendJson(res, 403, { error: 'not allowed to manage users' }); return; }
-    if (targetLocked(req, target)) { sendJson(res, 403, { error: 'only the owner can change this account' }); return; }
-    if (req.method === 'DELETE' && !action) {
-      if (!controllerUsers.deleteMember(target)) { sendJson(res, 400, { error: 'cannot remove that account' }); return; }
-      sendJson(res, 200, usersReply());
-      return;
-    }
-    if (req.method === 'POST' && action === 'password') {
-      readJson(1024, (data) => {
-        const password = String(data.password || '');
-        if (password.length < 8) { sendJson(res, 400, { error: 'password must be at least 8 characters' }); return; }
-        if (!controllerUsers.setPassword(target, password)) { sendJson(res, 400, { error: 'cannot change that account' }); return; }
-        sendJson(res, 200, usersReply());
-      });
-      return;
-    }
-    if (req.method === 'POST' && action === 'access') {
-      readJson(8192, (data) => {
-        if (!controllerUsers.setSettings(target, limitSettings(req, data))) { sendJson(res, 400, { error: 'cannot change that account' }); return; }
-        sendJson(res, 200, usersReply());
-      });
-      return;
-    }
-  }
+  if (usersApi.handle(req, res, url)) return;
 
   const proxyTarget = isMeta ? null : resolveInstanceProxy(req, url);
   if (proxyTarget) {
