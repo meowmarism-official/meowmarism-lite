@@ -22,6 +22,75 @@ info() { printf "    ${C_DIM}%s${C_RESET}\n" "$1"; }
 ok()   { printf "${C_GREEN}==>${C_RESET} %s\n" "$1"; }
 warn() { printf "${C_YELLOW}==>${C_RESET} %s\n" "$1"; }
 die()  { printf "${C_RED}error:${C_RESET} %s\n" "$1" >&2; exit 1; }
+# --- progress helpers: spinner with a check or cross per task, and a download bar ---
+if [ -t 1 ]; then INTERACTIVE=1; else INTERACTIVE=0; fi
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+  *UTF-8*|*utf8*|*UTF8*) FRAMES=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏); MARK_OK="✔"; MARK_FAIL="✘"; BAR_FULL="█"; BAR_EMPTY="░" ;;
+  *) FRAMES=('-' '\' '|' '/'); MARK_OK="OK"; MARK_FAIL="FAILED"; BAR_FULL="#"; BAR_EMPTY="-" ;;
+esac
+TASK_LOG="$(mktemp)"
+cursor_show() { [ "$INTERACTIVE" = "1" ] && printf '\033[?25h' || true; }
+trap cursor_show EXIT
+
+task_done() { # $1 exit code, $2 label
+  if [ "$1" -eq 0 ]; then
+    printf "\r\033[K    ${C_GREEN}%s${C_RESET} %s\n" "$MARK_OK" "$2"
+  else
+    printf "\r\033[K    ${C_RED}%s${C_RESET} %s\n" "$MARK_FAIL" "$2"
+    tail -n 12 "$TASK_LOG" | sed 's/^/      /'
+    cursor_show
+    exit 1
+  fi
+}
+
+# run "label" command [args...]: shows a spinner, then a check mark or a cross with the last output lines.
+run() {
+  local label="$1" pid rc=0 i=0; shift
+  "$@" >"$TASK_LOG" 2>&1 &
+  pid=$!
+  if [ "$INTERACTIVE" = "1" ]; then
+    printf '\033[?25l'
+    while kill -0 "$pid" 2>/dev/null; do
+      printf "\r    ${C_CYAN}%s${C_RESET} %s" "${FRAMES[i % ${#FRAMES[@]}]}" "$label"
+      i=$((i + 1)); sleep 0.1
+    done
+    printf '\033[?25h'
+  fi
+  wait "$pid" || rc=$?
+  task_done "$rc" "$label"
+}
+
+human_size() { awk -v b="$1" 'BEGIN { printf "%.1f MB", b / 1048576 }'; }
+
+# download URL FILE label: a progress bar when the size is known, a running size otherwise.
+download() {
+  local url="$1" dest="$2" label="$3" total cur pid rc=0 pct filled bar width=26 n spin=0 pos
+  total="$(curl -fsIL "$url" 2>/dev/null | tr -d '\r' | awk 'tolower($1) == "content-length:" { v = $2 } END { print v + 0 }' || true)"
+  curl -fsSL "$url" -o "$dest" >"$TASK_LOG" 2>&1 &
+  pid=$!
+  if [ "$INTERACTIVE" = "1" ]; then
+    printf '\033[?25l'
+    while kill -0 "$pid" 2>/dev/null; do
+      cur="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+      if [ "${total:-0}" -gt 0 ]; then
+        pct=$((cur * 100 / total)); [ "$pct" -gt 100 ] && pct=100
+        filled=$((pct * width / 100)); bar=""
+        for ((n = 0; n < width; n++)); do if [ "$n" -lt "$filled" ]; then bar="${bar}${BAR_FULL}"; else bar="${bar}${BAR_EMPTY}"; fi; done
+        printf "\r    ${C_PINK}%s${C_RESET} %3d%%  %s / %s  %s" "$bar" "$pct" "$(human_size "$cur")" "$(human_size "$total")" "$label"
+      else
+        pos=$((spin % (2 * (width - 6)))); [ "$pos" -ge $((width - 6)) ] && pos=$((2 * (width - 6) - pos))
+        bar=""
+        for ((n = 0; n < width; n++)); do if [ "$n" -ge "$pos" ] && [ "$n" -lt $((pos + 6)) ]; then bar="${bar}${BAR_FULL}"; else bar="${bar}${BAR_EMPTY}"; fi; done
+        printf "\r    ${C_PINK}%s${C_RESET}  %s  %s" "$bar" "$(human_size "$cur")" "$label"
+        spin=$((spin + 1))
+      fi
+      sleep 0.1
+    done
+    printf '\033[?25h'
+  fi
+  wait "$pid" || rc=$?
+  task_done "$rc" "$label ($(human_size "$(stat -c%s "$dest" 2>/dev/null || echo 0)"))"
+}
 
 REPO="meowmarism-official/meowmarism-lite"
 INSTALL_DIR="${MEOWMARISM_DIR:-/opt/meowmarism}"
@@ -30,12 +99,14 @@ CONTROLLER_PORT="${MEOWMARISM_PORT:-}"
 DEFAULT_PORT=8090
 
 printf "\n${C_PINK}${C_BOLD}  meowmarism${C_RESET} ${C_BOLD}LITE${C_RESET}\n"
-printf "${C_DIM}  self-hosted control panel for your Minecraft servers${C_RESET}\n\n"
+printf "\n"
 
 NODE_MAJOR_NEEDED=20
 
-install_node() {
-  warn "Node.js not found (or too old) - installing it"
+command -v sudo >/dev/null 2>&1 || die "sudo is required"
+sudo -v || die "sudo did not accept the password"
+
+node_install_cmd() {
   if command -v apt-get >/dev/null 2>&1; then
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_NEEDED}.x" | sudo -E bash -
     sudo apt-get install -y nodejs
@@ -50,6 +121,8 @@ install_node() {
        Install Node.js >=18 yourself (e.g. via https://nodejs.org), then re-run this script."
   fi
 }
+
+install_node() { warn "Node.js not found (or too old) - installing it"; run "Installing Node.js" node_install_cmd; }
 
 if ! command -v node >/dev/null 2>&1; then
   install_node
@@ -265,18 +338,21 @@ fi
 
 TARBALL_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'rm -rf "$TMP_DIR" "$TASK_LOG"; cursor_show' EXIT
 
 step "Downloading $TAG"
-curl -fL --progress-bar "$TARBALL_URL" -o "$TMP_DIR/release.tar.gz"
-tar -xzf "$TMP_DIR/release.tar.gz" -C "$TMP_DIR"
+download "$TARBALL_URL" "$TMP_DIR/release.tar.gz" "Downloading $TAG"
+run "Unpacking" tar -xzf "$TMP_DIR/release.tar.gz" -C "$TMP_DIR"
 EXTRACTED_DIR="$(find "$TMP_DIR" -maxdepth 1 -type d -name 'meowmarism-*')"
 
 step "Installing to $INSTALL_DIR"
-sudo mkdir -p "$INSTALL_DIR"
-sudo rsync -a --delete "$EXTRACTED_DIR/panel/" "$INSTALL_DIR/panel/"
-sudo cp "$EXTRACTED_DIR/package.json" "$INSTALL_DIR/package.json"
-sudo chown -R "$(whoami)" "$INSTALL_DIR"
+install_files() {
+  sudo mkdir -p "$INSTALL_DIR"
+  sudo rsync -a --delete "$EXTRACTED_DIR/panel/" "$INSTALL_DIR/panel/"
+  sudo cp "$EXTRACTED_DIR/package.json" "$INSTALL_DIR/package.json"
+  sudo chown -R "$(whoami)" "$INSTALL_DIR"
+}
+run "Copying the panel files" install_files
 
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 ALREADY_INSTALLED=0
@@ -320,9 +396,25 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable "$SERVICE_NAME"
-sudo systemctl restart "$SERVICE_NAME"
+
+wait_panel() {
+  local i
+  for i in $(seq 1 40); do
+    if curl -fs -o /dev/null "http://127.0.0.1:${CONTROLLER_PORT}/"; then return 0; fi
+    sleep 0.5
+  done
+  echo "the panel did not answer on port ${CONTROLLER_PORT}"
+  sudo journalctl -u "$SERVICE_NAME" -n 12 --no-pager 2>/dev/null || true
+  return 1
+}
+start_service() {
+  sudo systemctl daemon-reload
+  sudo systemctl enable "$SERVICE_NAME"
+  sudo systemctl restart "$SERVICE_NAME"
+}
+step "Starting the panel"
+run "Starting the service" start_service
+run "Waiting for the panel to answer" wait_panel
 
 # Detect the machine's own LAN IP so the final message gives a real,
 # clickable address instead of a "<this-host>" placeholder.
