@@ -1,0 +1,22 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 Inter, ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 26px; width: 320px; max-width: calc(100% - 32px); }
+h1 { font-size: 17px; margin: 0 0 18px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+input { width: 100%; background: #0c0e12; border: 1px solid var(--line); color: var(--text); padding: 9px 10px; border-radius: 5px; font-size: 13px; }
+button { width: 100%; height: 34px; margin-top: 6px; border: 1px solid #36506c; border-radius: 5px; background: #26364a; color: #dcecff; font-size: 13px; cursor: pointer; }
+button:hover { background: #2e4258; }
+.error { color: var(--red); font-size: 12.5px; margin-top: 10px; display: none; }
+
+.toggle-row { display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.toggle { position: relative; width: 34px; height: 19px; flex: 0 0 auto; }
+.toggle input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.toggle-track { position: absolute; inset: 0; background: #0c0e12; border: 1px solid var(--line); border-radius: 999px; transition: background .15s ease, border-color .15s ease; }
+.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: var(--muted); transition: transform .15s ease, background .15s ease; }
+.toggle input:checked ~ .toggle-thumb { transform: translateX(15px); background: #dcecff; }
+.toggle input:checked ~ .toggle-track { background: rgba(54,80,108,.35); border-color: #36506c; }
+.http-warn { display: none; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #6b5420; background: rgba(212,168,79,.1); color: var(--yellow); border-radius: 8px; font-size: 12.5px; line-height: 1.5; }
+h1 .wordmark { font-family: var(--font-brand); }
+.edition { font-size: .5em; font-weight: 750; letter-spacing: .08em; color: #ff6fc4; vertical-align: .3em; }

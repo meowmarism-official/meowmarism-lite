@@ -6,30 +6,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2026%2024%22%20fill%3D%22none%22%20stroke%3D%22%23ff6fc4%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20role%3D%22img%22%20aria-label%3D%22meowmarism%22%3E%3Cpath%20d%3D%22M3.2%204.7%20C3.2%203.29%204.82%202.5%205.94%203.36%20L13%208.83%20L20.06%203.36%20C21.18%202.5%2022.8%203.29%2022.8%204.7%20L22.8%2018.4%20C22.8%2020.58%2020.28%2021.79%2018.57%2020.42%20L13%2015.96%20L7.43%2020.42%20C5.72%2021.79%203.2%2020.58%203.2%2018.4%20Z%22%2F%3E%3Cpath%20d%3D%22M12.08%2014.59%20C12.08%2014.26%2012.35%2014.06%2012.74%2014.06%20H13.26%20C13.65%2014.06%2013.92%2014.26%2013.92%2014.59%20C13.92%2014.85%2013.79%2015.04%2013.59%2015.24%20L13%2015.83%20L12.41%2015.24%20C12.21%2015.04%2012.08%2014.85%2012.08%2014.59%20Z%22%20fill%3D%22%23ff6fc4%22%20stroke%3D%22none%22%2F%3E%3Cpath%20d%3D%22M6.3%2012.7%20L9.6%2013.7%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M6.3%2015.5%20L9.6%2014.9%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M19.7%2012.7%20L16.4%2013.7%22%20stroke-width%3D%221.3%22%2F%3E%3Cpath%20d%3D%22M19.7%2015.5%20L16.4%2014.9%22%20stroke-width%3D%221.3%22%2F%3E%3C%2Fsvg%3E">
 <title>meowmarism LITE - login</title>
 <link rel="stylesheet" href="/core/tokens/tokens.css">
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 Inter, ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
-    min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 26px; width: 320px; max-width: calc(100% - 32px); }
-  h1 { font-size: 17px; margin: 0 0 18px; }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  input { width: 100%; background: #0c0e12; border: 1px solid var(--line); color: var(--text); padding: 9px 10px; border-radius: 5px; font-size: 13px; }
-  button { width: 100%; height: 34px; margin-top: 6px; border: 1px solid #36506c; border-radius: 5px; background: #26364a; color: #dcecff; font-size: 13px; cursor: pointer; }
-  button:hover { background: #2e4258; }
-  .error { color: var(--red); font-size: 12.5px; margin-top: 10px; display: none; }
-
-  .toggle-row { display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-  .toggle { position: relative; width: 34px; height: 19px; flex: 0 0 auto; }
-  .toggle input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-  .toggle-track { position: absolute; inset: 0; background: #0c0e12; border: 1px solid var(--line); border-radius: 999px; transition: background .15s ease, border-color .15s ease; }
-  .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: var(--muted); transition: transform .15s ease, background .15s ease; }
-  .toggle input:checked ~ .toggle-thumb { transform: translateX(15px); background: #dcecff; }
-  .toggle input:checked ~ .toggle-track { background: rgba(54,80,108,.35); border-color: #36506c; }
-  .http-warn { display: none; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #6b5420; background: rgba(212,168,79,.1); color: var(--yellow); border-radius: 8px; font-size: 12.5px; line-height: 1.5; }
-  h1 .wordmark { font-family: var(--font-brand); }
-  .edition { font-size: .5em; font-weight: 750; letter-spacing: .08em; color: #ff6fc4; vertical-align: .3em; }
-</style>
+<link rel="stylesheet" href="/core/ui/login.css">
 <script src="/i18n.js"></script>
 </head>
 <body>
