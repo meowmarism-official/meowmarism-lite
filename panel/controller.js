@@ -753,7 +753,7 @@ const server = http.createServer(async (req, res) => {
   const langMatch = req.method === 'GET' && url.pathname.match(/^\/lang\/(de|fr|es)\.json$/);
   if (langMatch) {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
-    res.end(fs.readFileSync(path.join(__dirname, 'lang', langMatch[1] + '.json')));
+    res.end(fs.readFileSync(path.join(__dirname, 'core', 'lang', langMatch[1] + '.json')));
     return;
   }
 
@@ -769,7 +769,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/i18n.js' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
-    res.end(fs.readFileSync(path.join(__dirname, 'i18n.js')));
+    res.end(fs.readFileSync(path.join(__dirname, 'core', 'ui', 'i18n.js')));
     return;
   }
 
