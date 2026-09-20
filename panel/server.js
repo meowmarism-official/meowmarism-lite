@@ -58,7 +58,6 @@ const tailListeners = new Set();
 const ringBuffer = [];
 const recentConsole = [];
 const rawSampleCache = [];
-const players = new Map();
 const history = [];
 const history5s = [];
 const history1m = [];
@@ -83,7 +82,12 @@ let eventSeq = 0;
 let auditSeq = 0;
 const timelineEvents = [];
 const auditEntries = [];
-const playerHistory = new Map();
+const { createPlayerTracker, buildPlayerCommand, playerName: normalizePlayerName } = require('./core/modules/players');
+const tracker = createPlayerTracker({
+  onJoin: (name, source) => pushTimeline('player_join', `${name} joined`, source === 'log' ? 'Joined the server' : 'Detected online from /list', 'info', { player: name }),
+  onLeave: (name, durationMs) => pushTimeline('player_leave', `${name} left`, `Session ${Math.floor(durationMs / 1000)}s`, 'info', { player: name, durationMs }),
+});
+const { players, history: playerHistory } = tracker;
 const EVENT_MAX = 2500;
 const AUDIT_MAX = 2500;
 
@@ -188,41 +192,6 @@ function applySettingsPatch(patch) {
   return state;
 }
 
-function normalizePlayerName(value) {
-  const name = String(value || '').trim();
-  if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) throw new Error('invalid player name');
-  return name;
-}
-
-function safeReason(value, fallback) {
-  const reason = String(value || '').replace(/[\r\n]/g, ' ').trim().slice(0, 160);
-  return reason || fallback;
-}
-
-function buildPlayerCommand(action, player, value, reason) {
-  const name = normalizePlayerName(player);
-  switch (action) {
-    case 'kick': return `kick ${name} ${safeReason(reason, 'Kicked by an operator')}`;
-    case 'ban': return `ban ${name} ${safeReason(reason, 'Banned by an operator')}`;
-    case 'op': return `op ${name}`;
-    case 'deop': return `deop ${name}`;
-    case 'whitelist-add': return `whitelist add ${name}`;
-    case 'whitelist-remove': return `whitelist remove ${name}`;
-    case 'pardon': return `pardon ${name}`;
-    case 'kill': return `kill ${name}`;
-    case 'clear-effects': return `effect clear ${name}`;
-    case 'heal': return `effect give ${name} minecraft:instant_health 1 10 true`;
-    case 'feed': return `effect give ${name} minecraft:saturation 1 10 true`;
-    case 'gamemode': {
-      const mode = String(value || '');
-      if (!['survival', 'creative', 'adventure', 'spectator'].includes(mode)) throw new Error('invalid gamemode');
-      return `gamemode ${mode} ${name}`;
-    }
-    default: throw new Error('unsupported player action');
-  }
-}
-
-
 function trimArray(arr, max) {
   if (arr.length > max) arr.splice(0, arr.length - max);
 }
@@ -247,44 +216,9 @@ function pushAudit(action, target = '', detail = '', meta = {}) {
   return entry;
 }
 
-function getPlayerHistory(name) {
-  let h = playerHistory.get(name);
-  if (!h) {
-    h = { name, firstSeenAt: Date.now(), lastSeenAt: Date.now(), joins: 0, leaves: 0, totalPlayMs: 0, activeSince: null, sessions: [] };
-    playerHistory.set(name, h);
-  }
-  return h;
-}
-
-function recordPlayerJoin(name, source = 'log', announce = true) {
-  const now = Date.now();
-  const h = getPlayerHistory(name);
-  h.lastSeenAt = now;
-  if (!h.activeSince) {
-    h.activeSince = now;
-    h.joins++;
-    h.sessions.push({ joinedAt: now, leftAt: null, durationMs: null, source });
-    if (h.sessions.length > 100) h.sessions.shift();
-    if (announce) pushTimeline('player_join', `${name} joined`, source === 'log' ? 'Joined the server' : 'Detected online from /list', 'info', { player: name });
-  }
-  return h;
-}
-
-function recordPlayerLeave(name, source = 'log', announce = true) {
-  const now = Date.now();
-  const h = getPlayerHistory(name);
-  h.lastSeenAt = now;
-  if (h.activeSince) {
-    const durationMs = Math.max(0, now - h.activeSince);
-    h.totalPlayMs += durationMs;
-    h.leaves++;
-    const active = [...h.sessions].reverse().find((x) => x.leftAt == null);
-    if (active) { active.leftAt = now; active.durationMs = durationMs; }
-    h.activeSince = null;
-    if (announce) pushTimeline('player_leave', `${name} left`, `Session ${Math.floor(durationMs / 1000)}s`, 'info', { player: name, durationMs });
-  }
-  return h;
-}
+const getPlayerHistory = tracker.getHistory;
+const recordPlayerJoin = tracker.join;
+const recordPlayerLeave = tracker.leave;
 
 function classifyConsoleLine(text) {
   const line = String(text || '');
@@ -429,38 +363,7 @@ function maybeProbePerformance() {
   else if (f.engine === 'paper' || f.engine === 'purpur') sendCommand('tps');
 }
 
-function parsePlayerLine(line) {
-  let match = line.match(/\]: ([A-Za-z0-9_]{1,16}) joined the game\s*$/);
-  if (match) {
-    const name = match[1];
-    recordPlayerJoin(name, 'log', true);
-    players.set(name, { name, joinedAt: getPlayerHistory(name).activeSince || Date.now(), lastSeenAt: Date.now(), source: 'log' });
-    return;
-  }
-
-  match = line.match(/\]: ([A-Za-z0-9_]{1,16}) left the game\s*$/);
-  if (match) {
-    const name = match[1];
-    recordPlayerLeave(name, 'log', true);
-    players.delete(name);
-    return;
-  }
-
-  match = line.match(/There are\s+(\d+)\s+of a max of\s+(\d+)\s+players online:\s*(.*)$/i);
-  if (match) {
-    const names = match[3].split(',').map((name) => name.trim()).filter((name) => /^[A-Za-z0-9_]{1,16}$/.test(name));
-    const seen = new Set(names);
-    for (const name of names) {
-      const old = players.get(name);
-      if (!old) recordPlayerJoin(name, 'list', false);
-      const h = getPlayerHistory(name);
-      players.set(name, { name, joinedAt: old?.joinedAt || h.activeSince || Date.now(), lastSeenAt: Date.now(), source: 'list' });
-    }
-    for (const name of [...players.keys()]) {
-      if (!seen.has(name)) { recordPlayerLeave(name, 'list', false); players.delete(name); }
-    }
-  }
-}
+const parsePlayerLine = tracker.parseLine;
 
 function trimRecentConsole(now = Date.now()) {
   const cutoff = now - CACHE_WINDOW_MS;
@@ -971,35 +874,7 @@ function networkStats() {
 }
 
 function playerStats() {
-  const props = readServerProperties();
-  const maxPlayers = Number(props['max-players']) || null;
-  const now = Date.now();
-  const day = new Date(); day.setHours(0, 0, 0, 0); const dayStart = day.getTime();
-  const histories = [...playerHistory.values()];
-  const uniqueToday = histories.filter((h) => h.lastSeenAt >= dayStart).length;
-  const completedSessions = histories.flatMap((h) => h.sessions).filter((x) => Number.isFinite(Number(x.durationMs)));
-  const averageSessionSec = completedSessions.length ? Math.round(completedSessions.reduce((a, x) => a + Number(x.durationMs), 0) / completedSessions.length / 1000) : 0;
-  const longestSessionSec = Math.round(Math.max(0, ...completedSessions.map((x) => Number(x.durationMs) || 0), ...histories.filter((h) => h.activeSince).map((h) => now - h.activeSince)) / 1000);
-  return {
-    online: players.size,
-    max: maxPlayers,
-    uniqueToday,
-    averageSessionSec,
-    longestSessionSec,
-    knownPlayers: histories.length,
-    list: [...players.values()].sort((a, b) => a.name.localeCompare(b.name)).map((player) => {
-      const h = getPlayerHistory(player.name);
-      return {
-        name: player.name,
-        joinedAt: player.joinedAt,
-        sessionSec: Math.max(0, Math.floor((now - player.joinedAt) / 1000)),
-        firstSeenAt: h.firstSeenAt,
-        lastSeenAt: h.lastSeenAt,
-        joins: h.joins,
-        totalPlaySec: Math.floor((h.totalPlayMs + (h.activeSince ? now - h.activeSince : 0)) / 1000),
-      };
-    }),
-  };
+  return tracker.stats(Number(readServerProperties()['max-players']) || null);
 }
 
 function ema(prev, next, alpha) {

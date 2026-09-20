@@ -9,11 +9,7 @@ const COMMANDS = {
   banned: { add: 'ban', remove: 'pardon' },
 };
 
-function playerName(value) {
-  const name = String(value || '').trim();
-  if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) throw new Error('invalid player name');
-  return name;
-}
+const { playerName } = require('./players');
 
 // dir: server directory; isRunning(): bool; command(text): sends a console command
 function createAccess({ dir, isRunning, command }) {
@@ -49,4 +45,4 @@ function createAccess({ dir, isRunning, command }) {
   return { list, act };
 }
 
-module.exports = { createAccess, playerName };
+module.exports = { createAccess };

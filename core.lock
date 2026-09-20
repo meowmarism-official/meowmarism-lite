@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "4a53425eb8a213a471f801d1c4ca597ee832b2ec",
+  "commit": "e33e56e4062177d820cd16e8fa950b089d07862f",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -21,6 +21,7 @@
     "panel/core/modules/files.js",
     "panel/core/modules/modrinth.js",
     "panel/core/modules/mods.js",
+    "panel/core/modules/players.js",
     "panel/core/modules/properties.js",
     "panel/core/modules/ratelimit.js",
     "panel/core/modules/runtime-contract.js",
