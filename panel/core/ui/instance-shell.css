@@ -74,3 +74,9 @@
 .live-row{padding:6px 24.5px;gap:12px}
 .live-row span+span{opacity:0;transition:opacity .1s ease}
 @media(max-width:760px){:root{--sidebar-w:0px}.sidebar{width:100%;transition:none}.sidebar:hover{width:100%}.side-brand{display:none}.side-label,.live-row span+span,#updateBadge{opacity:1}.nav{flex-direction:row;display:flex;padding:6px;flex:none}.nav a{height:36px;padding:0 10px;gap:8px}.sidebar-foot{display:none}}
+.side-meta{padding:0 17px 8px;font-size:10px;color:var(--dim,var(--muted));white-space:nowrap;overflow:hidden;opacity:0;transition:opacity .1s ease}
+.sidebar:hover .side-meta{opacity:1}
+.side-meta a{color:var(--dim,var(--muted));text-decoration:underline}
+.side-meta a:hover{color:var(--text)}
+.side-dot{position:absolute;top:9px;left:15px;width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 0 2px var(--panel)}
+.back-link.gh svg{fill:currentColor;stroke:none}
