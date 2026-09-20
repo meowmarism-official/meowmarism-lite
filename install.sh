@@ -26,7 +26,8 @@ die()  { printf "${C_RED}error:${C_RESET} %s\n" "$1" >&2; exit 1; }
 REPO="meowmarism-official/meowmarism-lite"
 INSTALL_DIR="${MEOWMARISM_DIR:-/opt/meowmarism}"
 SERVICE_NAME="${MEOWMARISM_SERVICE:-meowmarism}"
-CONTROLLER_PORT="${MEOWMARISM_PORT:-8090}"
+CONTROLLER_PORT="${MEOWMARISM_PORT:-}"
+DEFAULT_PORT=8090
 
 printf "\n${C_PINK}${C_BOLD}  meowmarism${C_RESET} ${C_BOLD}LITE${C_RESET}\n"
 printf "${C_DIM}  self-hosted control panel for your Minecraft servers${C_RESET}\n\n"
@@ -80,9 +81,29 @@ for f in /etc/systemd/system/*.service; do
   if grep -q 'panel/controller\.js' "$f" 2>/dev/null; then
     EXISTING_SERVICE="$(basename "$f" .service)"
     EXISTING_DIR="$(sed -n 's/^WorkingDirectory=\(.*\)\/panel$/\1/p' "$f" | head -1)"
+    CURRENT_PORT="$(sed -n 's/^Environment=CONTROLLER_PORT=\([0-9]*\)$/\1/p' "$f" | head -1)"
+    CURRENT_HOST="$(sed -n 's/^Environment=MEOWMARISM_HOST=\(.*\)$/\1/p' "$f" | head -1)"
+    CURRENT_TRUST="$(sed -n 's/^Environment=MEOWMARISM_TRUST_PROXY=\(.*\)$/\1/p' "$f" | head -1)"
     break
   fi
 done
+
+port_in_use() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]$1$"; }
+free_port_from() { local p="$1"; while port_in_use "$p"; do p=$((p + 1)); done; echo "$p"; }
+
+# Asks for the panel port. $1 is the suggested port; an empty answer takes it.
+ask_port() {
+  local suggest="$1" a=""
+  while true; do
+    printf "    Port for the panel [%s]: " "$suggest"
+    read -r a 2>/dev/null < "$TTY" || a=""
+    printf "\n"
+    a="${a:-$suggest}"
+    if ! printf '%s' "$a" | grep -Eq '^[0-9]{4,5}$' || [ "$a" -lt 1024 ] || [ "$a" -gt 65535 ]; then warn "Use a number between 1024 and 65535."; continue; fi
+    if port_in_use "$a" && [ "$a" != "${CURRENT_PORT:-}" ]; then warn "Port $a is already in use on this host."; continue; fi
+    CONTROLLER_PORT="$a"; return
+  done
+}
 
 # Asks for the owner account and writes it into the accounts store.
 # MODE "create" (fresh install, before the service starts) or "reset" (existing install).
@@ -155,7 +176,7 @@ if [ -n "$EXISTING_SERVICE" ]; then
     fi
     read -r choice 2>/dev/null < "$TTY" || choice="c"
     if [ "${choice:0:1}" = "m" ] || [ "${choice:0:1}" = "M" ]; then
-      printf "    ${C_YELLOW}[O]${C_RESET}wner reset / ${C_YELLOW}[R]${C_RESET}emove / ${C_YELLOW}[C]${C_RESET}ancel? "
+      printf "    ${C_YELLOW}[O]${C_RESET}wner reset / ${C_YELLOW}[P]${C_RESET}ort / ${C_YELLOW}[R]${C_RESET}emove / ${C_YELLOW}[C]${C_RESET}ancel? "
       read -r choice 2>/dev/null < "$TTY" || choice="c"
     fi
   fi
@@ -210,6 +231,18 @@ if [ -n "$EXISTING_SERVICE" ]; then
       sudo systemctl restart "$EXISTING_SERVICE"
       exit 0
       ;;
+    [Pp])
+      step "Change the panel port"
+      info "current port: ${CURRENT_PORT:-$DEFAULT_PORT}"
+      ask_port "${CURRENT_PORT:-$DEFAULT_PORT}"
+      sudo sed -i "s/^Environment=CONTROLLER_PORT=.*/Environment=CONTROLLER_PORT=${CONTROLLER_PORT}/" "/etc/systemd/system/${EXISTING_SERVICE}.service"
+      sudo systemctl daemon-reload
+      sudo systemctl restart "$EXISTING_SERVICE"
+      HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+      ok "The panel now listens on port ${CONTROLLER_PORT}: http://${HOST_IP:-<this-host>}:${CONTROLLER_PORT}/"
+      info "Open this port in your firewall if you use one."
+      exit 0
+      ;;
     [Cc]|"")
       warn "Cancelled - nothing changed."
       exit 0
@@ -219,6 +252,9 @@ if [ -n "$EXISTING_SERVICE" ]; then
       step "Updating existing install"
       INSTALL_DIR="$EXISTING_DIR"
       SERVICE_NAME="$EXISTING_SERVICE"
+      [ -n "${MEOWMARISM_PORT:-}" ] || CONTROLLER_PORT="${CURRENT_PORT:-$DEFAULT_PORT}"
+      [ -n "${MEOWMARISM_HOST:-}" ] || MEOWMARISM_HOST="${CURRENT_HOST:-}"
+      [ -n "${MEOWMARISM_TRUST_PROXY:-}" ] || MEOWMARISM_TRUST_PROXY="${CURRENT_TRUST:-}"
       ;;
     *)
       warn "Cancelled - nothing changed."
@@ -251,7 +287,15 @@ ALREADY_INSTALLED=0
 # yet is a real (if brief) open window on a real network; writing the
 # account straight into its store first means there is no such window at
 # all, not just a short one.
-if [ "$ALREADY_INSTALLED" = "0" ]; then set_owner create "$INSTALL_DIR"; fi
+if [ "$ALREADY_INSTALLED" = "0" ]; then
+  if [ -z "$CONTROLLER_PORT" ]; then
+    if [ -t 0 ]; then TTY=/dev/stdin; else TTY=/dev/tty; fi
+    step "Choose the panel port"
+    if [ -r "$TTY" ]; then ask_port "$(free_port_from "$DEFAULT_PORT")"; else CONTROLLER_PORT="$(free_port_from "$DEFAULT_PORT")"; fi
+  fi
+  set_owner create "$INSTALL_DIR"
+fi
+[ -n "$CONTROLLER_PORT" ] || CONTROLLER_PORT="${CURRENT_PORT:-$DEFAULT_PORT}"
 
 EXTRA_ENV=""
 NL=$'\n'
