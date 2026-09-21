@@ -13,6 +13,7 @@
 <script src="/core/ui/access-ui.js"></script>
 <script src="/core/ui/backups-ui.js"></script>
 <script src="/core/ui/format.js"></script>
+<script src="/core/ui/automation-ui.js"></script>
 <script src="/core/ui/mods-ui.js"></script>
 <script src="/core/ui/console-ui.js"></script>
 <script>
@@ -55,7 +56,7 @@
 
   <div class="content">
     <header class="topbar" id="shellTopbar"></header>
-    <script>MeowInstanceShell.mount({ edition: 'LITE', brandSub: 'Official version', backLabel: 'All instances', pages: ["overview", "performance", "players", "console", "settings", "mods", "files", "access", "backups", "schedule", "manage", "automation", "events"], t: window.t, esc: (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])), sidebarEl: document.getElementById('shellSidebar'), topbarEl: document.getElementById('shellTopbar') });</script>
+    <script>const INSTANCE_SHELL = MeowInstanceShell.mount({ edition: 'LITE', brandSub: 'Official version', backLabel: 'All instances', base: window.__BASE || '', onPage: (page) => { currentPage = page; scheduleChartDraw(true); requestAnimationFrame(() => { if (page === 'console') CONSOLE.scrollToEnd(); }); }, pages: ["overview", "performance", "players", "console", "settings", "mods", "files", "access", "backups", "schedule", "manage", "automation", "events"], t: window.t, esc: (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])), sidebarEl: document.getElementById('shellSidebar'), topbarEl: document.getElementById('shellTopbar') });</script>
 
     <main class="workspace">
       <section class="page" id="page-overview">
@@ -149,46 +150,7 @@
         </div>
       </section>
 
-      <section class="page" id="page-automation">
-        <div class="grid">
-          <article class="card span-6"><div class="card-head"><div class="card-title">Daily auto-restart</div></div><div class="card-body">
-            <div class="hint" style="margin-bottom:8px">Restarts the server once a day at the chosen time (with an in-chat warning countdown and an automatic backup beforehand).</div>
-            <label class="hint" style="display:block;margin-bottom:6px"><input type="checkbox" id="autoRestartEnabled"> enabled</label>
-            <div class="cmd-row"><input class="compact-input" type="time" id="autoRestartTime"><select class="compact-select" id="autoRestartWarnSec"><option value="60">1 min warning</option><option value="120">2 min warning</option><option value="300" selected>5 min warning</option><option value="600">10 min warning</option></select></div>
-            <div class="settings-actions" style="margin-top:8px"><button class="btn primary" id="btnSaveAutoRestart">Save</button></div>
-          </div></article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Backup settings</div></div><div class="card-body">
-            <div class="hint" style="margin-bottom:8px">How often backups run automatically, how many are kept, and how much disk space must stay free after a backup.</div>
-            <div class="cmd-row">
-              <label class="hint">Every<input class="compact-input" type="number" min="0.25" max="168" step="0.25" id="backupIntervalHours" style="width:70px;margin:0 6px">hours</label>
-              <label class="hint">Max<input class="compact-input" type="number" min="1" max="100" step="1" id="maxBackups" style="width:60px;margin:0 6px">backups</label>
-              <label class="hint">Keep<input class="compact-input" type="number" min="0" max="1000" step="1" id="backupMinFreeGB" style="width:60px;margin:0 6px">GB free</label>
-            </div>
-            <div class="settings-actions" style="margin-top:8px"><button class="btn primary" id="btnSaveBackupCfg">Save</button></div>
-          </div></article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Sleep mode</div></div><div class="card-body">
-            <div class="hint" style="margin-bottom:8px">Automatically stops the server when nobody's online, and wakes it back up as soon as someone tries to join (the server stays visible in the multiplayer list while asleep).</div>
-            <label class="hint" style="display:block;margin-bottom:6px"><input type="checkbox" id="sleepEnabled"> enabled</label>
-            <div class="cmd-row"><label class="hint">After<input class="compact-input" type="number" min="1" max="1440" step="1" id="sleepAfterMinutes" style="width:70px;margin:0 6px">minutes with no players</label></div>
-            <div class="settings-actions" style="margin-top:8px"><button class="btn primary" id="btnSaveSleep">Save</button></div>
-          </div></article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Crash auto-restart</div></div><div class="card-body">
-            <div class="hint" style="margin-bottom:8px">Automatically restarts the server after an unexpected crash. Gives up after too many crashes in a row so a broken mod doesn't loop forever.</div>
-            <label class="hint" style="display:block;margin-bottom:6px"><input type="checkbox" id="crashAutoRestartEnabled"> enabled</label>
-            <div class="cmd-row">
-              <label class="hint">Wait<input class="compact-input" type="number" min="0" max="600" step="5" id="crashAutoRestartDelaySec" style="width:70px;margin:0 6px">sec</label>
-              <label class="hint">Max<input class="compact-input" type="number" min="1" max="20" step="1" id="maxCrashRestartsPerHour" style="width:60px;margin:0 6px">crashes/hour</label>
-            </div>
-            <div class="settings-actions" style="margin-top:8px"><button class="btn primary" id="btnSaveCrashRestart">Save</button></div>
-          </div></article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Console buffer</div></div><div class="card-body">
-            <div class="hint" style="margin-bottom:8px">How many console lines are kept in memory / the live view (more = more panel RAM usage).</div>
-            <div class="cmd-row"><input class="compact-input" type="number" min="100" max="50000" step="100" id="consoleBufferSize" style="width:110px"><span class="hint">lines</span></div>
-            <div class="settings-actions" style="margin-top:8px"><button class="btn primary" id="btnSaveConsoleCfg">Save</button></div>
-          </div></article>
-          <article class="card span-6"><div class="card-head"><div class="card-title">Lifecycle</div><div class="card-meta">warn players before restart</div></div><div class="card-body lifecycle-grid"><div class="restart-row"><label class="hint">Delay</label><select class="compact-select" id="restartDelay"><option value="0">now</option><option value="10" selected>10 sec</option><option value="30">30 sec</option><option value="60">1 min</option><option value="300">5 min</option></select></div><div class="restart-row"><label class="hint">Reason</label><input class="compact-input" id="restartReason" value="Scheduled restart" maxlength="160"></div><label class="hint"><input type="checkbox" id="restartWarn" checked> warn players in chat</label><div class="restart-actions"><button class="btn primary" id="btnScheduleRestart">Schedule restart</button><button class="btn" id="btnCancelRestart">Cancel</button><button class="btn danger" id="btnForceStop">Force stop</button></div><div class="restart-live" id="restartLive">—</div></div></article>
-        </div>
-      </section>
+      <section class="page" id="page-automation"><div id="automationRoot"></div></section>
 
       <section class="page" id="page-events">
         <div class="grid">
@@ -222,52 +184,19 @@
 <script>
 const $ = (id) => document.getElementById(id) || document.createElement('div');
 
-const pageMeta = {
-  overview: ['Overview', 'live server status'],
-  performance: ['Performance', 'CPU, memory, disk and network history'],
-  players: ['Players', 'click a player to manage them'],
-  console: ['Console', 'live server output and commands'],
-  settings: ['Settings', 'Minecraft server configuration'],
-  mods: ['Mods', 'enable or disable installed mods'],
-  files: ['Files', 'browse files on the server'],
-  access: ['Access', 'whitelist, operators and bans'],
-  backups: ['Backups', 'world backups, manual and automatic'],
-  schedule: ['Scheduler', 'plan backups, restarts and commands'],
-  manage: ['Manage instance', 'resources, server software and removal'],
-  automation: ['Automation', 'Scheduled restarts, backups, sleep mode and crash handling'],
-  events: ['Events & Audit', 'timeline, health, lifecycle and panel actions'],
-};
+const AUTOMATION = MeowAutomation.mount({
+  el: $('automationRoot'),
+  load: async () => (await fetch('/api/config')).json(),
+  save: async (patch) => { const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }); if (!r.ok) throw new Error('could not save'); },
+  toast: (message, type) => toast(message, type),
+  t: window.t,
+  after: (section) => { if (section === 'backup') loadBackups(); },
+});
 
 const BASE = window.__BASE || '';
-function pageFromPath() {
-  const page = location.pathname.slice(BASE.length).replace(/^\//, '') || 'overview';
-  return pageMeta[page] ? page : 'overview';
-}
-
 let currentPage = null;
-function showPage(page, { push = false, replace = false } = {}) {
-  if (!pageMeta[page]) page = 'overview';
-  document.querySelectorAll('.page').forEach((el) => el.classList.toggle('active', el.id === `page-${page}`));
-  document.querySelectorAll('[data-page]').forEach((el) => el.classList.toggle('active', el.dataset.page === page));
-  currentPage = page;
-  $('pageTitle').textContent = pageMeta[page][0];
-  $('pageSub').textContent = pageMeta[page][1];
-  document.title = `${pageMeta[page][0]} · Server Panel`;
-  const target = `${BASE}/${page}`;
-  if (push && location.pathname !== target) history.pushState({ page }, '', target);
-  else if (replace && location.pathname !== target) history.replaceState({ page }, '', target);
-  scheduleChartDraw(true);
-  requestAnimationFrame(() => {
-    if (page === 'console') CONSOLE.scrollToEnd();
-  });
-}
-
-document.querySelectorAll('[data-page]').forEach((link) => link.addEventListener('click', (e) => {
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-  e.preventDefault();
-  showPage(link.dataset.page, { push: true });
-}));
-window.addEventListener('popstate', () => showPage(pageFromPath()));
+const showPage = (page, opts) => INSTANCE_SHELL.show(page, opts);
+const pageFromPath = () => INSTANCE_SHELL.pageFromPath();
 
 let running = false;
 let isSleeping = false;
@@ -1224,45 +1153,7 @@ $('btnSaveStartup')?.addEventListener('click', () => {
 });
 
 // --- Automation (scheduled restarts, backups, sleep, crash handling) ---
-async function loadAutomation() {
-  loadStartup();
-  try {
-    const r = await fetch('/api/config');
-    const c = await r.json();
-    $('autoRestartEnabled').checked = !!c.autoRestartEnabled;
-    $('autoRestartTime').value = c.autoRestartTime || '04:00';
-    $('autoRestartWarnSec').value = String(c.autoRestartWarnSec || 300);
-    $('backupIntervalHours').value = c.backupIntervalHours ?? 6;
-    $('maxBackups').value = c.maxBackups ?? 10;
-    $('backupMinFreeGB').value = c.backupMinFreeGB ?? 5;
-    $('consoleBufferSize').value = c.consoleBufferSize ?? 5000;
-    $('sleepEnabled').checked = !!c.sleepEnabled;
-    $('sleepAfterMinutes').value = c.sleepAfterMinutes ?? 20;
-    $('crashAutoRestartEnabled').checked = !!c.crashAutoRestartEnabled;
-    $('crashAutoRestartDelaySec').value = c.crashAutoRestartDelaySec ?? 15;
-    $('maxCrashRestartsPerHour').value = c.maxCrashRestartsPerHour ?? 3;
-  } catch (err) { console.error(err); }
-}
-$('btnSaveAutoRestart')?.addEventListener('click', () => {
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoRestartEnabled: $('autoRestartEnabled').checked, autoRestartTime: $('autoRestartTime').value, autoRestartWarnSec: Number($('autoRestartWarnSec').value) }) })
-    .then(() => toast('Auto-restart settings saved'));
-});
-$('btnSaveBackupCfg')?.addEventListener('click', () => {
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backupIntervalHours: Number($('backupIntervalHours').value), maxBackups: Number($('maxBackups').value), backupMinFreeGB: Number($('backupMinFreeGB').value) }) })
-    .then(() => { toast('Backup settings saved'); loadBackups(); });
-});
-$('btnSaveConsoleCfg')?.addEventListener('click', () => {
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consoleBufferSize: Number($('consoleBufferSize').value) }) })
-    .then(() => toast('Console buffer setting saved'));
-});
-$('btnSaveSleep')?.addEventListener('click', () => {
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sleepEnabled: $('sleepEnabled').checked, sleepAfterMinutes: Number($('sleepAfterMinutes').value) }) })
-    .then(() => toast('Sleep mode settings saved'));
-});
-$('btnSaveCrashRestart')?.addEventListener('click', () => {
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ crashAutoRestartEnabled: $('crashAutoRestartEnabled').checked, crashAutoRestartDelaySec: Number($('crashAutoRestartDelaySec').value), maxCrashRestartsPerHour: Number($('maxCrashRestartsPerHour').value) }) })
-    .then(() => toast('Crash auto-restart settings saved'));
-});
+async function loadAutomation() { loadStartup(); return AUTOMATION.load(); }
 loadAutomation();
 
 // --- Update check ---
