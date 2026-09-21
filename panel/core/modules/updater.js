@@ -136,16 +136,37 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     });
   }
 
-  function rollbackInstall(reason, from, to) {
+  const retry = (fn) => {
+    let last;
+    for (let i = 0; i < 3; i++) { try { return fn(); } catch (err) { last = err; } }
+    throw last;
+  };
+  const remove = (p) => fs.rmSync(p, { recursive: true, force: true });
+
+  // Puts panel.old and package.json.old back as the live install. The panel folder is never left missing:
+  // if the old one cannot be moved into place, the folder that was moved away is moved back.
+  function restoreOldVersion() {
     const live = path.join(installDir, 'panel');
     const old = path.join(installDir, 'panel.old');
-    if (!fs.existsSync(old)) return false;
-    fs.rmSync(path.join(installDir, 'panel.failed'), { recursive: true, force: true });
-    fs.renameSync(live, path.join(installDir, 'panel.failed'));
-    fs.renameSync(old, live);
+    const failed = path.join(installDir, 'panel.failed');
     const oldPkg = path.join(installDir, 'package.json.old');
-    if (fs.existsSync(oldPkg)) fs.renameSync(oldPkg, path.join(installDir, 'package.json'));
-    fs.writeFileSync(RESULT, JSON.stringify({ rolledBack: true, reason, from, to, at: Date.now() }));
+    if (!fs.existsSync(old)) return false;
+    remove(failed);
+    const movedAway = fs.existsSync(live);
+    if (movedAway) retry(() => fs.renameSync(live, failed));
+    try {
+      retry(() => fs.renameSync(old, live));
+    } catch (err) {
+      if (movedAway) { try { fs.renameSync(failed, live); } catch (_) {} }
+      throw err;
+    }
+    if (fs.existsSync(oldPkg)) retry(() => fs.renameSync(oldPkg, path.join(installDir, 'package.json')));
+    return true;
+  }
+
+  function rollbackInstall(reason, from, to) {
+    if (!restoreOldVersion()) return false;
+    try { fs.writeFileSync(RESULT, JSON.stringify({ rolledBack: true, reason, from, to, at: Date.now() })); } catch (_) {}
     return true;
   }
 
@@ -154,6 +175,15 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     const tag = process.env.MEOW_UPDATE_TAG || await fetchLatestTag();
     if (!tag) throw new Error('no release found');
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meowmarism-update-'));
+    try {
+      return await installRelease(tag, tmp);
+    } catch (err) {
+      remove(tmp);
+      throw err;
+    }
+  }
+
+  async function installRelease(tag, tmp) {
     const tarball = path.join(tmp, 'release.tar.gz');
     state.step = 'Downloading';
     if (process.env.MEOW_UPDATE_TARBALL) fs.copyFileSync(process.env.MEOW_UPDATE_TARBALL, tarball);
@@ -165,46 +195,58 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
       p.on('error', reject);
     });
     const extracted = fs.readdirSync(tmp).find((n) => n.startsWith('meowmarism-') && fs.statSync(path.join(tmp, n)).isDirectory());
-    if (!extracted || !fs.existsSync(path.join(tmp, extracted, 'panel', 'controller.js'))) throw new Error('unexpected release layout');
-    try { checkSyntax(path.join(tmp, extracted, 'panel')); } catch (_) { throw new Error('the downloaded release failed its syntax check'); }
+    const release = extracted && path.join(tmp, extracted);
+    if (!release || !fs.existsSync(path.join(release, 'panel', 'controller.js')) || !readJson(path.join(release, 'package.json'))?.version) throw new Error('unexpected release layout');
+    try { checkSyntax(path.join(release, 'panel')); } catch (_) { throw new Error('the downloaded release failed its syntax check'); }
 
     state.step = 'Stopping servers';
     const token = hooks.stop ? await hooks.stop() : null;
+    const restoreServers = () => { if (hooks.restore) hooks.restore(token); };
 
     state.step = 'Installing';
     const livePanel = path.join(installDir, 'panel');
     const newPanel = path.join(installDir, 'panel.new');
     const oldPanel = path.join(installDir, 'panel.old');
-    let fromVersion = null;
-    try { fromVersion = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf8')).version; } catch (_) {}
+    const failedPanel = path.join(installDir, 'panel.failed');
+    const pkg = path.join(installDir, 'package.json');
+    const oldPkg = path.join(installDir, 'package.json.old');
+    const fromVersion = readJson(pkg)?.version || null;
     try {
-      fs.rmSync(newPanel, { recursive: true, force: true });
-      fs.rmSync(oldPanel, { recursive: true, force: true });
-      fs.cpSync(path.join(tmp, extracted, 'panel'), newPanel, { recursive: true });
-      fs.renameSync(livePanel, oldPanel);
+      remove(newPanel); remove(oldPanel); remove(oldPkg); remove(failedPanel);
+      fs.cpSync(path.join(release, 'panel'), newPanel, { recursive: true });
+      retry(() => fs.renameSync(livePanel, oldPanel));
       try {
-        fs.renameSync(newPanel, livePanel);
+        retry(() => fs.renameSync(newPanel, livePanel));
       } catch (err) {
-        fs.renameSync(oldPanel, livePanel);
+        retry(() => fs.renameSync(oldPanel, livePanel));
         throw err;
       }
-      try { fs.copyFileSync(path.join(installDir, 'package.json'), path.join(installDir, 'package.json.old')); } catch (_) {}
-      fs.copyFileSync(path.join(tmp, extracted, 'package.json'), path.join(installDir, 'package.json'));
+      if (fs.existsSync(pkg)) fs.copyFileSync(pkg, oldPkg);
+      fs.copyFileSync(path.join(release, 'package.json'), pkg);
     } catch (err) {
-      if (hooks.restore) hooks.restore(token);
+      try { restoreOldVersion(); } catch (_) {}
+      remove(newPanel); remove(failedPanel); remove(oldPkg);
+      restoreServers();
       throw new Error(`installing failed, the old version is still active (${err.message})`);
     }
 
     state.step = 'Testing the new version';
     if (!(await probeNewVersion(livePanel))) {
       rollbackInstall('the new version failed its start test', fromVersion, tag);
-      fs.rmSync(path.join(installDir, 'panel.failed'), { recursive: true, force: true });
-      if (hooks.restore) hooks.restore(token);
+      remove(failedPanel);
+      restoreServers();
       throw new Error('the new version failed its start test, the old version is still active');
     }
-    try { fs.unlinkSync(RESULT); } catch (_) {}
-    fs.writeFileSync(MARKER, JSON.stringify({ from: fromVersion, to: tag, boots: 0, at: Date.now() }));
-    fs.rmSync(tmp, { recursive: true, force: true });
+    try {
+      try { fs.unlinkSync(RESULT); } catch (_) {}
+      fs.writeFileSync(MARKER, JSON.stringify({ from: fromVersion, to: tag, boots: 0, at: Date.now() }));
+    } catch (err) {
+      rollbackInstall('the update could not be recorded', fromVersion, tag);
+      remove(failedPanel);
+      restoreServers();
+      throw new Error(`could not record the update, the old version is still active (${err.message})`);
+    }
+    remove(tmp);
     state.step = 'Restarting';
     process.exit(0);
   }
