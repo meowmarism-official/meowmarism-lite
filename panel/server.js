@@ -45,8 +45,8 @@ const RAW_CACHE_MAX = Math.ceil(CACHE_WINDOW_MS / FAST_SAMPLE_MS) + 200;
 const INSTANCE_ID = crypto.randomUUID();
 
 let child = null;
+const startupTimers = require('./core/modules/startup-timer').createStartupTimers();
 let startedAt = null;
-let startAttemptAt = null;
 let lastExitAt = null;
 let restartCount = 0;
 let serverPhase = 'offline';
@@ -411,8 +411,7 @@ function detectServerLifecycle(line) {
     const now = Date.now();
     const parsedMs = Math.round(Number(readyMatch[1]) * 1000);
     serverPhase = 'ready'; readyAt = now;
-    const since = startAttemptAt || startedAt;
-    startupDurationMs = since ? now - since : (Number.isFinite(parsedMs) ? parsedMs : null);
+    startupDurationMs = startupTimers.ready('server', Number.isFinite(parsedMs) ? parsedMs : null);
     lastReadyAt = readyAt; lastStartupDurationMs = startupDurationMs;
     pushTimeline('ready', 'Server ready', `Startup ${startupDurationMs != null ? (startupDurationMs / 1000).toFixed(2) + 's' : 'complete'}`, 'good', { startupDurationMs });
     broadcastStatus();
@@ -462,7 +461,7 @@ const runtime = require('./runtime').createRuntime({
   hasJstat: () => scanFeatures().jstat,
   hooks: {
     getPhase: () => serverPhase,
-    startAttempt: () => { lastStartBlock = null; startAttemptAt = Date.now(); },
+    startAttempt: () => { lastStartBlock = null; startupTimers.begin('server'); },
     blocked: (msg) => {
       lastStartBlock = msg;
       broadcast(`--- cannot start: ${msg} ---`);
@@ -731,6 +730,7 @@ function onProcessExit({ code, signal, reason, intent }) {
   for (const name of [...players.keys()]) recordPlayerLeave(name, 'shutdown', false);
   child = null;
   startedAt = null;
+  startupTimers.stopped('server');
   serverPhase = 'offline';
   readyAt = null;
   startupDurationMs = null;

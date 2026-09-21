@@ -12,6 +12,7 @@
 <script src="/core/ui/settings-ui.js"></script>
 <script src="/core/ui/access-ui.js"></script>
 <script src="/core/ui/backups-ui.js"></script>
+<script src="/core/ui/format.js"></script>
 <script src="/core/ui/mods-ui.js"></script>
 <script src="/core/ui/console-ui.js"></script>
 <script>
@@ -353,16 +354,7 @@ let lastChartDrawAt = 0;
 
 showPage(pageFromPath(), { replace: location.pathname === `${BASE}/` || location.pathname === BASE });
 
-function fmtDuration(v) {
-  if (!Number.isFinite(Number(v)) || v < 0) return '—';
-  let s = Math.floor(v), d = Math.floor(s / 86400); s %= 86400;
-  let h = Math.floor(s / 3600); s %= 3600;
-  let m = Math.floor(s / 60); s %= 60;
-  if (d) return `${d}d ${h}h ${m}m`;
-  if (h) return `${h}h ${m}m ${s}s`;
-  if (m) return `${m}m ${s}s`;
-  return `${s}s`;
-}
+function fmtDuration(v) { return MeowFormat.duration(v); }
 function fmtDate(ts) { return ts ? new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'; }
 function fmtClock(ts, withSeconds = true) { return ts ? new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}) }) : '—'; }
 function fmtGB(v) { return Number.isFinite(Number(v)) ? `${Number(v).toFixed(1)} GB` : '—'; }
@@ -382,7 +374,7 @@ function fmtBytes(v) {
   if (v >= 1024) return `${(v / 1024).toFixed(1)} KB`;
   return `${Math.round(v)} B`;
 }
-function fmtStartup(ms) { ms = Number(ms); if (!Number.isFinite(ms) || ms < 0) return '—'; return ms < 10000 ? `${(ms / 1000).toFixed(2)}s` : `${(ms / 1000).toFixed(1)}s`; }
+function fmtStartup(ms) { return MeowFormat.startup(ms); }
 function pct(v) { v = Number(v); return Number.isFinite(v) ? `${v.toFixed(1)}%` : '—'; }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function rangeLabel(ms) { return ms === 60000 ? '1 min' : ms === 300000 ? '5 min' : ms === 900000 ? '15 min' : ms === 3600000 ? '1 hour' : ms === 86400000 ? '24 hours' : '7 days'; }

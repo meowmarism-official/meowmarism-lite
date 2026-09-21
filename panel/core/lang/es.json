@@ -189,7 +189,12 @@
   "Changed access lists": "Cambió las listas de acceso",
   "Changed the scheduler": "Cambió el planificador",
   "Managed a player": "Gestionó a un jugador",
-  "Changed the instance": "Cambió la instancia"
+  "Changed the instance": "Cambió la instancia",
+  "Server ready · startup {t}": "Servidor listo · arranque en {t}",
+  "Server ready": "Servidor listo",
+  "Startup time": "Tiempo de arranque",
+  "Server uptime": "Tiempo activo del servidor",
+  "not started": "no iniciado"
  },
  "patterns": []
 }

@@ -807,7 +807,9 @@
   "Changed access lists": "Zugangslisten geändert",
   "Changed the scheduler": "Scheduler geändert",
   "Managed a player": "Spieler verwaltet",
-  "Changed the instance": "Instanz geändert"
+  "Changed the instance": "Instanz geändert",
+  "Server ready · startup {t}": "Server bereit · Start dauerte {t}",
+  "Server ready": "Server bereit"
  },
  "patterns": [
   [
