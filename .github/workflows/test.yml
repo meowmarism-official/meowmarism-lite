@@ -13,7 +13,7 @@ jobs:
           node-version: 20
       - name: Core at the locked commit is intact and green
         run: |
-          commit=$(node -p "require('./core.lock').commit")
+          commit=$(node -p "JSON.parse(require('fs').readFileSync('core.lock', 'utf8')).commit")
           git clone --quiet https://github.com/meowmarism-official/meowmarism-core /tmp/core
           git -C /tmp/core checkout --quiet "$commit"
           for dir in modules ui lang tokens brand; do diff -r "/tmp/core/$dir" "panel/core/$dir"; done
