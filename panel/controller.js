@@ -382,6 +382,11 @@ async function runRollback(inst, restoreWorld, log) {
 // Tests replace the network-facing steps (version lists, downloads, Java) through a module named in MEOW_TEST_HOOKS.
 const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HOOKS) : {};
 
+// Modpack picking is unfinished (no installer yet) and stays hidden unless switched on.
+const MODPACKS_ENABLED = process.env.MEOW_EXPERIMENTAL_MODPACKS === '1';
+const modpackApi = testHooks.modpackApi || require('./core/modules/modpack-api').createModpackApi();
+const modpackPreview = require('./core/modules/modpack-preview').createModpackPreview({ api: modpackApi, download: testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified });
+
 async function installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin) {
   if (testHooks.installServerSoftware) return testHooks.installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin);
   fs.mkdirSync(dir, { recursive: true });
@@ -773,7 +778,7 @@ const server = http.createServer(async (req, res) => {
         rssMB: status.stats?.server?.rssMB ?? null,
         crash: erroredOut ? status.crash : null,
       };
-    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create'), hostMemMB: Math.round(os.totalmem() / 1048576) }));
+    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create'), modpacks: MODPACKS_ENABLED, hostMemMB: Math.round(os.totalmem() / 1048576) }));
     return;
   }
 
@@ -794,6 +799,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (MODPACKS_ENABLED && url.pathname.startsWith('/api/modpacks/') && req.method === 'GET') {
+    if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed to create instances' }); return; }
+    const answer = (promise) => promise.then((data) => sendJson(res, 200, data)).catch((err) => sendJson(res, err.status || 502, { ok: false, error: err.message }));
+    const preview = /^\/api\/modpacks\/versions\/([\w-]+)\/preview$/.exec(url.pathname);
+    const versions = /^\/api\/modpacks\/([\w-]+)\/versions$/.exec(url.pathname);
+    if (url.pathname === '/api/modpacks/search') answer(modpackApi.searchModpacks({ query: url.searchParams.get('query') || '', offset: url.searchParams.get('offset') }));
+    else if (preview) answer(modpackPreview.preview(preview[1]));
+    else if (versions) answer(modpackApi.getVersions(versions[1]));
+    else sendJson(res, 404, { ok: false, error: 'not found' });
+    return;
+  }
+
   if (url.pathname === '/api/instances' && req.method === 'POST') {
     if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed to create instances' }); return; }
     let body = '';
@@ -803,6 +820,7 @@ const server = http.createServer(async (req, res) => {
       instanceCreateInProgress = true;
       try {
         const data = JSON.parse(body || '{}');
+        if (data.modpack) throw new Error('installing modpacks is not available yet');
         const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
         const loader = ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
         const mcVersion = String(data.mcVersion || '').trim();

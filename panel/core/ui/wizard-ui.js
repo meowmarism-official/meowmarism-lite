@@ -1,6 +1,7 @@
 // Step-by-step dialog for creating an instance, with a progress view while it is created. Shared by every product.
 // cfg: { steps: [{ title, hint, html, validate?() -> message | falsy, onShow?() }], createLabel, create() -> Promise (throws on failure),
 //   progress() -> Promise<{ lines, progress, done, error, name }>, openHref?(name), onFinished?(), onOpen?(), t, esc, openButton, focusEl? }
+// A step may have when() -> boolean; inactive steps are skipped by Next/Back and hidden in the step dots. The last step must always be active; Back on the first active step closes the dialog.
 (function () {
   function mount(cfg) {
     const { t, esc } = cfg;
@@ -8,6 +9,10 @@
     const $ = (id) => document.getElementById(id);
     let creating = false;
     let current = 1;
+    const active = (k) => !cfg.steps[k - 1].when || !!cfg.steps[k - 1].when();
+    const nextActive = (k) => { let j = k + 1; while (j < n && !active(j)) j++; return j; };
+    const prevActive = (k) => { for (let j = k - 1; j >= 1; j--) if (active(j)) return j; return null; };
+    const firstActive = () => { let j = 1; while (!active(j)) j++; return j; };
 
     const stepHtml = cfg.steps.map((s, i) => {
       const k = i + 1;
@@ -49,8 +54,15 @@ ${stepHtml}
     function showStep(k) {
       current = k;
       for (let i = 1; i <= n + 1; i++) $(`step${i}`).style.display = i === k ? '' : 'none';
-      for (let i = 1; i <= n; i++) $(`stepDot${i}`).classList.toggle('done', k >= i);
+      refresh();
       if (cfg.steps[k - 1] && cfg.steps[k - 1].onShow) cfg.steps[k - 1].onShow();
+    }
+    function refresh() {
+      for (let i = 1; i <= n; i++) {
+        const dot = $(`stepDot${i}`);
+        dot.style.display = active(i) ? '' : 'none';
+        dot.classList.toggle('done', current >= i);
+      }
     }
     function error(k, msg) {
       const el = $(`w${k}-error`);
@@ -60,7 +72,7 @@ ${stepHtml}
     }
     function open() {
       $('wizardBack').classList.add('open');
-      showStep(1);
+      showStep(firstActive());
       $('createStatus').textContent = '';
       for (let i = 1; i < n; i++) error(i, null);
       if (cfg.onOpen) cfg.onOpen();
@@ -73,10 +85,10 @@ ${stepHtml}
         const msg = cfg.steps[k - 1].validate && cfg.steps[k - 1].validate();
         if (msg) return error(k, msg);
         error(k, null);
-        showStep(k + 1);
+        showStep(nextActive(k));
       });
     }
-    for (let k = 2; k <= n; k++) $(`w-back${k}`).addEventListener('click', () => showStep(k - 1));
+    for (let k = 2; k <= n; k++) $(`w-back${k}`).addEventListener('click', () => { const p = prevActive(k); if (p == null) close(); else showStep(p); });
 
     $('w-create').addEventListener('click', async () => {
       const msg = cfg.steps[n - 1].validate && cfg.steps[n - 1].validate();
@@ -131,7 +143,7 @@ ${stepHtml}
     }
     $('creatingClose').addEventListener('click', close);
 
-    return { open, close, showStep, error };
+    return { open, close, showStep, error, refresh };
   }
   window.MeowWizard = { mount };
 })();

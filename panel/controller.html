@@ -9,12 +9,14 @@
 <link rel="stylesheet" href="/core/ui/base.css">
 <link rel="stylesheet" href="/core/ui/sidebar.css">
 <link rel="stylesheet" href="/core/ui/users-ui.css">
+<link rel="stylesheet" href="/core/ui/modpack-ui.css">
 <script src="/i18n.js"></script>
 <script src="/core/ui/loaders.js"></script>
 <script src="/core/ui/instances-ui.js"></script>
 <script src="/core/ui/system-ui.js"></script>
 <script src="/core/ui/shell.js"></script>
 <script src="/core/ui/wizard-ui.js"></script>
+<script src="/core/ui/modpack-ui.js"></script>
 <script src="/core/ui/users-ui.js"></script>
 </head>
 <body>
@@ -123,6 +125,7 @@ function healthLabel(i) {
 }
 
 let hostMemMB = 0;
+let modpacksOn = false;
 function instCard(i) {
   return {
     name: i.name, loader: i.loader, loaderVersion: i.loaderVersion, mcVersion: i.mcVersion, port: i.port, running: i.running,
@@ -136,6 +139,7 @@ async function loadInstances() {
   const data = await r.json();
   $('openWizard').style.display = data.canCreate ? '' : 'none';
   hostMemMB = data.hostMemMB || 0;
+  modpacksOn = !!data.modpacks;
   MeowInstances.render($('instGrid'), $('instSummary'), data.instances.map(instCard), hostMemMB, 'No instances yet - create your first server with the + button.');
 }
 
@@ -190,7 +194,8 @@ const WIZ = MeowWizard.mount({
   t: window.t, esc,
   createLabel: 'Create instance',
   steps: [
-    { title: 'Create instance', hint: 'Name it and pick what it runs.', html: `      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
+    { title: 'Create instance', hint: 'Start from scratch or from a modpack.', html: '<div id="w-source"></div>', when: () => modpacksOn },
+    { title: 'Create instance', hint: 'Name it and pick what it runs.', when: () => !modpacksOn || SOURCE.mode() === 'blank', html: `      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
       <div class="field-row">
         <div class="field"><label for="w-loader">Loader</label>
           <select id="w-loader">
@@ -211,7 +216,8 @@ const WIZ = MeowWizard.mount({
         if ($('w-loader').value !== 'vanilla' && !$('w-loaderVersion').value) return 'Pick a loader version';
         return null;
       } },
-    { title: 'Resources', hint: 'How much of this machine the instance may use.', html: `      <div class="field-row">
+    { title: 'Modpack', hint: 'Search Modrinth and pick a version.', html: '<div id="w-modpack"></div>', when: () => modpacksOn && SOURCE.mode() === 'modpack', validate: () => PICKER.validate() },
+    { title: 'Resources', hint: 'How much of this machine the instance may use.', onShow: () => { const p = modpackMode() && PICKER.value(); if (p) $('w-ram').value = p.ramMB; }, html: `      <div class="field-row">
         <div class="field"><label for="w-port">Server port</label><input id="w-port" type="number" value="25565"><div class="hint" id="w-portHint" style="margin-top:4px"></div></div>
         <div class="field"><label for="w-ram">Memory (MB)</label><input id="w-ram" type="number" value="4096" step="512" min="1024" max="32768"></div>
       </div>
@@ -231,8 +237,10 @@ const WIZ = MeowWizard.mount({
   ],
   onOpen: () => { suggestPort(25565); if ($('w-mc').options.length <= 1) loadMcVersions($('w-loader').value); },
   create: async () => {
+    const pack = modpackMode() ? PICKER.value() : null;
     const body = {
-      name: $('w-name').value.trim(), loader: $('w-loader').value, mcVersion: $('w-mc').value, loaderVersion: $('w-loaderVersion').value,
+      name: pack ? pack.name : $('w-name').value.trim(), loader: $('w-loader').value, mcVersion: $('w-mc').value, loaderVersion: $('w-loaderVersion').value,
+      ...(pack ? { modpack: { versionId: pack.versionId } } : {}),
       port: Number($('w-port').value), ramMB: Number($('w-ram').value),
       backupIntervalHours: Number($('w-backupInterval').value), maxBackups: Number($('w-maxBackups').value), autoStart: $('w-autostart').checked,
     };
@@ -244,6 +252,24 @@ const WIZ = MeowWizard.mount({
   progress: async () => (await fetch('/api/create-log')).json(),
   openHref: (name) => `/instance/${encodeURIComponent(name)}/`,
   onFinished: () => { $('w-name').value = ''; loadInstances(); },
+});
+const modpackMode = () => modpacksOn && SOURCE.mode() === 'modpack';
+const SOURCE = MeowModpack.mountSource({ el: $('w-source'), t: window.t, esc, onChange: () => { WIZ.refresh(); if (modpackMode()) PICKER.reset(); } });
+async function modpackJson(url) {
+  const r = await fetch(url);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Request failed');
+  return d;
+}
+const PICKER = MeowModpack.mountPicker({
+  el: $('w-modpack'), t: window.t, esc,
+  loaders: ['fabric', 'forge', 'neoforge'],
+  maxRamMB: () => hostMemMB,
+  api: {
+    search: ({ query, offset }) => modpackJson(`/api/modpacks/search?query=${encodeURIComponent(query)}&offset=${offset}`),
+    versions: (id) => modpackJson(`/api/modpacks/${encodeURIComponent(id)}/versions`),
+    preview: (versionId) => modpackJson(`/api/modpacks/versions/${encodeURIComponent(versionId)}/preview`),
+  },
 });
 $('w-port').addEventListener('change', (e) => suggestPort(Number(e.target.value) || 25565));
 $('w-loader').addEventListener('change', (e) => loadMcVersions(e.target.value));

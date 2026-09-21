@@ -28,8 +28,8 @@ process.stdin.on('data', (d) => {
 
 const FAKE_JAVA = '#!/bin/sh\necho \'openjdk version "21.0.1" 2024-01-16\' >&2\n';
 
-// options: instances (names), config ({ name: panel-config overrides }), hooks (path of a MEOW_TEST_HOOKS module)
-async function start({ instances = ['inst1'], config = {}, hooks = null } = {}) {
+// options: instances (names), config ({ name: panel-config overrides }), hooks (path of a MEOW_TEST_HOOKS module), env (extra environment)
+async function start({ instances = ['inst1'], config = {}, hooks = null, env = {} } = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'meow-int-'));
   const controllerPort = await freePort();
   const workerBase = await freePort();
@@ -52,7 +52,7 @@ async function start({ instances = ['inst1'], config = {}, hooks = null } = {}) 
   require(path.join(REPO, 'panel', 'lib', 'db.js')).createUserStore(path.join(home, '.meowmarism-controller-users.json')).upsertOwner('owner', 'ownerpass123');
 
   const child = spawn(process.execPath, [path.join(REPO, 'panel', 'controller.js')], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase), ...(hooks ? { MEOW_TEST_HOOKS: hooks } : {}) },
+    env: { ...process.env, HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase), ...(hooks ? { MEOW_TEST_HOOKS: hooks } : {}), ...env },
     cwd: path.join(REPO, 'panel'),
     stdio: 'ignore',
   });

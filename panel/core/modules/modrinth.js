@@ -335,4 +335,4 @@ function createModrinth({ modsDir, disabledDir, oldDir, datapackDir, mcVersion, 
   return { supported, installable, loaders, type, search, project, projectVersions, install, updates, applyUpdates };
 }
 
-module.exports = { createModrinth, loadersFor, projectTypeFor, fetchImage };
+module.exports = { createModrinth, loadersFor, projectTypeFor, fetchImage, request, downloadVerified, API };
