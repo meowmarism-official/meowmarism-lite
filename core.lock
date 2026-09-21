@@ -58,6 +58,7 @@
     "panel/core/ui/modrinth-ui.css",
     "panel/core/ui/modrinth-ui.js",
     "panel/core/ui/mods-ui.js",
+    "panel/core/ui/palette-ui.js",
     "panel/core/ui/players-ui.js",
     "panel/core/ui/schedule-ui.js",
     "panel/core/ui/server-icon-ui.js",

@@ -15,6 +15,7 @@
 <script src="/core/ui/format.js"></script>
 <script src="/core/ui/automation-ui.js"></script>
 <script src="/core/ui/players-ui.js"></script>
+<script src="/core/ui/palette-ui.js"></script>
 <script src="/core/ui/server-icon-ui.js"></script>
 <script src="/core/ui/mods-ui.js"></script>
 <script src="/core/ui/console-ui.js"></script>
@@ -157,7 +158,7 @@
 
 <div class="toast-stack" id="toastStack"></div>
 
-<div class="palette-backdrop" id="paletteBackdrop"><div class="palette" role="dialog" aria-modal="true" aria-label="Command palette"><input class="palette-input" id="paletteInput" placeholder="Go to page, find player, run action…" autocomplete="off"><div class="palette-list" id="paletteList"></div></div></div>
+/div>
 
 <script>
 const $ = (id) => document.getElementById(id) || document.createElement('div');
@@ -179,6 +180,22 @@ const PLAYERS = MeowPlayers.mount({
   onUpdate: (p) => { $('overviewPlayers').textContent = `${p.online || 0} / ${p.max ?? '—'}`; CONSOLE.refreshSuggestions(); },
   toast: (message, type) => toast(message, type),
   t: window.t, esc,
+});
+const PALETTE = MeowPalette.mount({
+  goto: (page) => showPage(page, { push: true }),
+  focusConsole: () => CONSOLE.focus(),
+  focusSearch: () => CONSOLE.focusSearch(),
+  extra: () => {
+    const out = [
+      { label: 'Restart server…', sub: 'Open scheduled restart controls', key: '', run: () => showPage('automation', { push: true }) },
+      { label: 'Start server', sub: 'Start Minecraft if offline', key: '', run: () => post('/start').catch((e) => toast(e.message, 'error')) },
+      { label: 'Stop server', sub: 'Clean shutdown', key: '', run: () => post('/stop').catch((e) => toast(e.message, 'error')) },
+      { label: 'Back to live graphs', sub: 'Leave history mode', key: '', run: () => { chartLiveMode = true; chartAnchorTime = null; updateHistoryModeUi(); scheduleChartDraw(true); } },
+    ];
+    for (const p of latest?.players?.list || []) out.push({ label: p.name, sub: `Player · ${fmtDuration(p.sessionSec)} online`, key: 'player', run: () => { showPage('players', { push: true }); PLAYERS.open(p.name); } });
+    return out;
+  },
+  esc,
 });
 const AUTOMATION = MeowAutomation.mount({
   el: $('automationRoot'),
@@ -236,7 +253,6 @@ let chartDrag = null;
 const timelineEntries = [];
 const auditEntriesClient = [];
 let restartPlanState = null;
-let paletteIndex = 0;
 
 const rawHistory = [];
 const history1s = [];
@@ -913,14 +929,6 @@ $('btnScheduleRestart').onclick=async()=>{try{const d=await post('/api/restart-p
 $('btnCancelRestart').onclick=async()=>{try{await post('/api/restart-plan',{action:'cancel'});applyRestartPlan(null);toast('Restart cancelled');}catch(e){toast(e.message,'error');}};
 $('btnForceStop').onclick=async()=>{if(!(await modalConfirm('Force stop?','Force stop the Minecraft process? Unsaved world data can be lost.','Force stop',true)))return;try{await post('/force-stop');toast('Force stop sent');}catch(e){toast(e.message,'error');}};
 
-function paletteActions(){ const out=[
-  {label:'Overview',sub:'Go to live server overview',key:'G O',run:()=>showPage('overview',{push:true})},{label:'Performance',sub:'CPU, RAM, network and tick telemetry',key:'G P',run:()=>showPage('performance',{push:true})},{label:'Players',sub:'Online players and history',key:'G U',run:()=>showPage('players',{push:true})},{label:'Console',sub:'Live console and commands',key:'G C',run:()=>{showPage('console',{push:true});setTimeout(()=>CONSOLE.focus(),0)}},{label:'Settings',sub:'server.properties',key:'G S',run:()=>showPage('settings',{push:true})},{label:'Events & Audit',sub:'Timeline, health and lifecycle',key:'G E',run:()=>showPage('events',{push:true})},
-  {label:'Restart server…',sub:'Open scheduled restart controls',key:'',run:()=>showPage('events',{push:true})},{label:'Start server',sub:'Start Minecraft if offline',key:'',run:()=>post('/start').catch((e)=>toast(e.message,'error'))},{label:'Stop server',sub:'Clean shutdown',key:'',run:()=>post('/stop').catch((e)=>toast(e.message,'error'))},{label:'Back to live graphs',sub:'Leave history mode',key:'',run:()=>{chartLiveMode=true;chartAnchorTime=null;updateHistoryModeUi();scheduleChartDraw(true)}}];
-  for(const p of latest?.players?.list||[]) out.push({label:p.name,sub:`Player · ${fmtDuration(p.sessionSec)} online`,key:'player',run:()=>{showPage('players',{push:true});PLAYERS.open(p.name)}}); return out; }
-function renderPalette(){const q=$('paletteInput').value.trim().toLowerCase(), all=paletteActions(), filtered=all.filter((a)=>!q||`${a.label} ${a.sub}`.toLowerCase().includes(q)).slice(0,18); paletteIndex=Math.max(0,Math.min(paletteIndex,Math.max(0,filtered.length-1))); $('paletteList').innerHTML=filtered.map((a,i)=>`<button class="palette-item ${i===paletteIndex?'active':''}" data-pal="${i}"><span><div class="palette-main">${esc(a.label)}</div><div class="palette-sub">${esc(a.sub||'')}</div></span><span class="palette-key">${esc(a.key||'')}</span></button>`).join(''); $('paletteList')._actions=filtered; }
-function openPalette(){paletteIndex=0;$('paletteBackdrop').classList.add('open');$('paletteInput').value='';renderPalette();setTimeout(()=>$('paletteInput').focus(),0);} function closePalette(){$('paletteBackdrop').classList.remove('open');}
-$('paletteInput').addEventListener('input',()=>{paletteIndex=0;renderPalette();}); $('paletteInput').addEventListener('keydown',(e)=>{const acts=$('paletteList')._actions||[];if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=(paletteIndex+1)%Math.max(1,acts.length);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=(paletteIndex-1+Math.max(1,acts.length))%Math.max(1,acts.length);renderPalette();}else if(e.key==='Enter'){e.preventDefault();const a=acts[paletteIndex];if(a){closePalette();a.run();}}else if(e.key==='Escape')closePalette();}); $('paletteList').addEventListener('click',(e)=>{const b=e.target.closest('[data-pal]');if(!b)return;const a=($('paletteList')._actions||[])[Number(b.dataset.pal)];if(a){closePalette();a.run();}}); $('paletteBackdrop').addEventListener('mousedown',(e)=>{if(e.target===$('paletteBackdrop'))closePalette();});
-let keyChord='';let keyChordTimer=null;document.addEventListener('keydown',(e)=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();return;}if(e.target.matches('input,textarea,select')||e.target.isContentEditable)return;if(e.key==='/'){e.preventDefault();showPage('console',{push:true});setTimeout(()=>search.focus(),0);return;}const k=e.key.toLowerCase();if(keyChord==='g'){const map={o:'overview',p:'performance',u:'players',c:'console',s:'settings',e:'events'};if(map[k]){e.preventDefault();showPage(map[k],{push:true});keyChord='';clearTimeout(keyChordTimer);return;}}if(k==='g'){keyChord='g';clearTimeout(keyChordTimer);keyChordTimer=setTimeout(()=>keyChord='',900);}});
 
 async function syncClock() {
   try {
