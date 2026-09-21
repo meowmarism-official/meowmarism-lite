@@ -14,6 +14,7 @@
 <script src="/core/ui/backups-ui.js"></script>
 <script src="/core/ui/format.js"></script>
 <script src="/core/ui/automation-ui.js"></script>
+<script src="/core/ui/server-icon-ui.js"></script>
 <script src="/core/ui/mods-ui.js"></script>
 <script src="/core/ui/console-ui.js"></script>
 <script>
@@ -95,12 +96,7 @@
       <section class="page" id="page-console"><div id="consoleRoot"></div></section>
 
       <section class="page" id="page-settings">
-        <article class="card" id="serverIconCard" style="margin-bottom:14px"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-          <img id="serverIconImg" width="64" height="64" alt="" style="image-rendering:pixelated;border-radius:6px;background:#17191d;border:1px solid var(--line)">
-          <div style="flex:1;min-width:220px"><div class="card-title">Server icon</div>
-            <div class="hint" style="margin:4px 0 8px">Shown in the Minecraft server list. It is scaled to 64x64. Restart the server to apply it.</div>
-            <div class="settings-actions"><button class="btn" id="btnIconChange">Change icon...</button> <button class="btn" id="btnIconReset">Use the meowmarism icon</button><input type="file" id="iconFile" accept="image/*" style="display:none"></div></div>
-        </div></article>
+        <div id="serverIconRoot"></div>
         <div id="settingsRoot"></div>
       </section>
 
@@ -184,6 +180,13 @@
 <script>
 const $ = (id) => document.getElementById(id) || document.createElement('div');
 
+const SERVER_ICON = MeowServerIcon.mount({
+  el: $('serverIconRoot'),
+  src: () => `${window.__BASE || ''}/api/server-icon?ts=${Date.now()}`,
+  send: async (body) => (await fetch('/api/server-icon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json(),
+  toast: (message, type) => toast(message, type),
+  t: window.t,
+});
 const AUTOMATION = MeowAutomation.mount({
   el: $('automationRoot'),
   load: async () => (await fetch('/api/config')).json(),
@@ -1363,33 +1366,6 @@ $('btnRollback').addEventListener('click', async () => {
 });
 swLoad();
 
-// --- Server icon ---
-function iconReload() { $('serverIconImg').src = `${window.__BASE || ''}/api/server-icon?ts=${Date.now()}`; }
-async function iconSend(body) {
-  const r = await fetch('/api/server-icon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json();
-  toast(d.ok ? t('Server icon saved, restart the server to apply it') : t(d.error || 'Failed'), d.ok ? 'ok' : 'error');
-  iconReload();
-}
-$('btnIconChange').addEventListener('click', () => $('iconFile').click());
-$('btnIconReset').addEventListener('click', () => iconSend({ reset: true }));
-$('iconFile').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  const img = new Image();
-  img.onload = () => {
-    const c = document.createElement('canvas');
-    c.width = 64; c.height = 64;
-    const side = Math.min(img.width, img.height);
-    c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 64, 64);
-    iconSend({ png: c.toDataURL('image/png').split(',')[1] });
-    URL.revokeObjectURL(img.src);
-  };
-  img.onerror = () => toast(t('That file is not an image'), 'error');
-  img.src = URL.createObjectURL(file);
-});
-iconReload();
 
 // --- Delete instance ---
 $('btnDeleteInstance').addEventListener('click', () => {

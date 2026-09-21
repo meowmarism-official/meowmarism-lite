@@ -46,6 +46,7 @@ const INSTANCE_ID = crypto.randomUUID();
 
 let child = null;
 const startupTimers = require('./core/modules/startup-timer').createStartupTimers();
+const serverIcon = require('./core/modules/server-icon').createServerIcon({ dir: SERVER_DIR, defaultIcon: path.join(__dirname, 'core', 'brand', 'server-icon.png') });
 let startedAt = null;
 let lastExitAt = null;
 let restartCount = 0;
@@ -1916,10 +1917,9 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/server-icon' && req.method === 'GET') {
-    const file = path.join(SERVER_DIR, 'server-icon.png');
-    if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
+    if (!serverIcon.exists()) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(serverIcon.file).pipe(res);
     return;
   }
   if (url.pathname === '/api/server-icon' && req.method === 'POST') {
@@ -1927,19 +1927,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 512 * 1024) req.destroy(); });
     req.on('end', () => {
       try {
-        const data = JSON.parse(body || '{}');
-        const dest = path.join(SERVER_DIR, 'server-icon.png');
-        if (data.reset === true) {
-          fs.copyFileSync(path.join(__dirname, 'core', 'brand', 'server-icon.png'), dest);
-        } else {
-          const png = Buffer.from(String(data.png || ''), 'base64');
-          const isPng = png.length > 33 && png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-          if (!isPng) throw new Error('that is not a PNG image');
-          if (png.readUInt32BE(16) !== 64 || png.readUInt32BE(20) !== 64) throw new Error('Minecraft needs a 64x64 PNG');
-          if (png.length > 100 * 1024) throw new Error('the image is too large');
-          fs.writeFileSync(dest, png);
-        }
-        pushAudit('server.icon', 'server', data.reset === true ? 'reset to the meowmarism icon' : 'changed');
+        pushAudit('server.icon', 'server', serverIcon.apply(JSON.parse(body || '{}')));
         sendJson(res, 200, { ok: true });
       } catch (err) { sendJson(res, 400, { ok: false, error: err.message || 'invalid image' }); }
     });
