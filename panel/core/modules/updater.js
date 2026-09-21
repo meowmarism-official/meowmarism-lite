@@ -6,6 +6,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const { spawn, execFileSync } = require('child_process');
+const { getBuildInfo } = require('./build-info');
 
 const MAX_BOOTS = 3;
 const CONFIRM_AFTER_MS = Number(process.env.MEOW_CONFIRM_MS) || 60000;
@@ -94,8 +95,8 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
 
   // Installed and latest version; the lookup is cached for five minutes.
   async function versionInfo(refresh) {
-    let version = null;
-    try { version = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf8')).version; } catch (_) {}
+    const build = getBuildInfo(installDir);
+    const version = build.version;
     const force = refresh && (!versionCache || Date.now() - versionCache.at > 30 * 1000);
     let checkError = null;
     if (force || !versionCache || Date.now() - versionCache.at > 5 * 60 * 1000) {
@@ -103,7 +104,7 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     }
     const latestVersion = versionCache?.tag ? versionCache.tag.replace(/^v/, '') : null;
     return {
-      version, latestVersion,
+      version, channel: build.channel, commit: build.commit, label: build.label, latestVersion,
       publishedAt: versionCache?.publishedAt || null,
       releaseUrl: versionCache?.url || `https://github.com/${repo}/releases/latest`,
       checkedAt: versionCache?.at || null,

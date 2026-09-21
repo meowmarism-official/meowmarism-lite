@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
-  "version": "0.0.1.1",
-  "commit": "1dd304e6f6fc8a25f4a265153f2b88ded38b3688",
+  "version": "0.0.2",
+  "commit": "1edbe42ee44688c008428adaabc8774f00f752ec",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -18,6 +18,7 @@
     "panel/core/tokens/tokens.json",
     "panel/core/modules/access.js",
     "panel/core/modules/backup.js",
+    "panel/core/modules/build-info.js",
     "panel/core/modules/files.js",
     "panel/core/modules/metrics.js",
     "panel/core/modules/modrinth.js",

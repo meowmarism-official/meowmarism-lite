@@ -162,7 +162,10 @@
       try {
         versionInfo = await (await fetch(refresh ? `${cfg.urls.version}?refresh=1` : cfg.urls.version)).json();
         refreshUpdateIndicator();
-        if (versionInfo.version) $('sideVersion').textContent = `v${versionInfo.version} · `;
+        if (versionInfo.version) {
+          $('sideVersion').textContent = `v${versionInfo.label || versionInfo.version} · `;
+          $('sideVersion').title = versionInfo.commit ? `${versionInfo.channel === 'dev' ? 'Development build' : 'Release'} · commit ${versionInfo.commit}` : '';
+        }
       } catch (_) {}
     }
     setInterval(loadVersion, 5 * 60 * 1000);
@@ -180,7 +183,7 @@
     async function loadUpdatePage() {
       const v = await (await fetch(cfg.urls.version)).json();
       versionInfo = v;
-      $('upd-current').textContent = v.version ? `v${v.version}` : 'unknown';
+      $('upd-current').textContent = v.version ? `v${v.label || v.version}${v.commit ? ` (${v.commit})` : ''}` : 'unknown';
       $('upd-latest').textContent = v.latestVersion ? `v${v.latestVersion}` : 'unknown';
       $('upd-date').textContent = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString() : '-';
       $('upd-status').innerHTML = v.checkError && !v.latestVersion ? `<span class="badge">${t('could not check GitHub')}</span>` : v.updateAvailable
