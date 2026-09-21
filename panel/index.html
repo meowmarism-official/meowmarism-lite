@@ -13,6 +13,7 @@
 <script src="/core/ui/access-ui.js"></script>
 <script src="/core/ui/backups-ui.js"></script>
 <script src="/core/ui/format.js"></script>
+<script src="/core/ui/resources-ui.js"></script>
 <script src="/core/ui/automation-ui.js"></script>
 <script src="/core/ui/players-ui.js"></script>
 <script src="/core/ui/palette-ui.js"></script>
@@ -41,30 +42,9 @@
     <script src="/js/shell-mount.js"></script>
 
     <main class="workspace">
-      <section class="page" id="page-overview">
-        <div class="status-strip" id="statusStrip">
-          <div class="status-main"><div class="status-kicker">Server status</div><div class="status-state"><span class="state-dot"></span><span id="statusState">Offline</span></div><div class="status-note" id="statusNote">Server is not running</div></div>
-          <div class="status-cell"><div class="status-kicker">Server uptime</div><div class="big-value" id="serverUptime">—</div><div class="small-value" id="serverStarted">not started</div></div>
-          <div class="status-cell"><div class="status-kicker">Players</div><div class="big-value" id="overviewPlayers">0 / —</div><div class="small-value">currently online</div></div>
-          <div class="status-cell"><div class="status-kicker">CPU</div><div class="big-value" id="overviewCpu">—%</div><div class="small-value" id="overviewLoad">sampling…</div></div>
-          <div class="status-cell"><div class="status-kicker">RAM</div><div class="big-value" id="overviewRam">—%</div><div class="small-value" id="overviewRamDetail">sampling…</div></div>
-        </div>
+      <section class="page" id="page-overview"></section>
 
-        <div class="grid">
-          <article class="card span-8"><div class="card-head"><div class="card-title">Performance history</div><div class="chart-head-right"><div class="chart-legend"><span><i class="legend-dot"></i>CPU</span><span><i class="legend-dot ram"></i>RAM</span></div><div class="chart-range"><button class="range-btn active" data-range-ms="60000">1m</button><button class="range-btn" data-range-ms="300000">5m</button><button class="range-btn" data-range-ms="900000">15m</button><button class="range-btn" data-range-ms="3600000">1h</button><button class="range-btn" data-range-ms="86400000">24h</button><button class="range-btn" data-range-ms="604800000">7d</button></div></div></div><div class="card-body"><div class="chart-host"><canvas class="chart" id="overviewChart"></canvas></div><div class="chart-hint">Drag to zoom · double click for live</div></div></article>
-          <article class="card span-4"><div class="card-head"><div class="card-title">Minecraft</div></div><div class="card-body"><table class="metric-table"><tr><td>Version</td><td id="mcVersion">—</td></tr><tr><td>Port</td><td id="mcPort">—</td></tr><tr><td>Gamemode</td><td id="mcGamemode">—</td></tr><tr><td>Difficulty</td><td id="mcDifficulty">—</td></tr><tr><td>View distance</td><td id="mcViewDistance">—</td></tr><tr><td>PvP</td><td id="mcPvp">—</td></tr><tr><td>Whitelist</td><td id="mcWhitelist">—</td></tr><tr><td>TPS</td><td id="mcTps">—</td></tr><tr><td>MOTD</td><td id="mcMotd" title="">—</td></tr></table></div></article>
-        </div>
-      </section>
-
-      <section class="page" id="page-performance">
-        <div class="grid">
-          <article class="card span-4"><div class="card-body"><div class="resource-top"><div><div class="resource-number" id="perfCpu">—%</div><div class="resource-label">CPU</div></div><div class="mono" id="perfTemp">—</div></div><div class="bar"><div id="perfCpuBar"></div></div><div class="resource-foot"><span id="perfCores">— cores</span><span id="perfClock">—</span></div><div class="sample-note" id="perfCpuSample">current — · min — · peak —</div></div></article>
-          <article class="card span-4"><div class="card-body"><div class="resource-top"><div><div class="resource-number" id="perfRam">—%</div><div class="resource-label">RAM</div></div></div><div class="bar"><div id="perfRamBar"></div></div><div class="resource-foot"><span id="perfRamUsed">—</span><span id="perfRamTotal">—</span></div><div class="sample-note" id="perfRamSample">current — · min — · peak —</div></div></article>
-          <article class="card span-4"><div class="card-body"><div class="resource-top"><div><div class="resource-number" id="perfDisk">—%</div><div class="resource-label">Disk</div></div></div><div class="bar"><div id="perfDiskBar"></div></div><div class="resource-foot"><span id="perfDiskUsed">— used</span><span id="perfDiskTotal">— total</span></div></div></article>
-
-          <article class="card span-12"><div class="card-head"><div class="card-title">CPU / RAM</div><div class="chart-head-right"><div class="chart-legend"><span><i class="legend-dot"></i>CPU</span><span><i class="legend-dot ram"></i>RAM</span></div><div class="chart-range"><button class="range-btn active" data-range-ms="60000">1m</button><button class="range-btn" data-range-ms="300000">5m</button><button class="range-btn" data-range-ms="900000">15m</button><button class="range-btn" data-range-ms="3600000">1h</button><button class="range-btn" data-range-ms="86400000">24h</button><button class="range-btn" data-range-ms="604800000">7d</button></div></div></div><div class="card-body"><div class="chart-host"><canvas class="chart" id="perfCpuRamChart"></canvas></div><div class="chart-hint">Lag, crash and restart markers are drawn on the timeline.</div></div></article>
-        </div>
-      </section>
+      <section class="page" id="page-performance"></section>
 
       <section class="page" id="page-players"><div id="playersRoot"></div></section>
 

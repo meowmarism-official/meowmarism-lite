@@ -68,16 +68,8 @@ function setRenderTarget(sample, { snap = false, catchup = false } = {}) {
 
 function renderDisplay() {
   const cpu = displayState.cpu, ram = displayState.ram, procCpu = displayState.procCpu, procRam = displayState.procRam;
-  $('overviewCpu').textContent = pct(cpu); $('overviewRam').textContent = pct(ram);
-  $('ovProcCpu').textContent = procCpu == null ? '—' : pct(procCpu); $('ovProcRam').textContent = procRam == null ? '—' : fmtMB(procRam);
-  $('ovRx').textContent = fmtRate(displayState.rx); $('ovTx').textContent = fmtRate(displayState.tx);
-  $('ovProcRead').textContent = fmtRate(displayState.procRead); $('ovProcWrite').textContent = fmtRate(displayState.procWrite);
-  $('perfCpu').textContent = pct(cpu); setBar('perfCpuBar', cpu, peakHold.cpu);
-  $('perfRam').textContent = pct(ram); setBar('perfRamBar', ram, peakHold.ram);
-  $('perfProc').textContent = procCpu == null ? '—' : pct(procCpu); setBar('perfProcBar', procCpu, peakHold.procCpu);
-  if (displayState.ramUsedGB != null) $('perfRamUsed').textContent = `${fmtGB(displayState.ramUsedGB)} used`;
-  $('perfProcRam').textContent = procRam == null ? '— RAM' : `${fmtMB(procRam)} RAM`;
-  $('sysProcCpu').textContent = procCpu == null ? '—' : pct(procCpu); $('sysProcRam').textContent = procRam == null ? '—' : fmtMB(procRam);
+  OVERVIEW_PAGE.update({ cpu: { value: cpu }, ram: { value: ram } });
+  PERF_PAGE.update({ cpu: { value: cpu, peak: peakHold.cpu }, ram: { value: ram, peak: peakHold.ram, used: displayState.ramUsedGB } });
   $('sysProcRead').textContent = fmtRate(displayState.procRead); $('sysProcWrite').textContent = fmtRate(displayState.procWrite);
   renderCores(displayState.cores || []);
 }

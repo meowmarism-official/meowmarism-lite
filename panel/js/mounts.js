@@ -1,6 +1,8 @@
 // Core components mounted on the instance page and the $ helper.
 const $ = (id) => document.getElementById(id) || document.createElement('div');
 
+const OVERVIEW_PAGE = MeowResources.mountOverview({ el: $('page-overview'), t: window.t });
+const PERF_PAGE = MeowResources.mountPerformance({ el: $('page-performance'), t: window.t });
 const SERVER_ICON = MeowServerIcon.mount({
   el: $('serverIconRoot'),
   src: () => `${window.__BASE || ''}/api/server-icon?ts=${Date.now()}`,
@@ -15,7 +17,7 @@ const PLAYERS = MeowPlayers.mount({
   act: (action, player, o) => post('/player-action', { player, action, value: o.value, reason: o.reason }),
   isRunning: () => running,
   confirm: (title, message, label, danger) => modalConfirm(title, message, label, danger),
-  onUpdate: (p) => { $('overviewPlayers').textContent = `${p.online || 0} / ${p.max ?? '—'}`; CONSOLE.refreshSuggestions(); },
+  onUpdate: (p) => { OVERVIEW_PAGE.update({ players: `${p.online || 0} / ${p.max ?? '—'}` }); CONSOLE.refreshSuggestions(); },
   toast: (message, type) => toast(message, type),
   t: window.t, esc,
 });

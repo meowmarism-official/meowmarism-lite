@@ -61,23 +61,21 @@ function setRunning(v) {
 
 function updateLifecycleUi() {
   const phase = running ? (serverPhase || 'starting') : 'offline';
-  const strip = $('statusStrip'), pill = $('phasePill');
-  for (const cls of ['ready', 'starting', 'stopping', 'error', 'offline']) { strip.classList.remove(cls); pill.classList.remove(cls); }
-  strip.classList.add(phase); pill.classList.add(phase);
+  const pill = $('phasePill');
+  for (const cls of ['ready', 'starting', 'stopping', 'error', 'offline']) pill.classList.remove(cls);
+  pill.classList.add(phase);
   const labels = { ready: 'Ready', starting: 'Starting', stopping: 'Stopping', error: 'Error', offline: 'Offline' };
   const label = (phase === 'offline' && isSleeping) ? 'Sleeping' : (labels[phase] || phase);
-  $('statusState').textContent = label; $('phaseText').textContent = label.toLowerCase(); $('ovPhase').textContent = label; $('sysPhase').textContent = label;
-  $('ovReadyAt').textContent = readyAt ? fmtDate(readyAt) : '—';
-  $('sysReadyAt').textContent = readyAt ? fmtDate(readyAt) : (lastReadyAt ? `${fmtDate(lastReadyAt)} (last)` : '—');
-  $('ovStartup').textContent = startupDurationMs != null ? fmtStartup(startupDurationMs) : (lastStartupDurationMs != null ? `${fmtStartup(lastStartupDurationMs)} last` : '—');
-  $('sysStartup').textContent = startupDurationMs != null ? fmtStartup(startupDurationMs) : (lastStartupDurationMs != null ? `${fmtStartup(lastStartupDurationMs)} (last)` : '—');
+  $('phaseText').textContent = label.toLowerCase();
   const now = serverNow();
-  if (phase === 'ready') $('statusNote').textContent = `Ready since ${fmtClock(readyAt)} · startup ${fmtStartup(startupDurationMs)}`;
-  else if (phase === 'starting') $('statusNote').textContent = `Starting · ${startedAt ? fmtDuration((now - startedAt) / 1000) : 'waiting for process'}`;
-  else if (phase === 'stopping') $('statusNote').textContent = 'Stopping server cleanly…';
-  else if (phase === 'error') $('statusNote').textContent = 'Server process reported a start error';
-  else if (isSleeping) $('statusNote').textContent = 'No players for a while — sleeping until someone tries to join';
-  else $('statusNote').textContent = lastExitAt ? `Offline · last exit ${fmtDate(lastExitAt)}` : 'Server is not running';
+  let note;
+  if (phase === 'ready') note = `Ready since ${fmtClock(readyAt)} · startup ${fmtStartup(startupDurationMs)}`;
+  else if (phase === 'starting') note = `Starting · ${startedAt ? fmtDuration((now - startedAt) / 1000) : 'waiting for process'}`;
+  else if (phase === 'stopping') note = 'Stopping server cleanly…';
+  else if (phase === 'error') note = 'Server process reported a start error';
+  else if (isSleeping) note = 'No players for a while — sleeping until someone tries to join';
+  else note = lastExitAt ? `Offline · last exit ${fmtDate(lastExitAt)}` : 'Server is not running';
+  OVERVIEW_PAGE.update({ status: { phase, label, note } });
 }
 
 function setLifecycle(payload = {}) {
@@ -119,16 +117,7 @@ function updateTelemetry() {
 
 function updateUptimes() {
   const now = serverNow(), serverSec = running && startedAt ? (now - startedAt) / 1000 : null;
-  $('serverUptime').textContent = serverSec == null ? '—' : fmtDuration(serverSec);
-  $('serverStarted').textContent = startedAt ? fmtDate(startedAt) : 'not started';
-  $('ovServerRuntime').textContent = serverSec == null ? '—' : fmtDuration(serverSec);
-  $('sysServerUptime').textContent = serverSec == null ? '—' : fmtDuration(serverSec);
-  if (latest) {
-    $('ovHostRuntime').textContent = fmtDuration(latest.system?.uptimeSec);
-    $('ovPanelRuntime').textContent = fmtDuration(latest.system?.panelUptimeSec);
-    $('sysHostUptime').textContent = fmtDuration(latest.system?.uptimeSec);
-    $('sysPanelUptime').textContent = fmtDuration(latest.system?.panelUptimeSec);
-  }
+  OVERVIEW_PAGE.update({ uptime: { value: serverSec == null ? '—' : fmtDuration(serverSec), started: startedAt ? fmtDate(startedAt) : 'not started' } });
   updateLifecycleUi();
   updateTelemetry();
 }

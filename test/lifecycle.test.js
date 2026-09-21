@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
-const harness = require('./helpers/harness');
+const harness = require('../test-support/harness');
 
 // The fake server is a shell-executable script, so the lifecycle tests need a Unix host.
 const opts = { skip: process.platform === 'win32' ? 'needs a Unix host' : false };

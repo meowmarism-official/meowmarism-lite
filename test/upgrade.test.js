@@ -2,11 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const harness = require('./helpers/harness');
+const harness = require('../test-support/harness');
 
 // Backups use GNU tar and the fake server is a shell script, so the full flows need a Unix host.
 const unix = { skip: process.platform === 'win32' ? 'needs a Unix host' : false };
-const HOOKS = path.join(__dirname, 'helpers', 'upgrade-hooks.js');
+const HOOKS = path.join(__dirname, '..', 'test-support', 'upgrade-hooks.js');
 
 let h;
 let owner;

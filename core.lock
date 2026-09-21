@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
-  "version": "0.0.2.1",
-  "commit": "0488d8a27a844acae35640e139848806c622feb1",
+  "version": "0.0.3",
+  "commit": "7f4107d8b9fb3e9adda8033366213ec64a26afa6",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -62,6 +62,7 @@
     "panel/core/ui/mods-ui.js",
     "panel/core/ui/palette-ui.js",
     "panel/core/ui/players-ui.js",
+    "panel/core/ui/resources-ui.js",
     "panel/core/ui/schedule-ui.js",
     "panel/core/ui/server-icon-ui.js",
     "panel/core/ui/settings-ui.css",

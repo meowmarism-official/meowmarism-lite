@@ -34,22 +34,19 @@ function updateStats(payload) {
   setLifecycle(payload.lifecycle || payload);
   latest = payload.stats || latest || {};
   const s = latest, cpu = s.cpu || {}, mem = s.memory || {}, disk = s.disk, proc = s.server, sys = s.system || {}, mc = s.minecraft || {}, win = s.sampleWindow || {};
-  $('overviewLoad').textContent = `1s avg ${pct(cpu.usage)} · min ${pct(cpu.min)} · peak ${pct(cpu.max)}`;
-  $('overviewRamDetail').textContent = `${fmtGB(mem.usedGB)} / ${fmtGB(mem.totalGB)} · 1s avg ${pct(mem.percent)}`;
+  OVERVIEW_PAGE.update({
+    cpu: { avg: cpu.usage, min: cpu.min, max: cpu.max },
+    ram: { avg: mem.percent, used: mem.usedGB, total: mem.totalGB },
+    minecraft: mc,
+  });
+  PERF_PAGE.update({
+    cpu: { temperatureC: cpu.temperatureC ?? null, cores: cpu.cores ?? null, speedMHz: cpu.speedMHz ?? null, avg: cpu.usage, min: cpu.min, max: cpu.max },
+    ram: { total: mem.totalGB, avg: mem.percent, min: mem.min, max: mem.max },
+    disk: disk ? { percent: disk.percent, used: disk.usedGB, total: disk.totalGB } : null,
+  });
   $('ovLastExit').textContent = lastExitAt ? fmtDate(lastExitAt) : '—'; $('ovRestarts').textContent = restartCount;
-  $('mcVersion').textContent = mc.version || '—'; $('mcPort').textContent = mc.port ?? '—'; $('mcGamemode').textContent = mc.gamemode || '—'; $('mcDifficulty').textContent = mc.difficulty || '—';
-  $('mcViewDistance').textContent = mc.viewDistance != null ? `${mc.viewDistance} chunks` : '—'; $('mcSimulationDistance').textContent = mc.simulationDistance != null ? `${mc.simulationDistance} chunks` : '—';
-  $('mcPvp').textContent = mc.pvp == null ? '—' : (mc.pvp ? 'on' : 'off'); $('mcWhitelist').textContent = mc.whitelist == null ? '—' : (mc.whitelist ? 'on' : 'off');
-  $('mcTps').textContent = mc.tps ? `${Number(mc.tps.one).toFixed(2)} / ${Number(mc.tps.five).toFixed(2)} / ${Number(mc.tps.fifteen).toFixed(2)}` : '—';
-  $('mcLag').textContent = mc.lag?.last ? `${mc.lag.warningCount} · last ${mc.lag.last.ticksBehind} ticks` : `${mc.lag?.warningCount || 0}`;
-  $('mcMotd').textContent = mc.motd || '—'; $('mcMotd').title = mc.motd || '';
   $('ovPid').textContent = proc?.pid ?? '—'; $('ovThreads').textContent = proc?.threads ?? '—'; $('ovDisk').textContent = disk ? pct(disk.percent) : '—'; $('ovFiles').textContent = proc?.openFiles ?? '—';
   $('ovRxTotal').textContent = fmtBytes(s.network?.rxTotal); $('ovTxTotal').textContent = fmtBytes(s.network?.txTotal);
-  $('perfTemp').textContent = cpu.temperatureC != null ? `${cpu.temperatureC.toFixed(1)}°C` : '—'; $('perfCores').textContent = `${cpu.cores ?? '—'} cores`; $('perfClock').textContent = cpu.speedMHz ? `${(cpu.speedMHz / 1000).toFixed(2)} GHz` : '—'; $('cpuModel').textContent = cpu.model || '—';
-  $('perfCpuSample').textContent = `1s avg ${pct(cpu.usage)} · min ${pct(cpu.min)} · peak ${pct(cpu.max)}`;
-  $('perfRamTotal').textContent = `${fmtGB(mem.totalGB)} total`; $('perfRamSample').textContent = `1s avg ${pct(mem.percent)} · min ${pct(mem.min)} · peak ${pct(mem.max)}`;
-  $('perfProcPid').textContent = `PID ${proc?.pid ?? '—'}`; $('perfProcSample').textContent = proc ? `1s avg ${pct(proc.cpuPercent)} · min ${pct(proc.cpuMin)} · peak ${pct(proc.cpuMax)}` : '1s avg — · min — · peak —';
-  $('perfDisk').textContent = disk ? pct(disk.percent) : '—'; setBar('perfDiskBar', disk?.percent, disk?.percent); $('perfDiskUsed').textContent = disk ? `${fmtGB(disk.usedGB)} used` : '—'; $('perfDiskTotal').textContent = disk ? `${fmtGB(disk.totalGB)} total` : '—';
   $('sampleWindowMeta').textContent = `${win.count ?? '—'} × ${win.sampleMs ?? '—'} ms raw · server EMA · 1 packet / ${win.publishMs ?? '—'} ms`;
   $('sysPid').textContent = proc?.pid ?? '—'; $('sysLauncherPid').textContent = proc?.launcherPid ?? '—'; $('sysThreads').textContent = proc?.threads ?? '—'; $('sysFiles').textContent = proc?.openFiles ?? '—';
   $('sysCtx').textContent = proc ? `${(proc.voluntaryCtx ?? 0).toLocaleString('de-DE')} / ${(proc.involuntaryCtx ?? 0).toLocaleString('de-DE')}` : '—';

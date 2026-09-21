@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const harness = require('../helpers/harness');
+const harness = require('../../test-support/harness');
 
 let puppeteer = null;
 try { puppeteer = require('puppeteer-core'); } catch (_) {}
