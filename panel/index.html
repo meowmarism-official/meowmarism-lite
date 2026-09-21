@@ -14,6 +14,7 @@
 <script src="/core/ui/backups-ui.js"></script>
 <script src="/core/ui/format.js"></script>
 <script src="/core/ui/automation-ui.js"></script>
+<script src="/core/ui/players-ui.js"></script>
 <script src="/core/ui/server-icon-ui.js"></script>
 <script src="/core/ui/mods-ui.js"></script>
 <script src="/core/ui/console-ui.js"></script>
@@ -85,13 +86,7 @@
         </div>
       </section>
 
-      <section class="page" id="page-players">
-        <div class="card">
-          <div class="player-summary" style="grid-template-columns:repeat(6,minmax(0,1fr))"><div class="player-stat"><div class="n" id="playersNow">0</div><div class="l">Online now</div></div><div class="player-stat"><div class="n" id="playersMax">—</div><div class="l">Server limit</div></div><div class="player-stat"><div class="n" id="playersPeak">0</div><div class="l">Peak session</div></div><div class="player-stat"><div class="n" id="playersUnique">0</div><div class="l">Unique today*</div></div><div class="player-stat"><div class="n" id="playersAvgSession">—</div><div class="l">Avg session*</div></div><div class="player-stat"><div class="n" id="playersLongest">—</div><div class="l">Longest session*</div></div></div><div class="hint" style="padding:7px 12px;border-bottom:1px solid var(--line)">*Since this panel process started; no fake historical data after a panel restart.</div>
-          <div class="table-wrap"><table class="data-table"><thead><tr><th>Player</th><th>Session</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody id="playerRows" data-no-i18n></tbody></table><div class="empty-state" id="playerEmpty">No players online.</div></div>
-        </div>
-        <div class="card" style="margin-top:12px"><div class="card-head"><div class="card-title">Player count history</div><div class="chart-head-right"><div class="card-meta">live</div><div class="chart-range"><button class="range-btn active" data-range-ms="60000">1m</button><button class="range-btn" data-range-ms="300000">5m</button><button class="range-btn" data-range-ms="900000">15m</button><button class="range-btn" data-range-ms="3600000">1h</button><button class="range-btn" data-range-ms="86400000">24h</button><button class="range-btn" data-range-ms="604800000">7d</button></div></div></div><div class="card-body"><div class="chart-host"><canvas class="chart chart-sm" id="playerChart"></canvas></div></div></div>
-      </section>
+      <section class="page" id="page-players"><div id="playersRoot"></div></section>
 
       <section class="page" id="page-console"><div id="consoleRoot"></div></section>
 
@@ -160,19 +155,6 @@
   </div>
 </div>
 
-<div class="drawer-backdrop" id="drawerBackdrop"></div>
-<aside class="player-drawer" id="playerDrawer" aria-hidden="true">
-  <div class="drawer-head"><div class="drawer-title">Player</div><button class="drawer-close" id="drawerClose" aria-label="Close player panel">×</button></div>
-  <div class="drawer-body">
-    <div class="player-identity"><div class="player-big-name" id="drawerPlayerName">—</div><div class="online-tag" id="drawerPlayerStatus">online</div></div>
-    <div class="drawer-section"><div class="drawer-section-title">Session</div><div class="drawer-section-body"><div class="drawer-kv"><span>Joined</span><span id="drawerJoined">—</span></div><div class="drawer-kv"><span>Session</span><span id="drawerSession">—</span></div></div></div>
-    <div class="drawer-section"><div class="drawer-section-title">Gamemode</div><div class="drawer-section-body"><div class="action-grid"><button class="action-btn" data-player-action="gamemode" data-value="survival">Survival</button><button class="action-btn" data-player-action="gamemode" data-value="creative">Creative</button><button class="action-btn" data-player-action="gamemode" data-value="adventure">Adventure</button><button class="action-btn" data-player-action="gamemode" data-value="spectator">Spectator</button></div></div></div>
-    <div class="drawer-section"><div class="drawer-section-title">Player</div><div class="drawer-section-body"><div class="action-grid"><button class="action-btn" data-player-action="heal">Heal</button><button class="action-btn" data-player-action="feed">Feed</button><button class="action-btn" data-player-action="clear-effects">Clear effects</button><button class="action-btn danger" data-player-action="kill">Kill</button></div></div></div>
-    <div class="drawer-section"><div class="drawer-section-title">Access</div><div class="drawer-section-body"><div class="action-grid"><button class="action-btn warn" data-player-action="op">OP</button><button class="action-btn" data-player-action="deop">DeOP</button><button class="action-btn" data-player-action="whitelist-add">Whitelist +</button><button class="action-btn" data-player-action="whitelist-remove">Whitelist −</button></div></div></div>
-    <div class="drawer-section"><div class="drawer-section-title">History</div><div class="drawer-section-body"><div class="player-history-grid"><div class="ph-box"><div class="v" id="drawerFirstSeen">—</div><div class="k">First seen</div></div><div class="ph-box"><div class="v" id="drawerTotalPlay">—</div><div class="k">Total play</div></div><div class="ph-box"><div class="v" id="drawerJoins">—</div><div class="k">Joins</div></div><div class="ph-box"><div class="v" id="drawerLastSeen">—</div><div class="k">Last seen</div></div></div><div class="session-list" id="drawerSessions" style="margin-top:8px"><div class="hint">Loading history…</div></div></div></div>
-    <div class="drawer-section"><div class="drawer-section-title">Moderation</div><div class="drawer-section-body"><input class="reason-input" id="playerReason" placeholder="Reason (optional)" maxlength="160"><div class="action-grid"><button class="action-btn warn" data-player-action="kick">Kick</button><button class="action-btn danger" data-player-action="ban">Ban</button></div></div></div>
-  </div>
-</aside>
 <div class="toast-stack" id="toastStack"></div>
 
 <div class="palette-backdrop" id="paletteBackdrop"><div class="palette" role="dialog" aria-modal="true" aria-label="Command palette"><input class="palette-input" id="paletteInput" placeholder="Go to page, find player, run action…" autocomplete="off"><div class="palette-list" id="paletteList"></div></div></div>
@@ -186,6 +168,17 @@ const SERVER_ICON = MeowServerIcon.mount({
   send: async (body) => (await fetch('/api/server-icon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json(),
   toast: (message, type) => toast(message, type),
   t: window.t,
+});
+const PLAYERS = MeowPlayers.mount({
+  el: $('playersRoot'),
+  chartHtml: `<div class="card" style="margin-top:12px"><div class="card-head"><div class="card-title">Player count history</div><div class="chart-head-right"><div class="card-meta">live</div><div class="chart-range"><button class="range-btn active" data-range-ms="60000">1m</button><button class="range-btn" data-range-ms="300000">5m</button><button class="range-btn" data-range-ms="900000">15m</button><button class="range-btn" data-range-ms="3600000">1h</button><button class="range-btn" data-range-ms="86400000">24h</button><button class="range-btn" data-range-ms="604800000">7d</button></div></div></div><div class="card-body"><div class="chart-host"><canvas class="chart chart-sm" id="playerChart"></canvas></div></div></div>`,
+  history: (name) => fetch(`/api/player-history?name=${encodeURIComponent(name)}`, { cache: 'no-store' }).then((r) => r.json()),
+  act: (action, player, o) => post('/player-action', { player, action, value: o.value, reason: o.reason }),
+  isRunning: () => running,
+  confirm: (title, message, label, danger) => modalConfirm(title, message, label, danger),
+  onUpdate: (p) => { $('overviewPlayers').textContent = `${p.online || 0} / ${p.max ?? '—'}`; CONSOLE.refreshSuggestions(); },
+  toast: (message, type) => toast(message, type),
+  t: window.t, esc,
 });
 const AUTOMATION = MeowAutomation.mount({
   el: $('automationRoot'),
@@ -213,8 +206,6 @@ let readyAt = null;
 let startupDurationMs = null;
 let lastReadyAt = null;
 let lastStartupDurationMs = null;
-let selectedPlayerName = null;
-let peakPlayers = 0;
 let chartRangeMs = 60_000;
 let panelInstanceId = null;
 let lastStatsSeq = 0;
@@ -383,7 +374,7 @@ function setRunning(v) {
   $('btnStop').disabled = !running;
   $('btnRestart').disabled = false;
   CONSOLE.setEnabled(running);
-  if (selectedPlayerName) renderSelectedPlayer();
+  PLAYERS.refresh();
   if (!running) hideCommandSuggestions();
 }
 
@@ -463,43 +454,6 @@ function updateUptimes() {
 setInterval(updateUptimes, 250);
 setInterval(() => { if (restartPlanState?.executeAt) applyRestartPlan({ ...restartPlanState, remainingSec: Math.max(0, Math.ceil((restartPlanState.executeAt - serverNow()) / 1000)) }); }, 1000);
 
-function updatePlayers(data) {
-  const p = data || { online: 0, max: null, list: [] };
-  peakPlayers = Math.max(peakPlayers, p.online || 0);
-  $('overviewPlayers').textContent = `${p.online || 0} / ${p.max ?? '—'}`;
-  $('playersNow').textContent = p.online || 0; $('playersMax').textContent = p.max ?? '—'; $('playersPeak').textContent = peakPlayers;
-  $('playersUnique').textContent = p.uniqueToday ?? 0; $('playersAvgSession').textContent = p.averageSessionSec ? fmtDuration(p.averageSessionSec) : '—'; $('playersLongest').textContent = p.longestSessionSec ? fmtDuration(p.longestSessionSec) : '—';
-  const rows = $('playerRows'), empty = $('playerEmpty'), list = p.list || [];
-  rows.innerHTML = list.map((x) => `<tr class="player-row"><td class="player-name"><button class="player-link" data-player="${esc(x.name)}">${esc(x.name)}</button></td><td class="mono">${fmtDuration(x.sessionSec)}</td><td class="mono">${fmtDate(x.joinedAt)}</td><td><span style="color:var(--green)">online</span></td><td class="player-open">›</td></tr>`).join('');
-  empty.style.display = list.length ? 'none' : 'block';
-  if (selectedPlayerName) renderSelectedPlayer();
-  CONSOLE.refreshSuggestions();
-}
-function getSelectedPlayer() { return latest?.players?.list?.find((p) => p.name === selectedPlayerName) || null; }
-function renderSelectedPlayer() {
-  const p = getSelectedPlayer();
-  $('drawerPlayerName').textContent = selectedPlayerName || '—';
-  $('drawerJoined').textContent = p ? fmtDate(p.joinedAt) : '—';
-  $('drawerSession').textContent = p ? fmtDuration(p.sessionSec) : '—';
-  $('drawerPlayerStatus').textContent = p ? 'online' : 'offline';
-  $('drawerPlayerStatus').style.color = p ? 'var(--green)' : 'var(--muted)';
-  document.querySelectorAll('[data-player-action]').forEach((b) => b.disabled = !p || !running);
-}
-function openPlayer(name) {
-  selectedPlayerName = name; $('playerReason').value = ''; renderSelectedPlayer();
-  $('drawerFirstSeen').textContent = '—'; $('drawerTotalPlay').textContent = '—'; $('drawerJoins').textContent = '—'; $('drawerLastSeen').textContent = '—'; $('drawerSessions').innerHTML = '<div class="hint">Loading history…</div>';
-  $('playerDrawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); $('playerDrawer').setAttribute('aria-hidden', 'false');
-  fetch(`/api/player-history?name=${encodeURIComponent(name)}`, { cache:'no-store' }).then((r) => r.json()).then((h) => {
-    if (selectedPlayerName !== name || h.error) return;
-    $('drawerFirstSeen').textContent = fmtDate(h.firstSeenAt); $('drawerLastSeen').textContent = fmtDate(h.lastSeenAt); $('drawerTotalPlay').textContent = fmtDuration(h.totalPlaySec); $('drawerJoins').textContent = h.joins ?? 0;
-    const sessions = (h.sessions || []).slice().reverse().slice(0, 12);
-    $('drawerSessions').innerHTML = sessions.length ? sessions.map((x) => `<div class="session-line">${fmtDate(x.joinedAt)} · ${x.leftAt ? fmtDuration((x.durationMs || 0)/1000) : 'online now'}</div>`).join('') : '<div class="hint">No completed sessions yet.</div>';
-  }).catch(() => { $('drawerSessions').innerHTML = '<div class="hint">History unavailable.</div>'; });
-}
-function closePlayer() { $('playerDrawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); $('playerDrawer').setAttribute('aria-hidden', 'true'); }
-$('playerRows').addEventListener('click', (e) => { const b = e.target.closest('[data-player]'); if (b) openPlayer(b.dataset.player); });
-$('drawerClose').onclick = closePlayer; $('drawerBackdrop').onclick = closePlayer;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlayer(); });
 
 function toast(message, type = 'ok') { const d = document.createElement('div'); d.className = `toast ${type}`; d.textContent = message; $('toastStack').appendChild(d); setTimeout(() => d.remove(), 3200); }
 
@@ -657,7 +611,7 @@ function ingestSamples(samples, { enqueue = true, initializeCursor = false } = {
     if (seq && seenSampleSeq.has(seq)) continue;
     if (seq) { seenSampleSeq.add(seq); highestSampleSeq = Math.max(highestSampleSeq, seq); }
     rawHistory.push(sampleToHistoryPoint(sample));
-    peakPlayers = Math.max(peakPlayers, Number(sample.players) || 0);
+    PLAYERS.notePeak(sample.players);
     lastReceivedSample = sample;
     added.push(sample);
     if (enqueue && !backgroundPaused) enqueuePlaybackSample(sample);
@@ -841,7 +795,7 @@ function redrawCharts() {
     { label: 'RX', color: '#5cb6a4', get: (p) => p.rx, rawGet: (p) => p.rxRaw, format: fmtRate },
     { label: 'TX', color: '#d3a75c', get: (p) => p.tx, rawGet: (p) => p.txRaw, format: fmtRate },
   ], { yFormat: fmtRate });
-  drawChart('playerChart', [{ label: 'Players', color: '#5f9ee8', get: (p) => p.players, format: (v) => String(Math.round(v)) }], { max: Math.max(1, latest?.players?.max || peakPlayers || 1), yFormat: (v) => String(Math.round(v)) });
+  drawChart('playerChart', [{ label: 'Players', color: '#5f9ee8', get: (p) => p.players, format: (v) => String(Math.round(v)) }], { max: Math.max(1, latest?.players?.max || PLAYERS.peak() || 1), yFormat: (v) => String(Math.round(v)) });
 }
 function scheduleChartDraw(force = false) {
   if (chartDrawPending && !force) return;
@@ -882,12 +836,6 @@ const SETTINGS = MeowSettings.mount({
 $('btnStart').onclick = () => post('/start').catch((e) => toast(e.message, 'error'));
 $('btnStop').onclick = async () => { if (await modalConfirm('Stop the server?', 'Players will be disconnected and the world is saved.', 'Stop', true)) post('/stop').catch(console.error); };
 $('btnRestart').onclick = async () => { if (await modalConfirm('Restart the server?', 'Players will be disconnected while it restarts.', 'Restart', true)) post('/restart').catch(console.error); };
-async function playerAction(action, value = null) {
-  const p = getSelectedPlayer(); if (!p) return toast('Player is no longer online', 'error');
-  if (['ban', 'kill', 'deop', 'op'].includes(action) && !(await modalConfirm(`${action.toUpperCase()} ${p.name}?`, t('This is sent to the server right away.'), action.toUpperCase(), action === 'ban' || action === 'kill'))) return;
-  try { await post('/player-action', { player: p.name, action, value, reason: $('playerReason').value }); toast(`${p.name}: ${action}`); if (action === 'kick' || action === 'ban') setTimeout(closePlayer, 300); } catch (e) { toast(e.message, 'error'); }
-}
-document.querySelectorAll('[data-player-action]').forEach((b) => b.addEventListener('click', () => playerAction(b.dataset.playerAction, b.dataset.value || null)));
 
 function updateHealth() {
   const disk = latest?.disk, mc = latest?.minecraft || {}, lag = mc.lag?.last, lagCount = mc.lag?.warningCount || 0;
@@ -932,7 +880,7 @@ function updateStats(payload) {
   $('sysCacheWindow').textContent = s.panel?.cacheWindowMs != null ? `${Math.round(s.panel.cacheWindowMs / 60000)} min` : '5 min'; $('sysSnapshotWindow').textContent = s.panel?.snapshotWindowMs != null ? `${Math.round(s.panel.snapshotWindowMs / 1000)} s` : '60 s';
   $('sysRawCache').textContent = s.panel?.rawCacheSamples ?? '—'; $('sysConsoleCache').textContent = s.panel?.consoleCacheLines ?? '—'; $('sysClients').textContent = s.panel?.eventClients ?? '—'; $('sysBuffer').textContent = `${s.panel?.bufferedLines ?? 0} lines`; $('sysLastExit').textContent = lastExitAt ? fmtDate(lastExitAt) : '—'; $('sysRestarts').textContent = restartCount;
   $('telemetrySample').textContent = win.sampleMs != null ? `${win.sampleMs} ms` : '—'; $('telemetryBatch').textContent = win.count != null ? `${win.count} samples` : '—'; lastBatchCount = Number(win.count) || lastBatchCount;
-  updatePlayers(s.players); updateHealth(); updateExtendedStats(); updateUptimes(); scheduleChartDraw();
+  PLAYERS.update(s.players); updateHealth(); updateExtendedStats(); updateUptimes(); scheduleChartDraw();
 }
 
 
@@ -968,7 +916,7 @@ $('btnForceStop').onclick=async()=>{if(!(await modalConfirm('Force stop?','Force
 function paletteActions(){ const out=[
   {label:'Overview',sub:'Go to live server overview',key:'G O',run:()=>showPage('overview',{push:true})},{label:'Performance',sub:'CPU, RAM, network and tick telemetry',key:'G P',run:()=>showPage('performance',{push:true})},{label:'Players',sub:'Online players and history',key:'G U',run:()=>showPage('players',{push:true})},{label:'Console',sub:'Live console and commands',key:'G C',run:()=>{showPage('console',{push:true});setTimeout(()=>CONSOLE.focus(),0)}},{label:'Settings',sub:'server.properties',key:'G S',run:()=>showPage('settings',{push:true})},{label:'Events & Audit',sub:'Timeline, health and lifecycle',key:'G E',run:()=>showPage('events',{push:true})},
   {label:'Restart server…',sub:'Open scheduled restart controls',key:'',run:()=>showPage('events',{push:true})},{label:'Start server',sub:'Start Minecraft if offline',key:'',run:()=>post('/start').catch((e)=>toast(e.message,'error'))},{label:'Stop server',sub:'Clean shutdown',key:'',run:()=>post('/stop').catch((e)=>toast(e.message,'error'))},{label:'Back to live graphs',sub:'Leave history mode',key:'',run:()=>{chartLiveMode=true;chartAnchorTime=null;updateHistoryModeUi();scheduleChartDraw(true)}}];
-  for(const p of latest?.players?.list||[]) out.push({label:p.name,sub:`Player · ${fmtDuration(p.sessionSec)} online`,key:'player',run:()=>{showPage('players',{push:true});openPlayer(p.name)}}); return out; }
+  for(const p of latest?.players?.list||[]) out.push({label:p.name,sub:`Player · ${fmtDuration(p.sessionSec)} online`,key:'player',run:()=>{showPage('players',{push:true});PLAYERS.open(p.name)}}); return out; }
 function renderPalette(){const q=$('paletteInput').value.trim().toLowerCase(), all=paletteActions(), filtered=all.filter((a)=>!q||`${a.label} ${a.sub}`.toLowerCase().includes(q)).slice(0,18); paletteIndex=Math.max(0,Math.min(paletteIndex,Math.max(0,filtered.length-1))); $('paletteList').innerHTML=filtered.map((a,i)=>`<button class="palette-item ${i===paletteIndex?'active':''}" data-pal="${i}"><span><div class="palette-main">${esc(a.label)}</div><div class="palette-sub">${esc(a.sub||'')}</div></span><span class="palette-key">${esc(a.key||'')}</span></button>`).join(''); $('paletteList')._actions=filtered; }
 function openPalette(){paletteIndex=0;$('paletteBackdrop').classList.add('open');$('paletteInput').value='';renderPalette();setTimeout(()=>$('paletteInput').focus(),0);} function closePalette(){$('paletteBackdrop').classList.remove('open');}
 $('paletteInput').addEventListener('input',()=>{paletteIndex=0;renderPalette();}); $('paletteInput').addEventListener('keydown',(e)=>{const acts=$('paletteList')._actions||[];if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=(paletteIndex+1)%Math.max(1,acts.length);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=(paletteIndex-1+Math.max(1,acts.length))%Math.max(1,acts.length);renderPalette();}else if(e.key==='Enter'){e.preventDefault();const a=acts[paletteIndex];if(a){closePalette();a.run();}}else if(e.key==='Escape')closePalette();}); $('paletteList').addEventListener('click',(e)=>{const b=e.target.closest('[data-pal]');if(!b)return;const a=($('paletteList')._actions||[])[Number(b.dataset.pal)];if(a){closePalette();a.run();}}); $('paletteBackdrop').addEventListener('mousedown',(e)=>{if(e.target===$('paletteBackdrop'))closePalette();});

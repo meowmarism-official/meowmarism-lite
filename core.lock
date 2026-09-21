@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.0",
-  "commit": "813d6a4824ef8f58091abea64a3596aa8ab917db",
+  "commit": "7d229a7ffc846db46b9abe595811534e292ea5c1",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -58,7 +58,6 @@
     "panel/core/ui/modrinth-ui.css",
     "panel/core/ui/modrinth-ui.js",
     "panel/core/ui/mods-ui.js",
-    "panel/core/ui/players-ui.css",
     "panel/core/ui/players-ui.js",
     "panel/core/ui/schedule-ui.js",
     "panel/core/ui/server-icon-ui.js",

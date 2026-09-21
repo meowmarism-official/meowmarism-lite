@@ -15,5 +15,8 @@
     if (!Number.isFinite(ms) || ms < 0) return '—';
     return ms < 10000 ? `${(ms / 1000).toFixed(2)}s` : `${(ms / 1000).toFixed(1)}s`;
   }
-  window.MeowFormat = { duration, startup };
+  function date(ts) {
+    return ts ? new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+  }
+  window.MeowFormat = { duration, startup, date };
 })();
