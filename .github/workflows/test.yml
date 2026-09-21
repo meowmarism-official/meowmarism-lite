@@ -18,4 +18,5 @@ jobs:
           git -C /tmp/core checkout --quiet "$commit"
           for dir in modules ui lang tokens brand; do diff -r "/tmp/core/$dir" "panel/core/$dir"; done
           (cd /tmp/core && node --test)
+      - run: npm ci --prefix test/browser
       - run: node --test

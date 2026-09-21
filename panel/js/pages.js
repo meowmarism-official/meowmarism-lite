@@ -10,8 +10,6 @@ const BACKUPS = MeowBackups.mount({
   confirm: (title, message, label, danger) => modalConfirm(title, message, label, danger),
 });
 const loadBackups = () => BACKUPS.load();
-loadBackups();
-setInterval(loadBackups, 30000);
 
 // --- Mods ---
 const MODS = MeowMods.mount({
@@ -24,7 +22,6 @@ const MODS = MeowMods.mount({
 });
 const loadMods = () => MODS.load();
 const MR = MODS.modrinth;
-loadMods();
 
 // --- Files ---
 const FILES = MeowFiles.mount({
@@ -84,27 +81,8 @@ $('btnSaveStartup')?.addEventListener('click', () => {
 
 // --- Automation (scheduled restarts, backups, sleep, crash handling) ---
 async function loadAutomation() { loadStartup(); return AUTOMATION.load(); }
-loadAutomation();
 
 // --- Update check ---
 
 
-es.addEventListener('stats', (e) => {
-  try {
-    const d = JSON.parse(e.data);
-    if (d.instanceId && panelInstanceId && d.instanceId !== panelInstanceId) { scheduleRecovery('panel restart'); return; }
-    const batchSeq = Number(d.seq) || 0; if (batchSeq && batchSeq <= lastStatsSeq) return; if (batchSeq) lastStatsSeq = batchSeq;
-    updateStats(d); appendHistoryFromStats(d);
-    const samples = Array.isArray(d.samples) ? d.samples : [];
-    if (samples.length) {
-      const firstSeq = Number(samples[0].seq) || 0;
-      if (firstSeq && contiguousSampleSeq && firstSeq > contiguousSampleSeq + 1) scheduleRecovery('sample gap');
-      ingestSamples(samples, { enqueue: !backgroundPaused, initializeCursor: !hasSnapshot });
-    } else if (d.stats) setRenderTarget(aggregateAsSample(d.stats));
-    markSynced();
-  } catch (err) { console.error(err); }
-});
 
-setTimeout(() => { if (!hasSnapshot) fetch('/snapshot', { cache: 'no-store' }).then((r) => r.json()).then(applySnapshot).catch(() => {}); }, 1500);
-syncClock();
-updateHistoryModeUi();

@@ -104,7 +104,6 @@ function renderLoop(now) {
   if (now - lastDomRender >= 33) { lastDomRender = now; renderDisplay(); updateTelemetry(); }
   requestAnimationFrame(renderLoop);
 }
-requestAnimationFrame(renderLoop);
 
 function sampleToHistoryPoint(sample) {
   return {

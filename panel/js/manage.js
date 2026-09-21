@@ -37,8 +37,6 @@ async function upgFillLoaders() {
   const list = Array.isArray(d) ? d : d.versions || [];
   $('upgLoader').innerHTML = list.map((v) => `<option value="${esc(v)}"${v === c.loaderVersion ? ' selected' : ''}>${esc(v)}</option>`).join('') || `<option value="">${t('none found')}</option>`;
 }
-async function upgOpen() {
-  await swLoad();
 const INST_MC = () => (swState && swState.current && swState.current.mcVersion) || '';
 $('btnInstallJava').addEventListener('click', async () => {
   $('btnInstallJava').disabled = true;
@@ -58,6 +56,8 @@ $('btnInstallJava').addEventListener('click', async () => {
     } catch (_) { /* keep polling */ }
   }, 2000);
 });
+async function upgOpen() {
+  await swLoad();
   if (!swState) return;
   const c = swState.current;
   $('upgError').style.display = 'none';
@@ -128,7 +128,6 @@ $('btnRollback').addEventListener('click', async () => {
   $('upgBack').classList.add('open');
   upgWatch('rollback');
 });
-swLoad();
 
 
 // --- Delete instance ---

@@ -49,7 +49,6 @@ function updateSyncIndicator() {
   else if (visibleSyncMode === 'stale') text.textContent = 'Live stream stale';
   else text.textContent = `Live${behind ? ` · ${behind}` : ''}`;
 }
-setInterval(updateSyncIndicator, 500);
 
 function setRunning(v) {
   running = !!v;
@@ -133,5 +132,3 @@ function updateUptimes() {
   updateLifecycleUi();
   updateTelemetry();
 }
-setInterval(updateUptimes, 250);
-setInterval(() => { if (restartPlanState?.executeAt) applyRestartPlan({ ...restartPlanState, remainingSec: Math.max(0, Math.ceil((restartPlanState.executeAt - serverNow()) / 1000)) }); }, 1000);

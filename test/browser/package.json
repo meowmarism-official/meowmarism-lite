@@ -1,0 +1,8 @@
+{
+  "name": "meowmarism-lite-browser-tests",
+  "private": true,
+  "description": "Browser smoke tests. Dev dependency only: the panel itself runs without npm install.",
+  "devDependencies": {
+    "puppeteer-core": "25.11.0"
+  }
+}

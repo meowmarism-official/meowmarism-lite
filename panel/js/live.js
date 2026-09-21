@@ -8,7 +8,6 @@ async function syncClock() {
     clockRttMs = rtt; clockSynced = true; lastClockSyncAt = Date.now(); updateTelemetry();
   } catch (_) {}
 }
-setInterval(syncClock, 30000);
 
 function resetForNewInstance() {
   stopPlayback(); rawHistory.length = 0; history1s.length = 0; history5s.length = 0; history1m.length = 0; history10m.length = 0; seenSampleSeq.clear(); contiguousSampleSeq = 0; highestSampleSeq = 0; lastQueuedSeq = 0; lastReceivedSample = null;
@@ -79,20 +78,3 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-const es = new EventSource('/api/events');
-es.onopen = () => { setConnected(true); syncClock(); if (hasSnapshot && !backgroundPaused) recoverMissing('reconnect'); };
-es.onerror = () => setConnected(false);
-es.addEventListener('snapshot', (e) => { try { applySnapshot(JSON.parse(e.data)); } catch (err) { console.error(err); } });
-es.addEventListener('console', (e) => {
-  try {
-    const d = JSON.parse(e.data), seq = Number(d.seq) || 0;
-    if (seq && CONSOLE.state.contiguous && seq > CONSOLE.state.contiguous + 1) scheduleRecovery('console gap');
-    appendLine(d.line, { seq, at: d.at, level:d.level, category:d.category, animate: !backgroundPaused }); markSynced();
-  } catch (err) { console.error(err); }
-});
-es.addEventListener('status', (e) => { try { setLifecycle(JSON.parse(e.data)); updateUptimes(); markSynced(); } catch (_) {} });
-es.addEventListener('settings', (e) => { try { SETTINGS.render(JSON.parse(e.data)); markSynced(); } catch (err) { console.error(err); } });
-es.addEventListener('timeline', (e) => { try { mergeTimeline([JSON.parse(e.data)]); markSynced(); } catch (err) { console.error(err); } });
-es.addEventListener('audit', (e) => { try { mergeAudit([JSON.parse(e.data)]); markSynced(); } catch (err) { console.error(err); } });
-es.addEventListener('restart-plan', (e) => { try { applyRestartPlan(JSON.parse(e.data)); markSynced(); } catch (err) { console.error(err); } });
-es.addEventListener('backup', (e) => { try { loadBackups(); } catch (err) { console.error(err); } });

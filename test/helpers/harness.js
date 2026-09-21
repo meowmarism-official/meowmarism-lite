@@ -44,6 +44,7 @@ async function start({ instances = ['inst1'], config = {}, hooks = null } = {}) 
     const mcPort = await freePort();
     fs.writeFileSync(path.join(dir, 'server.properties'), `server-port=${mcPort}\nlevel-name=world\nmotd=test\n`);
     fs.writeFileSync(path.join(dir, 'run.sh'), FAKE_SERVER, { mode: 0o755 });
+    fs.copyFileSync(path.join(REPO, 'panel', 'core', 'brand', 'server-icon.png'), path.join(dir, 'server-icon.png'));
     fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ javaPath: path.join(bin, 'java'), backupIntervalHours: 6, maxBackups: 10, ...(config[instances[n]] || {}) }));
     registry.push({ id: `id${n}`, name: instances[n], dir, port: mcPort, panelPort: workerBase + n, mcVersion: '1.21.1', loader: 'vanilla', loaderVersion: '', createdAt: 1 });
   }
