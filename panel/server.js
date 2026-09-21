@@ -46,6 +46,7 @@ const INSTANCE_ID = crypto.randomUUID();
 
 let child = null;
 let startedAt = null;
+let startAttemptAt = null;
 let lastExitAt = null;
 let restartCount = 0;
 let serverPhase = 'offline';
@@ -410,7 +411,8 @@ function detectServerLifecycle(line) {
     const now = Date.now();
     const parsedMs = Math.round(Number(readyMatch[1]) * 1000);
     serverPhase = 'ready'; readyAt = now;
-    startupDurationMs = Number.isFinite(parsedMs) ? parsedMs : (startedAt ? now - startedAt : null);
+    const since = startAttemptAt || startedAt;
+    startupDurationMs = since ? now - since : (Number.isFinite(parsedMs) ? parsedMs : null);
     lastReadyAt = readyAt; lastStartupDurationMs = startupDurationMs;
     pushTimeline('ready', 'Server ready', `Startup ${startupDurationMs != null ? (startupDurationMs / 1000).toFixed(2) + 's' : 'complete'}`, 'good', { startupDurationMs });
     broadcastStatus();
@@ -460,7 +462,7 @@ const runtime = require('./runtime').createRuntime({
   hasJstat: () => scanFeatures().jstat,
   hooks: {
     getPhase: () => serverPhase,
-    startAttempt: () => { lastStartBlock = null; },
+    startAttempt: () => { lastStartBlock = null; startAttemptAt = Date.now(); },
     blocked: (msg) => {
       lastStartBlock = msg;
       broadcast(`--- cannot start: ${msg} ---`);
