@@ -95,3 +95,50 @@ test('the modpack flow: source, search, unsupported Quilt, version summary, memo
   assert.deepEqual(problems, []);
   await close();
 });
+
+test('creating from a modpack in the browser, through the phases to Ready and into the instance page', opts, async () => {
+  await open({ MEOW_EXPERIMENTAL_MODPACKS: '1' });
+  page.on('response', (res) => { if (res.status() === 404) problems.push(`404: ${res.url()}`); });
+  const hold = path.join(h.home, '.hold-create');
+  fs.writeFileSync(hold, '');
+  const instancesRoot = path.join(h.home, 'meowmarism', 'instances');
+  const listed = async () => (await (await fetch(`${h.base}/api/instances`, { headers: { Cookie: await cookieHeader() } })).json()).instances.map((i) => i.name);
+  const cookieHeader = async () => (await page.cookies()).map((c) => `${c.name}=${c.value}`).join('; ');
+
+  await waitFor(() => document.querySelector('#w-source .source-card'));
+  await page.click('[data-mode="modpack"]');
+  await page.click('#w-next1');
+  await waitFor(() => document.querySelectorAll('.mp-card').length === 2);
+  await page.click('.mp-card[data-id="p1"]');
+  await waitFor(() => document.querySelector('#mp-ram'));
+  await page.$eval('#mp-ram', (el) => { el.value = '4096'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.$eval('#mp-name', (el) => { el.value = 'e2epack'; });
+  await page.click('#w-next3');
+  await waitFor(() => document.getElementById('step4').style.display !== 'none');
+  await page.$eval('#w-port', (el) => { el.value = '25610'; });
+  await page.click('#w-next4');
+  await waitFor(() => document.getElementById('step5').style.display !== 'none');
+  await page.click('#w-create');
+
+  await waitFor(() => document.getElementById('step6').style.display !== 'none');
+  await waitFor(() => document.getElementById('creatingHint').textContent.includes('Installing NeoForge'));
+  assert.ok(!(await listed()).includes('e2epack'), 'not listed while installing');
+  assert.ok(!fs.existsSync(path.join(instancesRoot, 'e2epack')), 'no final folder while installing');
+  assert.ok(fs.existsSync(path.join(instancesRoot, 'e2epack.creating')), 'work happens in the staging folder');
+
+  fs.rmSync(hold);
+  await waitFor(() => document.getElementById('creatingTitle').textContent.includes('is ready'));
+  assert.ok(await page.$eval('#creatingOpen', (el) => el.style.display !== 'none'), 'the open button is offered');
+  assert.ok((await listed()).includes('e2epack'));
+  assert.ok(!fs.existsSync(path.join(instancesRoot, 'e2epack.creating')));
+  const entry = JSON.parse(fs.readFileSync(path.join(h.home, '.meowmarism-instances.json'), 'utf8')).find((i) => i.name === 'e2epack');
+  assert.deepEqual([entry.ramMB, entry.loader, entry.mcVersion, entry.loaderVersion, entry.port], [4096, 'neoforge', '1.21.1', '21.1.5', 25610]);
+  assert.match(fs.readFileSync(path.join(instancesRoot, 'e2epack', 'server.properties'), 'utf8'), /^server-port=25610$/m);
+
+  await h.workerReady('e2epack');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('#creatingOpen')]);
+  await waitFor(() => document.getElementById('page-overview').classList.contains('active'));
+  assert.ok(await page.$eval('#shellSidebar', (el) => el.getBoundingClientRect().width > 30), 'the new instance page renders');
+  assert.deepEqual(problems, []);
+  await close();
+});
