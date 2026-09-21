@@ -384,7 +384,7 @@ quickButtons.forEach((b) => b.onclick = () => sendCmd(b.dataset.command));
         get highest() { return highestConsoleSeq; },
       },
       reset() { consoleEl.innerHTML = ''; consoleSeen.clear(); receivedConsoleSeq.clear(); totalLines = 0; contiguousConsoleSeq = 0; highestConsoleSeq = 0; consoleClearSeq = 0; },
-      setEnabled(on) { cmdInput.disabled = !on; $('btnSend').disabled = !on; quickButtons.forEach((b) => { b.disabled = !on; }); },
+      setEnabled(on) { cmdInput.disabled = !on; $('btnSend').disabled = !on; quickButtons.forEach((b) => { b.disabled = !on; }); if (!on) hideCommandSuggestions(); },
       focusSearch() { search.focus(); },
       scrollToEnd() { if (autoscroll) consoleEl.scrollTop = consoleEl.scrollHeight; },
       focus() { cmdInput.focus(); },

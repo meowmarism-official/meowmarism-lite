@@ -659,6 +659,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const pageJs = req.method === 'GET' && url.pathname.match(/^\/js\/([\w-]+\.js)$/);
+  if (pageJs) {
+    const file = path.join(__dirname, 'js', pageJs[1]);
+    if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
   if (url.pathname === '/i18n.js' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
     res.end(fs.readFileSync(path.join(__dirname, 'core', 'ui', 'i18n.js')));
