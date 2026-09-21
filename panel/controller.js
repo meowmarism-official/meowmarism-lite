@@ -9,6 +9,7 @@
 // process lifecycle (start/stop/restart a worker). Once an instance is
 // running, its full dashboard lives at the worker's own port - the
 // controller just links you there.
+const workerSecret = require('./lib/worker-secret');
 const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (_) { return String(s); } };
 const updater = require('./core/modules/updater').createUpdater({
   repo: 'meowmarism-official/meowmarism-lite',
@@ -294,7 +295,7 @@ async function installJava(major, log) {
 
 function workerJson(port, p, method = 'GET', timeoutMs = 10000, jsonBody = null) {
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port, path: p, method, timeout: timeoutMs, headers: jsonBody ? { 'Content-Type': 'application/json' } : {} }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: p, method, timeout: timeoutMs, headers: jsonBody ? { 'Content-Type': 'application/json', [workerSecret.HEADER]: workerSecret.get() } : { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(data || '{}') }); } catch (_) { resolve({ status: res.statusCode, body: {} }); } });
@@ -474,7 +475,7 @@ function stopWorker(id) {
 // stopped.
 function workerAction(port, actionPath) {
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port, path: actionPath, method: 'POST', timeout: 5000 }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: actionPath, method: 'POST', timeout: 5000, headers: { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
       res.resume();
       resolve(res.statusCode < 400);
     });
@@ -497,7 +498,7 @@ function sendJson(res, status, data) {
 function proxyToWorker(req, res, port, targetPath, caps) {
   const upstream = http.request({
     host: '127.0.0.1', port, method: req.method, path: targetPath,
-    headers: { ...req.headers, 'x-forwarded-host': req.headers.host || '', 'x-forwarded-proto': 'https', 'x-meow-caps': caps.join(',') },
+    headers: { ...req.headers, 'x-forwarded-host': req.headers.host || '', 'x-forwarded-proto': 'https', 'x-meow-caps': caps.join(','), [workerSecret.HEADER]: workerSecret.get() },
   }, (upRes) => {
     res.writeHead(upRes.statusCode, upRes.headers);
     upRes.pipe(res);
@@ -534,7 +535,7 @@ function resolveInstanceProxy(req, url) {
 // instance list.
 function fetchWorkerStatus(port) {
   return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port, path: '/status', timeout: 2500 }, (res) => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/status', timeout: 2500, headers: { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch (_) { resolve(null); } });

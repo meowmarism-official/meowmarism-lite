@@ -12,11 +12,14 @@ function createFiles({ root }) {
   function safePath(rel) {
     const resolved = path.resolve(base, rel || '.');
     if (resolved !== base && !resolved.startsWith(base + path.sep)) return null;
+    // The nearest existing ancestor decides: a symlink anywhere on the way must not lead out of the root, even when the target does not exist yet.
+    let probe = resolved;
+    while (!fs.existsSync(probe) && probe !== path.dirname(probe)) probe = path.dirname(probe);
     try {
-      const real = fs.realpathSync(resolved);
       const realBase = fs.realpathSync(base);
+      const real = fs.realpathSync(probe);
       if (real !== realBase && !real.startsWith(realBase + path.sep)) return null;
-    } catch (_) { /* does not exist yet: the caller's fs call reports the real error */ }
+    } catch (_) { return null; }
     return resolved;
   }
 

@@ -45,6 +45,7 @@ const RAW_CACHE_MAX = Math.ceil(CACHE_WINDOW_MS / FAST_SAMPLE_MS) + 200;
 const INSTANCE_ID = crypto.randomUUID();
 
 let child = null;
+const workerSecret = require('./lib/worker-secret');
 const startupTimers = require('./core/modules/startup-timer').createStartupTimers();
 const serverIcon = require('./core/modules/server-icon').createServerIcon({ dir: SERVER_DIR, defaultIcon: path.join(__dirname, 'core', 'brand', 'server-icon.png') });
 let startedAt = null;
@@ -1365,9 +1366,9 @@ const server = http.createServer((req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch (_) { res.writeHead(400); res.end('bad request'); return; }
 
-  // The controller sends the caller's capabilities for this instance in
-  // x-meow-caps. Only the controller can reach this worker (127.0.0.1), so
-  // the header is trusted; direct local access has no header and is unrestricted.
+  // Only the controller knows the worker secret; without it nothing is answered, so other local processes cannot skip the controller's accounts.
+  if (!workerSecret.matches(req.headers[workerSecret.HEADER])) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('forbidden'); return; }
+  // The controller sends the caller's capabilities for this instance in x-meow-caps.
   if (req.headers['x-meow-caps'] !== undefined) {
     const caps = String(req.headers['x-meow-caps']).split(',').filter(Boolean);
     const need = requiredCap(req.method, url.pathname);
