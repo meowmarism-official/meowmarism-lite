@@ -155,4 +155,11 @@ function createProperties({ file, isRunning, command }) {
   return { read, state, apply, clearPending: () => pending.clear(), bump: () => { seq++; }, schema: SETTINGS_SCHEMA };
 }
 
-module.exports = { createProperties, SETTINGS_SCHEMA };
+// Sets server-port in server.properties text and leaves every other line alone (also with CRLF files).
+function withServerPort(text, port) {
+  const line = `server-port=${port}`;
+  if (/^server-port=[^\r\n]*/m.test(text)) return text.replace(/^server-port=[^\r\n]*/m, line);
+  return `${text ? text.replace(/\r?\n?$/, '\n') : ''}${line}\n`;
+}
+
+module.exports = { createProperties, SETTINGS_SCHEMA, withServerPort };

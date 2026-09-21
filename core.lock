@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
-  "version": "0.0.10",
-  "commit": "65b0817f1ef3390417e60714eb382fe5599df209",
+  "version": "0.0.11",
+  "commit": "a38bada1ec5bb77a3e8c2582d9872030159f2c98",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",

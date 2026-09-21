@@ -474,11 +474,7 @@ function setCreatePhase(label, progress) {
 const MODPACK_LOADERS = ['fabric', 'forge', 'neoforge'];
 const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purpur: 'Purpur', fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge' };
 
-// A pack may ship its own server.properties: keep it and only force the chosen port.
-function withServerPort(text, port) {
-  const line = `server-port=${port}`;
-  return /^server-port=[^\r\n]*/m.test(text) ? text.replace(/^server-port=[^\r\n]*/m, line) : `${text.replace(/\r?\n?$/, '\n')}${line}\n`;
-}
+const { withServerPort } = require('./core/modules/properties');
 
 // Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
 function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin }) {
