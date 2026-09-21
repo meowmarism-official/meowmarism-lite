@@ -1,6 +1,6 @@
 {
   "name": "meowmarism-lite",
-  "version": "0.3.9.1",
+  "version": "0.3.9.2",
   "description": "meowmarism LITE: a self-hosted control panel for your Minecraft servers",
   "private": true,
   "main": "panel/server.js",
