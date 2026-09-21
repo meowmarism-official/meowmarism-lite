@@ -104,7 +104,14 @@ function loadInstances() {
   catch (_) { return []; }
 }
 function saveInstances(list) {
-  try { fs.writeFileSync(INSTANCES_FILE, JSON.stringify(list, null, 2)); } catch (_) {}
+  const part = `${INSTANCES_FILE}.part`;
+  try {
+    fs.writeFileSync(part, JSON.stringify(list, null, 2));
+    fs.renameSync(part, INSTANCES_FILE);
+  } catch (err) {
+    try { fs.rmSync(part, { force: true }); } catch (_) {}
+    throw err;
+  }
 }
 function nextFreePort(instances) {
   const used = new Set(instances.map((i) => i.panelPort).filter(Boolean));
@@ -384,6 +391,8 @@ const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HO
 
 // Modpack picking is unfinished (no installer yet) and stays hidden unless switched on.
 const MODPACKS_ENABLED = process.env.MEOW_EXPERIMENTAL_MODPACKS === '1';
+const { inspectMrpack } = require('./core/modules/modpack');
+const { installModpack } = require('./core/modules/modpack-install');
 const modpackApi = testHooks.modpackApi || require('./core/modules/modpack-api').createModpackApi();
 const modpackPreview = require('./core/modules/modpack-preview').createModpackPreview({ api: modpackApi, download: testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified });
 
@@ -455,6 +464,37 @@ function pushCreateLog(line) {
   else if (l.includes('running installer')) creationLog.progress = Math.max(creationLog.progress, 70);
   else creationLog.progress = Math.min(90, creationLog.progress + 1);
 }
+
+function setCreatePhase(label, progress) {
+  if (!creationLog) return;
+  creationLog.phase = label;
+  if (progress != null) creationLog.progress = Math.max(creationLog.progress, Math.min(99, progress));
+}
+
+const MODPACK_LOADERS = ['fabric', 'forge', 'neoforge'];
+const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purpur: 'Purpur', fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge' };
+
+// A pack may ship its own server.properties: keep it and only force the chosen port.
+function withServerPort(text, port) {
+  const line = `server-port=${port}`;
+  return /^server-port=[^\r\n]*/m.test(text) ? text.replace(/^server-port=[^\r\n]*/m, line) : `${text.replace(/\r?\n?$/, '\n')}${line}\n`;
+}
+
+// Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
+function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin }) {
+  fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n');
+  const props = path.join(dir, 'server.properties');
+  const text = fs.existsSync(props) ? fs.readFileSync(props, 'utf8') : 'motd=hosted by meowmarism :3\n';
+  fs.writeFileSync(props, withServerPort(text, mcPort));
+  const icon = path.join(dir, 'server-icon.png');
+  if (!fs.existsSync(icon)) { try { fs.copyFileSync(path.join(__dirname, 'core', 'brand', 'server-icon.png'), icon); } catch (_) {} }
+  fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ backupIntervalHours, maxBackups, autoStart: autoStart === true, ...(javaBin ? { javaPath: javaBin } : {}) }, null, 2));
+}
+
+// Leftovers of a creation that died with the panel.
+try {
+  for (const entry of fs.readdirSync(INSTANCES_ROOT)) if (entry.endsWith('.creating')) fs.rmSync(path.join(INSTANCES_ROOT, entry), { recursive: true, force: true });
+} catch (_) {}
 
 function startWorker(inst) {
   if (workers.has(inst.id)) return;
@@ -820,18 +860,19 @@ const server = http.createServer(async (req, res) => {
       instanceCreateInProgress = true;
       try {
         const data = JSON.parse(body || '{}');
-        if (data.modpack) throw new Error('installing modpacks is not available yet');
+        const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
+        if (modpackReq && (!MODPACKS_ENABLED || !/^[\w-]{1,64}$/.test(modpackReq.versionId))) throw new Error('invalid modpack');
         const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
-        const loader = ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
-        const mcVersion = String(data.mcVersion || '').trim();
-        const loaderVersion = String(data.loaderVersion || '').trim();
+        let loader = ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
+        let mcVersion = String(data.mcVersion || '').trim();
+        let loaderVersion = String(data.loaderVersion || '').trim();
         let mcPort = Number(data.port);
         const ramMB = Math.min(32768, Math.max(1024, Number(data.ramMB) || 4096));
         const backupIntervalHours = Math.min(168, Math.max(1, Number(data.backupIntervalHours) || 6));
         const maxBackups = Math.min(100, Math.max(1, Number(data.maxBackups) || 10));
         if (!rawName) throw new Error('invalid instance name');
-        if (!mcVersion) throw new Error('invalid Minecraft version');
-        if (!BUILD_LOADERS.includes(loader) && !loaderVersion) throw new Error('invalid loader version');
+        if (!modpackReq && !mcVersion) throw new Error('invalid Minecraft version');
+        if (!modpackReq && !BUILD_LOADERS.includes(loader) && !loaderVersion) throw new Error('invalid loader version');
         if (!Number.isInteger(mcPort) || mcPort < 1 || mcPort > 65535) throw new Error('invalid port');
         const instances = loadInstances();
         const requestedPort = mcPort;
@@ -846,33 +887,66 @@ const server = http.createServer(async (req, res) => {
           name = `${rawName}${String(n).padStart(2, '0')}`;
         }
         const dir = path.join(INSTANCES_ROOT, name);
+        const staging = `${dir}.creating`;
         fs.mkdirSync(INSTANCES_ROOT, { recursive: true });
-        if (fs.existsSync(dir)) throw new Error(`${dir} already exists`);
+        if (fs.existsSync(dir) || fs.existsSync(staging)) throw new Error(`${dir} already exists`);
         instanceCreateInProgress = true;
-        creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null };
+        creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
         sendJson(res, 202, { ok: true });
+        let renamed = false, registered = false, packTmp = null;
         try {
           const createLog = (line) => { console.log(`[create:${name}] ${line}`); pushCreateLog(line); };
           if (mcPort !== requestedPort) createLog(`port ${requestedPort} is in use, using ${mcPort} instead`);
+          let pack = null;
+          if (modpackReq) {
+            setCreatePhase('Reading modpack', 5);
+            packTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meow-pack-'));
+            const version = await modpackApi.getVersion(modpackReq.versionId);
+            const file = path.join(packTmp, 'pack.mrpack');
+            await (testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified)(version.file.url, file, version.file.sha512, version.file.size);
+            const inspected = inspectMrpack(file);
+            if (!MODPACK_LOADERS.includes(inspected.loader)) throw new Error(`This pack needs ${LOADER_LABELS[inspected.loader] || inspected.loader}, which LITE cannot run yet.`);
+            pack = { file, inspected, version };
+            loader = inspected.loader; mcVersion = inspected.minecraft; loaderVersion = inspected.loaderVersion;
+            Object.assign(creationLog, { loader, mcVersion });
+          }
+          setCreatePhase('Preparing Java', 10);
           const javaBin = await ensureJava(mcVersion, createLog);
-          const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, createLog, javaBin);
-          fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n');
-          fs.writeFileSync(path.join(dir, 'server.properties'), `server-port=${mcPort}\nmotd=hosted by meowmarism :3\n`);
-          try { fs.copyFileSync(path.join(__dirname, 'core', 'brand', 'server-icon.png'), path.join(dir, 'server-icon.png')); } catch (_) {}
-          fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ backupIntervalHours, maxBackups, autoStart: data.autoStart === true, ...(javaBin ? { javaPath: javaBin } : {}) }, null, 2));
-          const panelPort = nextFreePort(instances);
-          const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort, mcVersion, loader, loaderVersion: builtVersion || loaderVersion, ramMB, createdAt: Date.now() };
-          instances.push(inst);
-          saveInstances(instances);
+          setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
+          const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
+          if (pack) {
+            setCreatePhase('Downloading modpack files', 45);
+            await installModpack({
+              mrpack: pack.file, inspected: pack.inspected, instanceDir: staging,
+              source: { projectId: pack.version.projectId, versionId: pack.version.id, packVersion: pack.version.versionNumber },
+              download: testHooks.modpackFileDownload, log: createLog,
+              progress: ({ phase, done, total }) => {
+                if (phase === 'downloads') setCreatePhase(`Downloading modpack files ${done} / ${total}`, 45 + Math.round(40 * done / Math.max(1, total)));
+                else if (phase === 'overrides') setCreatePhase('Applying overrides', 88);
+              },
+            });
+          }
+          setCreatePhase('Finalizing instance', 92);
+          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin });
+          (testHooks.renameDir || fs.renameSync)(staging, dir);
+          renamed = true;
+          const current = loadInstances();
+          if (current.some((i) => i.name === name)) throw new Error(`an instance named ${name} appeared while this one was being created`);
+          const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, ramMB, createdAt: Date.now() };
+          saveInstances([...current, inst]);
+          registered = true;
           startWorker(inst);
+          setCreatePhase('Ready', 100);
           creationLog.progress = 100;
           creationLog.instanceId = inst.id;
           creationLog.panelPort = inst.panelPort;
         } catch (err) {
           console.error(`[create:${name}] failed: ${err.message}`);
           creationLog.error = err.message;
-          if (!instances.some((i) => i.name === name)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+          try { fs.rmSync(staging, { recursive: true, force: true }); } catch (_) {}
+          if (renamed && !registered) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
         } finally {
+          if (packTmp) { try { fs.rmSync(packTmp, { recursive: true, force: true }); } catch (_) {} }
           instanceCreateInProgress = false;
           creationLog.done = true;
         }
@@ -992,7 +1066,11 @@ const server = http.createServer(async (req, res) => {
         }
         const w = workers.get(id);
         if (w) await new Promise((resolve) => { const t = setTimeout(resolve, 15000); w.proc.once('exit', () => { clearTimeout(t); resolve(); }); w.proc.kill('SIGTERM'); });
-        saveInstances(instances.filter((i) => i.id !== id));
+        try { saveInstances(instances.filter((i) => i.id !== id)); } catch (err) {
+          startWorker(inst);
+          sendJson(res, 500, { ok: false, error: `could not update the instance list: ${err.message}` });
+          return;
+        }
         try {
           if (wantFiles) fs.rmSync(inst.dir, { recursive: true, force: true });
           if (wantFiles && wantBackups && backupDir.startsWith(path.join(DATA_ROOT, 'backups') + path.sep)) fs.rmSync(backupDir, { recursive: true, force: true });

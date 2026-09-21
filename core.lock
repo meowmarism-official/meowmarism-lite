@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
-  "version": "0.0.8",
-  "commit": "5074427d8e0932c43a811415a14ce94b10d0b2c5",
+  "version": "0.0.10",
+  "commit": "65b0817f1ef3390417e60714eb382fe5599df209",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -22,6 +22,7 @@
     "panel/core/modules/files.js",
     "panel/core/modules/metrics.js",
     "panel/core/modules/modpack-api.js",
+    "panel/core/modules/modpack-install.js",
     "panel/core/modules/modpack-memory.js",
     "panel/core/modules/modpack-preview.js",
     "panel/core/modules/modpack.js",

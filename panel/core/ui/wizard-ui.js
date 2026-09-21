@@ -123,6 +123,7 @@ ${stepHtml}
         }
         if (lines.length > shown) { shown = lines.length; box.scrollTop = box.scrollHeight; }
         $('creatingBar').style.width = `${s.progress || 0}%`;
+        if (s.phase && !s.done) $('creatingHint').textContent = t(s.phase);
         if (!s.done) return;
         clearInterval(poll);
         creating = false;
