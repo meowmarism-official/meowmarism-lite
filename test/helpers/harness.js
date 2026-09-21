@@ -28,7 +28,8 @@ process.stdin.on('data', (d) => {
 
 const FAKE_JAVA = '#!/bin/sh\necho \'openjdk version "21.0.1" 2024-01-16\' >&2\n';
 
-async function start({ instances = ['inst1'] } = {}) {
+// options: instances (names), config ({ name: panel-config overrides }), hooks (path of a MEOW_TEST_HOOKS module)
+async function start({ instances = ['inst1'], config = {}, hooks = null } = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'meow-int-'));
   const controllerPort = await freePort();
   const workerBase = await freePort();
@@ -39,17 +40,18 @@ async function start({ instances = ['inst1'] } = {}) {
   for (let n = 0; n < instances.length; n++) {
     const dir = path.join(home, 'instances', instances[n]);
     fs.mkdirSync(path.join(dir, 'world'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'world', 'level.dat'), 'level v1');
     const mcPort = await freePort();
     fs.writeFileSync(path.join(dir, 'server.properties'), `server-port=${mcPort}\nlevel-name=world\nmotd=test\n`);
     fs.writeFileSync(path.join(dir, 'run.sh'), FAKE_SERVER, { mode: 0o755 });
-    fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ javaPath: path.join(bin, 'java'), backupIntervalHours: 6, maxBackups: 10 }));
+    fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ javaPath: path.join(bin, 'java'), backupIntervalHours: 6, maxBackups: 10, ...(config[instances[n]] || {}) }));
     registry.push({ id: `id${n}`, name: instances[n], dir, port: mcPort, panelPort: workerBase + n, mcVersion: '1.21.1', loader: 'vanilla', loaderVersion: '', createdAt: 1 });
   }
   fs.writeFileSync(path.join(home, '.meowmarism-instances.json'), JSON.stringify(registry));
   require(path.join(REPO, 'panel', 'lib', 'db.js')).createUserStore(path.join(home, '.meowmarism-controller-users.json')).upsertOwner('owner', 'ownerpass123');
 
   const child = spawn(process.execPath, [path.join(REPO, 'panel', 'controller.js')], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase) },
+    env: { ...process.env, HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase), ...(hooks ? { MEOW_TEST_HOOKS: hooks } : {}) },
     cwd: path.join(REPO, 'panel'),
     stdio: 'ignore',
   });
@@ -80,4 +82,4 @@ async function start({ instances = ['inst1'] } = {}) {
   return { home, base, registry, login, call, json, until, workerReady, workerSecret, stop, dir: (name) => path.join(home, 'instances', name), controller: child };
 }
 
-module.exports = { start, sleep, freePort };
+module.exports = { start, sleep, freePort, FAKE_SERVER };

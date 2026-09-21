@@ -118,6 +118,7 @@ const PURPUR_PROJECT = 'https://api.purpurmc.org/v2/purpur';
 const BUILD_LOADERS = ['vanilla', 'paper', 'purpur'];
 
 async function listLoaderVersions(loader, mcFilter) {
+  if (testHooks.listLoaderVersions) return testHooks.listLoaderVersions(loader, mcFilter);
   if (loader === 'paper' || loader === 'purpur') {
     let versions;
     if (loader === 'paper') {
@@ -262,6 +263,7 @@ const javaJobs = new Map();
 
 // Uses the system Java when it is new enough, otherwise installs the needed one into the data folder.
 async function ensureJava(mcVersion, log) {
+  if (testHooks.ensureJava) return testHooks.ensureJava(mcVersion, log);
   const need = launchLib.requiredJavaMajor(mcVersion);
   if (!need) return '';
   const have = launchLib.javaMajor();
@@ -336,12 +338,19 @@ async function runUpgrade(inst, target, log) {
   for (const f of SNAPSHOT_FILES) if (fs.existsSync(path.join(inst.dir, f))) fs.copyFileSync(path.join(inst.dir, f), path.join(snapDir, f));
   log('saved the current launch files');
 
-  const javaBin = await ensureJava(target.mcVersion, log);
-  if (javaBin) {
-    const r = await workerJson(inst.panelPort, '/api/config', 'POST', 10000, { javaPath: javaBin });
-    if (!r.body.ok) throw new Error(r.body.error || 'could not save the Java path');
+  let built;
+  try {
+    const javaBin = await ensureJava(target.mcVersion, log);
+    if (javaBin) {
+      const r = await workerJson(inst.panelPort, '/api/config', 'POST', 10000, { javaPath: javaBin });
+      if (!r.body.ok) throw new Error(r.body.error || 'could not save the Java path');
+    }
+    built = await installServerSoftware(inst.loader, target.mcVersion, target.loaderVersion, null, inst.dir, log, javaBin);
+  } catch (err) {
+    for (const f of SNAPSHOT_FILES) if (fs.existsSync(path.join(snapDir, f))) fs.copyFileSync(path.join(snapDir, f), path.join(inst.dir, f));
+    log(`restored the launch files of ${from.mcVersion}`);
+    throw err;
   }
-  const built = await installServerSoftware(inst.loader, target.mcVersion, target.loaderVersion, null, inst.dir, log, javaBin);
   if (fs.existsSync(path.join(snapDir, 'user_jvm_args.txt'))) fs.copyFileSync(path.join(snapDir, 'user_jvm_args.txt'), path.join(inst.dir, 'user_jvm_args.txt'));
   const newLoaderVersion = built || target.loaderVersion || '';
   setInstanceVersions(inst, target.mcVersion, newLoaderVersion);
@@ -370,7 +379,11 @@ async function runRollback(inst, restoreWorld, log) {
   await restartWorkerFor(inst);
 }
 
+// Tests replace the network-facing steps (version lists, downloads, Java) through a module named in MEOW_TEST_HOOKS.
+const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HOOKS) : {};
+
 async function installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin) {
+  if (testHooks.installServerSoftware) return testHooks.installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin);
   fs.mkdirSync(dir, { recursive: true });
   if (loader === 'paper' || loader === 'purpur') return installPaperLike(loader, mcVersion, dir, ramMB, log);
   if (loader === 'vanilla') { await installVanilla(mcVersion, dir, ramMB, log); return; }
