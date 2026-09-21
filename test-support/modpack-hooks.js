@@ -12,12 +12,12 @@ const VERSIONS = {
   p1: [{ id: 'v1', projectId: 'p1', versionNumber: '1.0', mcVersions: ['1.21.1'], loaders: ['neoforge'] }],
   pq: [{ id: 'vq', projectId: 'pq', versionNumber: '1.0', mcVersions: ['1.21.1'], loaders: ['quilt'] }],
 };
-const FIXTURES = { v1: 'fixture.mrpack', vq: 'fixture-quilt.mrpack', vf: 'fixture-fabric.mrpack', vp: 'fixture-props.mrpack' };
-const PROJECT_OF = { v1: 'p1', vq: 'pq', vf: 'pf', vp: 'pp' };
+const FIXTURES = { v1: 'fixture.mrpack', vq: 'fixture-quilt.mrpack', vf: 'fixture-fabric.mrpack', vp: 'fixture-props.mrpack', vg: 'fixture-forge.mrpack', vu: 'fixture-forge-unknown.mrpack' };
+const PROJECT_OF = { v1: 'p1', vq: 'pq', vf: 'pf', vp: 'pp', vg: 'pg', vu: 'pu' };
 const fail = process.env.MEOW_TEST_FAIL;
 
 module.exports = {
-  listLoaderVersions: async (loader, mc) => (mc ? ['1'] : { mcVersions: ['1.21.1', '1.20.1'] }),
+  listLoaderVersions: async (loader, mc) => (mc ? (loader === 'forge' ? ['47.4.0', '47.3.0'] : ['1']) : { mcVersions: ['1.21.1', '1.20.1'] }),
   ensureJava: async () => null,
   installServerSoftware: async (loader, mcVersion, loaderVersion, ramMB, dir) => {
     fs.mkdirSync(dir, { recursive: true });

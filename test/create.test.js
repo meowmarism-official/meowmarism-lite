@@ -72,6 +72,24 @@ test('a Quilt pack is refused before anything is created', async () => {
   });
 });
 
+test('a Forge pack installs exactly the Forge version it names', async () => {
+  await withController({}, async ({ create, names, dirOf }) => {
+    const log = await create({ name: 'Forged', modpack: { versionId: 'vg' } });
+    assert.equal(log.error, null);
+    assert.ok((await names()).includes('Forged'));
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dirOf('Forged'), '.installed-with.json'), 'utf8')), { loader: 'forge', mcVersion: '1.20.1', loaderVersion: '47.4.0' });
+  });
+});
+
+test('a Forge version that does not exist for that Minecraft version is refused, not replaced by another', async () => {
+  await withController({}, async ({ create, names, dirOf }) => {
+    const log = await create({ name: 'Nope', modpack: { versionId: 'vu' } });
+    assert.match(log.error, /Forge 99.9.9 is not available for Minecraft 1.20.1/);
+    assert.ok(!(await names()).includes('Nope'));
+    nothingLeft(dirOf, 'Nope');
+  });
+});
+
 test('the server software failing leaves neither staging nor instance', async () => {
   await withController({ MEOW_TEST_FAIL: 'software' }, async ({ create, names, dirOf }) => {
     const log = await create({ name: 'Pack', modpack: { versionId: 'v1' } });

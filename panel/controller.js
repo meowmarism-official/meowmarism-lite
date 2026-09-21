@@ -906,6 +906,10 @@ const server = http.createServer(async (req, res) => {
             await (testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified)(version.file.url, file, version.file.sha512, version.file.size);
             const inspected = inspectMrpack(file);
             if (!MODPACK_LOADERS.includes(inspected.loader)) throw new Error(`This pack needs ${LOADER_LABELS[inspected.loader] || inspected.loader}, which LITE cannot run yet.`);
+            if (inspected.loader === 'forge') {
+              const known = await listLoaderVersions('forge', inspected.minecraft);
+              if (!known.includes(inspected.loaderVersion)) throw new Error(`Forge ${inspected.loaderVersion} is not available for Minecraft ${inspected.minecraft}.`);
+            }
             pack = { file, inspected, version };
             loader = inspected.loader; mcVersion = inspected.minecraft; loaderVersion = inspected.loaderVersion;
             Object.assign(creationLog, { loader, mcVersion });
