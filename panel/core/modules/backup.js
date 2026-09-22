@@ -185,9 +185,10 @@ function runBackup(reason, deps) {
 
       // Whatever happens after save-off, save-on is sent in the finally below.
       if (deps.runtime.isReady()) {
-        deps.runtime.command('save-off');
+        // command() returns false when nothing took the command; a backup without a guaranteed flush is not made.
+        if (deps.runtime.command('save-off') === false) throw new Error('could not disable world saving');
         savingOff = true;
-        deps.runtime.command('save-all flush');
+        if (deps.runtime.command('save-all flush') === false) throw new Error('could not flush the world before the backup');
         await delay(1500);
       }
 
