@@ -9,7 +9,7 @@ const HOOKS = path.join(__dirname, '..', 'test-support', 'modpack-hooks.js');
 const CORE_ICON = path.join(__dirname, '..', 'panel', 'core', 'brand', 'server-icon.png');
 
 async function withController(env, fn) {
-  const h = await harness.start({ hooks: HOOKS, env: { MEOW_EXPERIMENTAL_MODPACKS: '1', ...env } });
+  const h = await harness.start({ hooks: HOOKS, env });
   try {
     const cookie = await h.login();
     const instancesRoot = path.join(h.home, 'meowmarism', 'instances');
@@ -171,13 +171,4 @@ test('the instance only shows up after everything is installed, and the phases a
     assert.ok((await names()).includes('Slow'));
     assert.ok(!fs.existsSync(`${dirOf('Slow')}.creating`));
   });
-});
-
-test('modpack requests are refused when the feature is off', async () => {
-  const h = await harness.start({ hooks: HOOKS });
-  try {
-    const cookie = await h.login();
-    const r = await h.json(cookie, 'POST', '/api/instances', { name: 'Pack', port: 25570, modpack: { versionId: 'v1' } });
-    assert.equal(r.status, 400);
-  } finally { await h.stop(); }
 });

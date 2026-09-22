@@ -40,20 +40,20 @@ async function close() {
   browser = h = null;
 }
 
-test('without modpack support the dialog starts at the blank server step', opts, async () => {
+test('the dialog starts at the source choice and the blank server flow is intact', opts, async () => {
   await open({});
-  await waitFor(() => document.getElementById('wizardBack').classList.contains('open'));
-  assert.ok(await visible('step2'), 'the blank server step is shown first');
-  assert.ok(!(await visible('step1')));
-  assert.equal(await dots(), 3, 'blank, resources, backups');
+  await waitFor(() => document.querySelector('#w-source .source-card'));
+  assert.ok(await visible('step1'));
+  await page.click('#w-next1');
+  assert.ok(await visible('step2'), 'Blank server is the default and leads to the blank step');
   await page.click('#w-back2');
-  await waitFor(() => !document.getElementById('wizardBack').classList.contains('open'));
+  assert.ok(await visible('step1'));
   assert.deepEqual(problems, []);
   await close();
 });
 
 test('the modpack flow: source, search, unsupported Quilt, version summary, memory handed on', opts, async () => {
-  await open({ MEOW_EXPERIMENTAL_MODPACKS: '1' });
+  await open({});
   await waitFor(() => document.querySelector('#w-source .source-card'));
   assert.ok(await visible('step1'));
   assert.equal(await dots(), 4, 'source, blank, resources, backups');
@@ -97,7 +97,7 @@ test('the modpack flow: source, search, unsupported Quilt, version summary, memo
 });
 
 test('creating from a modpack in the browser, through the phases to Ready and into the instance page', opts, async () => {
-  await open({ MEOW_EXPERIMENTAL_MODPACKS: '1' });
+  await open({});
   page.on('response', (res) => { if (res.status() === 404) problems.push(`404: ${res.url()}`); });
   const hold = path.join(h.home, '.hold-create');
   fs.writeFileSync(hold, '');

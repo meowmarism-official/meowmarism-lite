@@ -389,8 +389,6 @@ async function runRollback(inst, restoreWorld, log) {
 // Tests replace the network-facing steps (version lists, downloads, Java) through a module named in MEOW_TEST_HOOKS.
 const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HOOKS) : {};
 
-// Modpack picking is unfinished (no installer yet) and stays hidden unless switched on.
-const MODPACKS_ENABLED = process.env.MEOW_EXPERIMENTAL_MODPACKS === '1';
 const { inspectMrpack } = require('./core/modules/modpack');
 const { installModpack } = require('./core/modules/modpack-install');
 const modpackApi = testHooks.modpackApi || require('./core/modules/modpack-api').createModpackApi();
@@ -825,7 +823,7 @@ const server = http.createServer(async (req, res) => {
         rssMB: status.stats?.server?.rssMB ?? null,
         crash: erroredOut ? status.crash : null,
       };
-    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create'), modpacks: MODPACKS_ENABLED, hostMemMB: Math.round(os.totalmem() / 1048576) }));
+    })).then((list) => sendJson(res, 200, { instances: list, createInProgress: instanceCreateInProgress, canCreate: canPanel(req, 'create'), hostMemMB: Math.round(os.totalmem() / 1048576) }));
     return;
   }
 
@@ -846,7 +844,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (MODPACKS_ENABLED && url.pathname.startsWith('/api/modpacks/') && req.method === 'GET') {
+  if (url.pathname.startsWith('/api/modpacks/') && req.method === 'GET') {
     if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed to create instances' }); return; }
     const answer = (promise) => promise.then((data) => sendJson(res, 200, data)).catch((err) => sendJson(res, err.status || 502, { ok: false, error: err.message }));
     const preview = /^\/api\/modpacks\/versions\/([\w-]+)\/preview$/.exec(url.pathname);
@@ -868,7 +866,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const data = JSON.parse(body || '{}');
         const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
-        if (modpackReq && (!MODPACKS_ENABLED || !/^[\w-]{1,64}$/.test(modpackReq.versionId))) throw new Error('invalid modpack');
+        if (modpackReq && !/^[\w-]{1,64}$/.test(modpackReq.versionId)) throw new Error('invalid modpack');
         const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
         let loader = ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
         let mcVersion = String(data.mcVersion || '').trim();

@@ -125,7 +125,6 @@ function healthLabel(i) {
 }
 
 let hostMemMB = 0;
-let modpacksOn = false;
 function instCard(i) {
   return {
     name: i.name, loader: i.loader, loaderVersion: i.loaderVersion, mcVersion: i.mcVersion, port: i.port, running: i.running,
@@ -139,7 +138,6 @@ async function loadInstances() {
   const data = await r.json();
   $('openWizard').style.display = data.canCreate ? '' : 'none';
   hostMemMB = data.hostMemMB || 0;
-  modpacksOn = !!data.modpacks;
   MeowInstances.render($('instGrid'), $('instSummary'), data.instances.map(instCard), hostMemMB, 'No instances yet - create your first server with the + button.');
 }
 
@@ -194,8 +192,8 @@ const WIZ = MeowWizard.mount({
   t: window.t, esc,
   createLabel: 'Create instance',
   steps: [
-    { title: 'Create instance', hint: 'Start from scratch or from a modpack.', html: '<div id="w-source"></div>', when: () => modpacksOn },
-    { title: 'Create instance', hint: 'Name it and pick what it runs.', when: () => !modpacksOn || SOURCE.mode() === 'blank', html: `      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
+    { title: 'Create instance', hint: 'Start from scratch or from a modpack.', html: '<div id="w-source"></div>' },
+    { title: 'Create instance', hint: 'Name it and pick what it runs.', when: () => SOURCE.mode() === 'blank', html: `      <div class="field"><label for="w-name">Instance name</label><input id="w-name" placeholder="survival-2"></div>
       <div class="field-row">
         <div class="field"><label for="w-loader">Loader</label>
           <select id="w-loader">
@@ -216,7 +214,7 @@ const WIZ = MeowWizard.mount({
         if ($('w-loader').value !== 'vanilla' && !$('w-loaderVersion').value) return 'Pick a loader version';
         return null;
       } },
-    { title: 'Modpack', hint: 'Search Modrinth and pick a version.', html: '<div id="w-modpack"></div>', when: () => modpacksOn && SOURCE.mode() === 'modpack', validate: () => PICKER.validate() },
+    { title: 'Modpack', hint: 'Search Modrinth and pick a version.', html: '<div id="w-modpack"></div>', when: () => modpackMode(), validate: () => PICKER.validate() },
     { title: 'Resources', hint: 'How much of this machine the instance may use.', onShow: () => { const p = modpackMode() && PICKER.value(); if (p) $('w-ram').value = p.ramMB; }, html: `      <div class="field-row">
         <div class="field"><label for="w-port">Server port</label><input id="w-port" type="number" value="25565"><div class="hint" id="w-portHint" style="margin-top:4px"></div></div>
         <div class="field"><label for="w-ram">Memory (MB)</label><input id="w-ram" type="number" value="4096" step="512" min="1024" max="32768"></div>
@@ -253,7 +251,7 @@ const WIZ = MeowWizard.mount({
   openHref: (name) => `/instance/${encodeURIComponent(name)}/`,
   onFinished: () => { $('w-name').value = ''; loadInstances(); },
 });
-const modpackMode = () => modpacksOn && SOURCE.mode() === 'modpack';
+const modpackMode = () => SOURCE.mode() === 'modpack';
 const SOURCE = MeowModpack.mountSource({ el: $('w-source'), t: window.t, esc, onChange: () => { WIZ.refresh(); if (modpackMode()) PICKER.reset(); } });
 async function modpackJson(url) {
   const r = await fetch(url);
