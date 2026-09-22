@@ -35,10 +35,13 @@ module.exports = {
   },
   listLoaderVersions: async (loader, mc) => (mc ? (loader === 'forge' ? ['47.4.0', '47.3.0'] : ['1']) : { mcVersions: ['1.21.1', '1.20.1'] }),
   ensureJava: async () => null,
-  installServerSoftware: async (loader, mcVersion, loaderVersion, ramMB, dir) => {
+  installServerSoftware: async (loader, mcVersion, loaderVersion, ramMB, dir, log) => {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'run.sh'), '#!/bin/sh\n# launcher made by the runtime\nexit 0\n', { mode: 0o755 });
     fs.writeFileSync(path.join(dir, '.installed-with.json'), JSON.stringify({ loader, mcVersion, loaderVersion }));
+    // Stands in for a real Forge install, which logs hundreds of "Patching ..." lines after any earlier
+    // modpack environment decisions have already been logged.
+    if (process.env.MEOW_TEST_NOISY_LOG && log) for (let i = 0; i < 400; i++) log(`Patching net/minecraft/noisy/Line${i} 1/1`);
     while (fs.existsSync(path.join(os.homedir(), '.hold-create'))) await new Promise((resolve) => setTimeout(resolve, 100));
     if (fail === 'software') throw new Error('server software download failed');
   },

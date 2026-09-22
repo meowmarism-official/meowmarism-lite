@@ -392,6 +392,7 @@ async function runRollback(inst, restoreWorld, log) {
 
 const { inspectMrpack } = require('./core/modules/modpack');
 const { resolveEnvironments } = require('./core/modules/modpack-environment');
+const { isImportantCreateLine } = require('./core/modules/create-log');
 const { installModpack } = require('./core/modules/modpack-install');
 const modpackApi = testHooks.modpackApi || require('./core/modules/modpack-api').createModpackApi();
 const modpackPreview = require('./core/modules/modpack-preview').createModpackPreview({ api: modpackApi, request: testHooks.modrinthRequest, download: testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified });
@@ -454,10 +455,17 @@ function restoreAfterFailedUpdate(running) {
 // Only one creation runs at a time (gated by instanceCreateInProgress), so a
 // single slot is enough.
 let creationLog = null;
+const MAX_IMPORTANT_LOG_LINES = 100;
 function pushCreateLog(line) {
   if (!creationLog) return;
   creationLog.lines.push(line);
   if (creationLog.lines.length > 300) creationLog.lines.shift();
+  // A noisy installer (Forge logs hundreds of "Patching ..." lines) would otherwise push modpack
+  // environment decisions and errors out of the ring buffer above before anyone reads the log.
+  if (isImportantCreateLine(line)) {
+    creationLog.important.push(line);
+    if (creationLog.important.length > MAX_IMPORTANT_LOG_LINES) creationLog.important.shift();
+  }
   const l = line.toLowerCase();
   if (l.includes('looking up') || l.includes('resolving')) creationLog.progress = Math.max(creationLog.progress, 12);
   else if (l.includes('downloading')) creationLog.progress = Math.max(creationLog.progress, 35);
@@ -830,7 +838,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/create-log' && req.method === 'GET') {
-    sendJson(res, 200, creationLog || { done: true, lines: [], progress: 0 });
+    sendJson(res, 200, creationLog || { done: true, lines: [], important: [], progress: 0 });
     return;
   }
 
@@ -898,7 +906,7 @@ const server = http.createServer(async (req, res) => {
         fs.mkdirSync(INSTANCES_ROOT, { recursive: true });
         if (fs.existsSync(dir) || fs.existsSync(staging)) throw new Error(`${dir} already exists`);
         instanceCreateInProgress = true;
-        creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
+        creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], important: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
         sendJson(res, 202, { ok: true });
         let renamed = false, registered = false, packTmp = null;
         try {
@@ -919,7 +927,8 @@ const server = http.createServer(async (req, res) => {
             }
             pack = { file, inspected, version };
             loader = inspected.loader; mcVersion = inspected.minecraft; loaderVersion = inspected.loaderVersion;
-            Object.assign(creationLog, { loader, mcVersion });
+            Object.assign(creationLog, { loader, mcVersion, loaderVersion });
+            createLog(`Using ${LOADER_LABELS[loader]}${loaderVersion ? ` ${loaderVersion}` : ''} for Minecraft ${mcVersion}`);
           }
           setCreatePhase('Preparing Java', 10);
           const javaBin = await ensureJava(mcVersion, createLog);

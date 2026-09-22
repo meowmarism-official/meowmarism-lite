@@ -201,3 +201,14 @@ test('a server-capable environment keeps the mods, and a failing Modrinth lookup
     assert.ok(fs.existsSync(path.join(dirOf('Pack'), 'mods', 'a.jar')) && fs.existsSync(path.join(dirOf('Pack'), 'mods', 'b.jar')));
   });
 });
+
+test('an early environment-skip message survives hundreds of noisy installer lines afterwards', async () => {
+  await withController({ MEOW_TEST_ENVIRONMENT: 'client_only', MEOW_TEST_NOISY_LOG: '1' }, async ({ create }) => {
+    const log = await create({ name: 'Pack', modpack: { versionId: 'v1' } });
+    assert.equal(log.error, null);
+    assert.ok(log.lines.length <= 300, `the normal buffer stays capped (saw ${log.lines.length})`);
+    assert.ok(!log.lines.some((l) => l.includes('Skipping a.jar')), 'the noisy lines really did push it out of the normal buffer');
+    assert.ok(log.important.some((l) => l.includes('Skipping a.jar: client-only according to Modrinth')), 'but it survives in the important log');
+    assert.ok(log.important.length <= 100, `the important log is bounded too (saw ${log.important.length})`);
+  });
+});
