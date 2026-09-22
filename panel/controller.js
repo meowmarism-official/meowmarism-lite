@@ -599,10 +599,21 @@ function fetchWorkerStatus(port) {
   });
 }
 
+// Browsers send Origin on every cross-site write; a page on another site must not act with the panel's cookie.
+function crossOrigin(req) {
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  try {
+    const host = new URL(origin).host;
+    return host !== req.headers.host && !(loadSettings().trustProxy && host === req.headers['x-forwarded-host']);
+  } catch (_) { return true; }
+}
+
 const server = http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch (_) { res.writeHead(400); res.end('bad request'); return; }
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS' && crossOrigin(req)) { sendJson(res, 403, { ok: false, error: 'cross-origin request refused' }); return; }
   // /_meta/... reaches controller routes from an instance page without the Referer-based worker proxy.
   const isMeta = url.pathname.startsWith('/_meta/');
   if (isMeta) url.pathname = url.pathname.slice('/_meta'.length);

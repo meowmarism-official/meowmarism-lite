@@ -173,51 +173,66 @@ function runBackup(reason, deps) {
       deps.pushTimeline('backup', 'World backup skipped', msg, 'error', { reason });
       return false;
     }
-    ensureBackupDir();
     state.backupInProgress = true;
-    deps.broadcastEvent('backup', { state: 'started', reason });
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const file = `world-${stamp}${BACKUP_EXT}`;
-    const dest = path.join(BACKUP_DIR, file);
-    const startedAtMs = Date.now();
+    let savingOff = false;
+    try {
+      ensureBackupDir();
+      deps.broadcastEvent('backup', { state: 'started', reason });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = `world-${stamp}${BACKUP_EXT}`;
+      const dest = path.join(BACKUP_DIR, file);
+      const startedAtMs = Date.now();
 
-    const live = deps.runtime.isReady();
-    if (live) { deps.runtime.command('save-off'); deps.runtime.command('save-all flush'); await delay(1500); }
+      // Whatever happens after save-off, save-on is sent in the finally below.
+      if (deps.runtime.isReady()) {
+        deps.runtime.command('save-off');
+        savingOff = true;
+        deps.runtime.command('save-all flush');
+        await delay(1500);
+      }
 
-    deps.broadcast(`--- backing up world -> backups/${file} (${reason}, ${ZSTD_AVAILABLE ? 'zstd -T0' : 'gzip'}) ---`);
-    const ok = await new Promise((resolve) => {
-      const tar = spawn('tar', tarCreateArgs(dest, names));
-      tar.on('error', (err) => {
-        state.lastBackupError = String(err);
-        deps.broadcast(`--- backup failed: ${err} ---`);
-        deps.broadcastEvent('backup', { state: 'error', error: String(err) });
-        resolve(false);
-      });
-      tar.on('exit', (code) => {
-        if (tarCreateSucceeded(code)) {
-          const tookSec = ((Date.now() - startedAtMs) / 1000).toFixed(1);
+      deps.broadcast(`--- backing up world -> backups/${file} (${reason}, ${ZSTD_AVAILABLE ? 'zstd -T0' : 'gzip'}) ---`);
+      return await new Promise((resolve) => {
+        const fail = (message) => {
+          state.lastBackupError = message;
+          try { fs.unlinkSync(dest); } catch (_) {}
+          try {
+            deps.broadcast(`--- backup failed: ${message} ---`);
+            deps.broadcastEvent('backup', { state: 'error', error: message });
+            deps.pushTimeline('backup', 'World backup failed', message, 'error', { reason });
+          } catch (_) {}
+          resolve(false);
+        };
+        const tar = spawn('tar', tarCreateArgs(dest, names));
+        tar.on('error', (err) => fail(String(err)));
+        tar.on('exit', (code) => {
+          if (!tarCreateSucceeded(code)) { fail(`tar exited with code ${code}`); return; }
           state.lastBackupAt = Date.now();
           state.lastBackupError = null;
-          pruneBackups();
-          const sizeMB = fs.existsSync(dest) ? +(fs.statSync(dest).size / 1024 / 1024).toFixed(1) : null;
-          deps.broadcast(`--- backup done: ${file} (${sizeMB} MB in ${tookSec}s) ---`);
-          deps.broadcastEvent('backup', { state: 'done', file, sizeMB, tookSec: Number(tookSec) });
-          deps.pushTimeline('backup', 'World backup created', `${file} · ${sizeMB} MB · ${tookSec}s · ${reason}`, 'good', { file, sizeMB, tookSec: Number(tookSec), reason });
+          try {
+            const tookSec = ((Date.now() - startedAtMs) / 1000).toFixed(1);
+            try { pruneBackups(); } catch (err) { deps.broadcast(`--- pruning old backups failed: ${err} ---`); }
+            const sizeMB = fs.existsSync(dest) ? +(fs.statSync(dest).size / 1024 / 1024).toFixed(1) : null;
+            deps.broadcast(`--- backup done: ${file} (${sizeMB} MB in ${tookSec}s) ---`);
+            deps.broadcastEvent('backup', { state: 'done', file, sizeMB, tookSec: Number(tookSec) });
+            deps.pushTimeline('backup', 'World backup created', `${file} · ${sizeMB} MB · ${tookSec}s · ${reason}`, 'good', { file, sizeMB, tookSec: Number(tookSec), reason });
+          } catch (_) { /* the archive exists; only the reporting failed */ }
           resolve(true);
-        } else {
-          state.lastBackupError = `tar exited with code ${code}`;
-          try { fs.unlinkSync(dest); } catch (_) {}
-          deps.broadcast(`--- backup failed: tar exited with code ${code} ---`);
-          deps.broadcastEvent('backup', { state: 'error', error: state.lastBackupError });
-          deps.pushTimeline('backup', 'World backup failed', state.lastBackupError, 'error', { reason });
-          resolve(false);
-        }
+        });
       });
-    });
-
-    state.backupInProgress = false;
-    if (live) deps.runtime.command('save-on');
-    return ok;
+    } catch (err) {
+      const message = String((err && err.message) || err);
+      state.lastBackupError = message;
+      try {
+        deps.broadcast(`--- backup failed: ${message} ---`);
+        deps.broadcastEvent('backup', { state: 'error', error: message });
+        deps.pushTimeline('backup', 'World backup failed', message, 'error', { reason });
+      } catch (_) {}
+      return false;
+    } finally {
+      state.backupInProgress = false;
+      if (savingOff) { try { deps.runtime.command('save-on'); } catch (_) {} }
+    }
   })();
 }
 

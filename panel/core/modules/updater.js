@@ -104,7 +104,7 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     }
     const latestVersion = versionCache?.tag ? versionCache.tag.replace(/^v/, '') : null;
     return {
-      version, channel: build.channel, commit: build.commit, label: build.label, latestVersion,
+      version, channel: build.channel, commit: build.commit, core: build.core, label: build.label, latestVersion,
       publishedAt: versionCache?.publishedAt || null,
       releaseUrl: versionCache?.url || `https://github.com/${repo}/releases/latest`,
       checkedAt: versionCache?.at || null,

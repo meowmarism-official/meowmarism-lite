@@ -107,6 +107,8 @@
     </div>
     <div class="card">
       <div class="kv-row"><div class="kv-key">Installed version</div><div class="kv-val" id="upd-current">-</div></div>
+      <div class="kv-row" id="upd-core-row" style="display:none"><div class="kv-key">Core</div><div class="kv-val" id="upd-core">-</div></div>
+      <div class="kv-row" id="upd-core-commit-row" style="display:none"><div class="kv-key">Core commit</div><div class="kv-val" id="upd-core-commit">-</div></div>
       <div class="kv-row"><div class="kv-key">Latest release</div><div class="kv-val" id="upd-latest">-</div></div>
       <div class="kv-row"><div class="kv-key">Released</div><div class="kv-val" id="upd-date">-</div></div>
       <div class="kv-row"><div class="kv-key">Status</div><div class="kv-val" id="upd-status">-</div></div>
@@ -184,6 +186,9 @@
       const v = await (await fetch(cfg.urls.version)).json();
       versionInfo = v;
       $('upd-current').textContent = v.version ? `v${v.label || v.version}${v.commit ? ` (${v.commit})` : ''}` : 'unknown';
+      $('upd-core-row').style.display = v.core ? '' : 'none';
+      $('upd-core-commit-row').style.display = v.core && v.core.commit ? '' : 'none';
+      if (v.core) { $('upd-core').textContent = 'v' + v.core.version; $('upd-core-commit').textContent = v.core.commit || '-'; }
       $('upd-latest').textContent = v.latestVersion ? `v${v.latestVersion}` : 'unknown';
       $('upd-date').textContent = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString() : '-';
       $('upd-status').innerHTML = v.checkError && !v.latestVersion ? `<span class="badge">${t('could not check GitHub')}</span>` : v.updateAvailable

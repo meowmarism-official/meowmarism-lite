@@ -71,6 +71,14 @@ test('navigating to Players and Manage works', opts, async () => {
   }
 });
 
+test('the Update page shows the panel version and the core version', opts, async () => {
+  await page.goto(`${h.base}/update`, { waitUntil: 'networkidle2' });
+  const core = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'panel', 'core', 'core.json'), 'utf8'));
+  await waitFor((expected) => (document.getElementById('upd-core') || {}).textContent === expected, `v${core.version}`);
+  assert.match(await text('#upd-current'), /^v\d/);
+  assert.equal(await text('#upd-core-commit'), core.commit.slice(0, 8));
+});
+
 test('nothing went wrong in the browser', opts, async () => {
   assert.deepEqual(problems, [], problems.join('\n'));
 });

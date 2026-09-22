@@ -8,7 +8,7 @@ const { execFileSync } = require('child_process');
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return null; } };
 const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
 
-// installDir: the folder with package.json and panel/
+// installDir: the folder with package.json and panel/; core is the shared core version the panel was built with (panel/core/core.json, written by sync).
 function getBuildInfo(installDir) {
   const version = readJson(path.join(installDir, 'package.json'))?.version || null;
   const stamped = readJson(path.join(installDir, 'panel', 'build.json'))?.commit;
@@ -21,7 +21,11 @@ function getBuildInfo(installDir) {
       try { git(installDir, ['describe', '--tags', '--exact-match', 'HEAD']); channel = 'release'; } catch (_) {}
     } catch (_) {}
   }
-  return { version, channel, commit, label: version ? `${version}${channel === 'dev' ? '-dev' : ''}` : null };
+  const coreInfo = readJson(path.join(installDir, 'panel', 'core', 'core.json'));
+  const core = coreInfo && typeof coreInfo.version === 'string'
+    ? { version: coreInfo.version, commit: typeof coreInfo.commit === 'string' && /^[0-9a-f]{7,40}$/.test(coreInfo.commit) ? coreInfo.commit.slice(0, 8) : null }
+    : null;
+  return { version, channel, commit, core, label: version ? `${version}${channel === 'dev' ? '-dev' : ''}` : null };
 }
 
 module.exports = { getBuildInfo };
