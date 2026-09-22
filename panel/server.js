@@ -1125,6 +1125,7 @@ function buildAggregatedStats(samples) {
     },
     health,
     crash: lastCrash ? { at: lastCrash.at, code: lastCrash.code, signal: lastCrash.signal, reason: lastCrash.reason, runtimeMs: lastCrash.runtimeMs } : null,
+    modpack: fs.existsSync(path.join(SERVER_DIR, '.meowmarism-modpack.json')),
     restartPlan: currentRestartPlanState(),
     players: playerStats(),
     panel: {

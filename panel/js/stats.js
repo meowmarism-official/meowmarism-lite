@@ -38,6 +38,7 @@ function updateStats(payload) {
     cpu: { avg: cpu.usage, min: cpu.min, max: cpu.max },
     ram: { avg: mem.percent, used: mem.usedGB, total: mem.totalGB },
     minecraft: mc,
+    notice: !!(s.modpack && s.crash && !running),
   });
   PERF_PAGE.update({
     cpu: { temperatureC: cpu.temperatureC ?? null, cores: cpu.cores ?? null, speedMHz: cpu.speedMHz ?? null, avg: cpu.usage, min: cpu.min, max: cpu.max },

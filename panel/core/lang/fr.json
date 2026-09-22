@@ -194,7 +194,61 @@
   "Server ready": "Serveur prêt",
   "Startup time": "Temps de démarrage",
   "Server uptime": "Disponibilité du serveur",
-  "not started": "non démarré"
+  "not started": "non démarré",
+  "Start from scratch or from a modpack.": "Partir de zéro ou d'un modpack.",
+  "Modpack": "Modpack",
+  "Search Modrinth and pick a version.": "Cherchez sur Modrinth et choisissez une version.",
+  "Blank server": "Serveur vierge",
+  "Choose the loader and version yourself.": "Choisissez vous-même le loader et la version.",
+  "From modpack": "Depuis un modpack",
+  "Pick a Modrinth modpack and get it running.": "Choisissez un modpack Modrinth et lancez-le.",
+  "Search modpacks…": "Rechercher des modpacks…",
+  "Show more": "Afficher plus",
+  "downloads": "téléchargements",
+  "Searching…": "Recherche…",
+  "No modpacks found.": "Aucun modpack trouvé.",
+  "Loading…": "Chargement…",
+  "Loading failed": "Échec du chargement",
+  "Search failed": "Échec de la recherche",
+  "Choose another modpack": "Choisir un autre modpack",
+  "Pack version": "Version du pack",
+  "not supported here": "non pris en charge ici",
+  "This modpack has no version that can run on a server.": "Ce modpack n'a aucune version pouvant tourner sur un serveur.",
+  "None of this modpack's versions can run on this edition.": "Aucune version de ce modpack ne peut tourner sur cette édition.",
+  "Reading the modpack…": "Lecture du modpack…",
+  "Could not read the modpack": "Impossible de lire le modpack",
+  "This pack needs {loader}, which this edition cannot run yet.": "Ce pack nécessite {loader}, que cette édition ne peut pas encore exécuter.",
+  "Loader": "Loader",
+  "Mods": "Mods",
+  "{n} files are ignored because Meowmarism manages them.": "{n} fichiers sont ignorés car Meowmarism les gère lui-même.",
+  "Meowmarism recommendation": "Recommandation de Meowmarism",
+  "minimum": "minimum",
+  "Pick a modpack": "Choisissez un modpack",
+  "Pick a modpack version that this edition can run": "Choisissez une version de modpack que cette édition peut exécuter",
+  "Pick an instance name": "Choisissez un nom d'instance",
+  "Reading modpack": "Lecture du modpack",
+  "Preparing Java": "Préparation de Java",
+  "Downloading modpack files": "Téléchargement des fichiers du modpack",
+  "Applying overrides": "Application des overrides",
+  "Finalizing instance": "Finalisation de l'instance",
+  "Starting the server": "Démarrage du serveur",
+  "Ready": "Prêt",
+  "Core": "Core",
+  "Core commit": "Commit du core",
+  "Installation completed, but the server could not start.": "L'installation est terminée, mais le serveur n'a pas pu démarrer.",
+  "The modpack may contain files that are not compatible with a dedicated server.": "Le modpack peut contenir des fichiers incompatibles avec un serveur dédié.",
+  "View log": "Voir le journal"
  },
- "patterns": []
+ "patterns": [
+  [
+   "^Downloading modpack files (\\d+) / (\\d+)$",
+   "",
+   "Téléchargement des fichiers du modpack $1 / $2"
+  ],
+  [
+   "^Installing (Fabric|Forge|NeoForge)$",
+   "",
+   "Installation de $1"
+  ]
+ ]
 }

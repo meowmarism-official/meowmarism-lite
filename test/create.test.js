@@ -50,6 +50,10 @@ test('a NeoForge pack becomes a complete instance with its source recorded', asy
     const entry = JSON.parse(fs.readFileSync(path.join(h.home, '.meowmarism-instances.json'), 'utf8')).find((i) => i.name === 'Pack');
     assert.deepEqual([entry.loader, entry.mcVersion, entry.loaderVersion], ['neoforge', '1.21.1', '21.1.5']);
     assert.ok(!('modpack' in entry) && !('source' in entry), 'the pack source lives only in .meowmarism-modpack.json');
+    await h.workerReady('Pack');
+    const pack = await h.until(async () => (await h.json(cookie, 'GET', '/instance/Pack/snapshot')).body.stats, 'the worker stats');
+    assert.equal(pack.modpack, true, 'the page can tell this is a modpack instance');
+    assert.equal((await h.json(cookie, 'GET', '/instance/inst1/snapshot')).body.stats.modpack, false);
   });
 });
 

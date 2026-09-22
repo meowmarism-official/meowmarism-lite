@@ -1,5 +1,5 @@
 // Overview and Performance pages: status strip, resource cards and the Minecraft card. Shared by every product.
-// mountOverview({ el, t, chart, side }) and mountPerformance({ el, t, chart, cards }); update() only touches the fields it is given.
+// mountOverview({ el, t, chart, side, onViewLog }) and mountPerformance({ el, t, chart, cards }); update() only touches the fields it is given.
 // Numbers are formatted here; text / detail override the formatted strings.
 (function () {
   const RANGES = [['60000', '1m'], ['300000', '5m'], ['900000', '15m'], ['3600000', '1h'], ['86400000', '24h'], ['604800000', '7d']];
@@ -42,6 +42,7 @@
     const t = cfg.t || ((s) => s);
     const cell = (label, big, small) => `<div class="status-cell"><div class="status-kicker">${t(label)}</div><div class="big-value" id="${big[0]}">${big[1]}</div>${small}</div>`;
     cfg.el.innerHTML = `
+        <div class="pack-notice" id="packNotice" style="display:none"><div><b>${t('Installation completed, but the server could not start.')}</b><div class="hint">${t('The modpack may contain files that are not compatible with a dedicated server.')}</div></div><button type="button" class="btn" id="packNoticeLog">${t('View log')}</button></div>
         <div class="status-strip" id="statusStrip">
           <div class="status-main"><div class="status-kicker">${t('Server status')}</div><div class="status-state"><span class="state-dot"></span><span id="statusState">${t('Offline')}</span></div><div class="status-note" id="statusNote">${t('Server is not running')}</div></div>
           ${cell('Server uptime', ['serverUptime', DASH], `<div class="small-value" id="serverStarted">${t('not started')}</div>`)}
@@ -56,6 +57,8 @@
         </div>`;
     const { set } = writer(cfg.el);
     const strip = cfg.el.querySelector('#statusStrip');
+    const notice = cfg.el.querySelector('#packNotice');
+    cfg.el.querySelector('#packNoticeLog').addEventListener('click', () => { if (cfg.onViewLog) cfg.onViewLog(); });
 
     function update(v = {}) {
       if (v.status) {
@@ -66,6 +69,7 @@
         }
         set('statusState', s.label); set('statusNote', s.note);
       }
+      if (v.notice !== undefined) notice.style.display = v.notice ? '' : 'none';
       if (v.uptime) { set('serverUptime', v.uptime.value); set('serverStarted', v.uptime.started); }
       set('overviewPlayers', v.players);
       if (v.cpu) {

@@ -1,7 +1,7 @@
 // Core components mounted on the instance page and the $ helper.
 const $ = (id) => document.getElementById(id) || document.createElement('div');
 
-const OVERVIEW_PAGE = MeowResources.mountOverview({ el: $('page-overview'), t: window.t });
+const OVERVIEW_PAGE = MeowResources.mountOverview({ el: $('page-overview'), t: window.t, onViewLog: () => showPage('console', { push: true }) });
 const PERF_PAGE = MeowResources.mountPerformance({ el: $('page-performance'), t: window.t });
 const SERVER_ICON = MeowServerIcon.mount({
   el: $('serverIconRoot'),
