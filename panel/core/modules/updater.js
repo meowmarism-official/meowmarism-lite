@@ -1,5 +1,14 @@
 // Panel self-update: latest release lookup, download, safe swap of panel/, a start test and rollback.
 // The previous panel/ stays as panel.old until the new version has run healthily.
+//
+// Product and core are tracked as two separately versioned components (see build-info.js for how the
+// installed core version/commit is read from panel/core/core.json, written by core's scripts/sync.js).
+// The product's own repo is the only source of truth for which core commit is "compatible": every commit
+// on its default branch that touches panel/core/ was synced and tested there (see core.lock, LEGAL note in
+// scripts/sync.js). A core-only update therefore never touches meowmarism-core directly - it re-downloads
+// this product's own repo (default branch tip, or a tagged release when the product itself is also behind)
+// and takes only its panel/core/ and core.lock. That keeps "no core commit unless this product vendored it"
+// true for both kinds of update.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -56,11 +65,12 @@ function checkSyntax(dir) {
 }
 
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return null; } };
+const shortCommit = (c) => (typeof c === 'string' && /^[0-9a-f]{7,40}$/.test(c) ? c.slice(0, 8) : null);
 
 // repo: 'owner/name'; panelDir: the installed panel/ folder; statePrefix: '.meowmarism' in the home directory;
 // probePath: a URL path the new version answers with 200 when healthy;
 // hooks: { stop() -> token (before the swap), restore(token) (when the swap fails) }
-function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {} }) {
+function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {}, fetchText = getText }) {
   const installDir = path.resolve(panelDir, '..');
   const MARKER = path.join(os.homedir(), `${statePrefix}-update-pending.json`);
   const RESULT = path.join(os.homedir(), `${statePrefix}-update-result.json`);
@@ -70,30 +80,47 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
   async function fetchLatestTag() {
     let names = [];
     try {
-      const releases = JSON.parse(await getText(`https://api.github.com/repos/${repo}/releases?per_page=30`));
+      const releases = JSON.parse(await fetchText(`https://api.github.com/repos/${repo}/releases?per_page=30`));
       names = releases.filter((r) => !r.draft && !r.prerelease).map((r) => r.tag_name);
     } catch (_) {}
     if (!names.length) {
       try {
-        names = JSON.parse(await getText(`https://api.github.com/repos/${repo}/tags?per_page=100`)).map((t) => t.name);
+        names = JSON.parse(await fetchText(`https://api.github.com/repos/${repo}/tags?per_page=100`)).map((t) => t.name);
       } catch (_) {
-        const html = await getText(`https://github.com/${repo}/tags`);
+        const html = await fetchText(`https://github.com/${repo}/tags`);
         names = [...html.matchAll(/\/releases\/tag\/(v\d+(?:\.\d+){2,3})/g)].map((m) => m[1]);
       }
     }
     return names.filter((n) => parseTag(n).length === 4).sort(newestFirst)[0] || null;
   }
 
+  // The compatible core for right now: whatever core.lock the product repo's default branch currently carries.
+  // Every commit that changes it in this repo was synced from meowmarism-core and passed this product's own CI,
+  // so it is "released" for this product line even without a tagged product version bump.
+  async function fetchBranchCompat() {
+    const out = { core: null, productVersion: null };
+    try {
+      const lock = JSON.parse(await fetchText(`https://raw.githubusercontent.com/${repo}/HEAD/core.lock`));
+      if (lock && typeof lock.version === 'string' && shortCommit(lock.commit)) out.core = { version: lock.version, commit: shortCommit(lock.commit) };
+    } catch (_) {}
+    try { out.productVersion = JSON.parse(await fetchText(`https://raw.githubusercontent.com/${repo}/HEAD/package.json`))?.version || null; } catch (_) {}
+    return out;
+  }
+
   async function refreshVersionCache() {
-    const cache = { at: Date.now(), tag: await fetchLatestTag(), publishedAt: null, url: null };
+    const cache = { at: Date.now(), tag: await fetchLatestTag(), publishedAt: null, url: null, core: null, corePkgVersion: null };
     if (cache.tag) {
       cache.url = `https://github.com/${repo}/releases/tag/${cache.tag}`;
-      try { cache.publishedAt = JSON.parse(await getText(`https://api.github.com/repos/${repo}/releases/tags/${cache.tag}`)).published_at || null; } catch (_) {}
+      try { cache.publishedAt = JSON.parse(await fetchText(`https://api.github.com/repos/${repo}/releases/tags/${cache.tag}`)).published_at || null; } catch (_) {}
     }
+    const branch = await fetchBranchCompat();
+    cache.core = branch.core;
+    cache.corePkgVersion = branch.productVersion;
     versionCache = cache;
   }
 
-  // Installed and latest version; the lookup is cached for five minutes.
+  // Installed and latest version; the lookup is cached for five minutes. Product and core are reported and
+  // compared separately: updateAvailable is true when either one is behind what this product line vendors.
   async function versionInfo(refresh) {
     const build = getBuildInfo(installDir);
     const version = build.version;
@@ -103,13 +130,22 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
       try { await refreshVersionCache(); } catch (err) { checkError = err.message || 'could not reach GitHub'; }
     }
     const latestVersion = versionCache?.tag ? versionCache.tag.replace(/^v/, '') : null;
+    const productUpdateAvailable = !!(version && latestVersion && isNewer(latestVersion, version));
+    const latestCore = versionCache?.core || null;
+    // A core-only update is only offered when the branch tip that carries it has not also moved the product
+    // itself past what we already know about - otherwise a plain product update covers it, and swapping in
+    // panel/core/ alone from a branch tip whose panel/ has diverged further would not be a like-for-like swap.
+    const coreOnlySafe = !!(versionCache?.corePkgVersion && (versionCache.corePkgVersion === version || versionCache.corePkgVersion === latestVersion));
+    const coreUpdateAvailable = !productUpdateAvailable && !!(build.core && latestCore && latestCore.commit !== build.core.commit && coreOnlySafe);
     return {
-      version, channel: build.channel, commit: build.commit, core: build.core, label: build.label, latestVersion,
+      version, channel: build.channel, commit: build.commit, core: build.core, label: build.label,
+      latestVersion, latestCore,
       publishedAt: versionCache?.publishedAt || null,
       releaseUrl: versionCache?.url || `https://github.com/${repo}/releases/latest`,
       checkedAt: versionCache?.at || null,
       checkError,
-      updateAvailable: !!(version && latestVersion && isNewer(latestVersion, version)),
+      productUpdateAvailable, coreUpdateAvailable,
+      updateAvailable: productUpdateAvailable || coreUpdateAvailable,
     };
   }
 
@@ -165,9 +201,32 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     return true;
   }
 
-  function rollbackInstall(reason, from, to) {
-    if (!restoreOldVersion()) return false;
-    try { fs.writeFileSync(RESULT, JSON.stringify({ rolledBack: true, reason, from, to, at: Date.now() })); } catch (_) {}
+  // Same idea as restoreOldVersion(), scoped to panel/core/ and core.lock only - the rest of panel/ (and
+  // package.json) is never touched by a core-only update, so it needs no restoring either.
+  function restoreOldCore() {
+    const live = path.join(panelDir, 'core');
+    const old = path.join(panelDir, 'core.old');
+    const failed = path.join(panelDir, 'core.failed');
+    const lock = path.join(installDir, 'core.lock');
+    const oldLock = path.join(installDir, 'core.lock.old');
+    if (!fs.existsSync(old)) return false;
+    remove(failed);
+    const movedAway = fs.existsSync(live);
+    if (movedAway) retry(() => fs.renameSync(live, failed));
+    try {
+      retry(() => fs.renameSync(old, live));
+    } catch (err) {
+      if (movedAway) { try { fs.renameSync(failed, live); } catch (_) {} }
+      throw err;
+    }
+    if (fs.existsSync(oldLock)) retry(() => fs.renameSync(oldLock, lock));
+    return true;
+  }
+
+  function rollbackInstall(reason, from, to, type = 'product') {
+    const ok = type === 'core' ? restoreOldCore() : restoreOldVersion();
+    if (!ok) return false;
+    try { fs.writeFileSync(RESULT, JSON.stringify({ rolledBack: true, type, reason, from, to, at: Date.now() })); } catch (_) {}
     return true;
   }
 
@@ -233,16 +292,16 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
 
     state.step = 'Testing the new version';
     if (!(await probeNewVersion(livePanel))) {
-      rollbackInstall('the new version failed its start test', fromVersion, tag);
+      rollbackInstall('the new version failed its start test', fromVersion, tag, 'product');
       remove(failedPanel);
       restoreServers();
       throw new Error('the new version failed its start test, the old version is still active');
     }
     try {
       try { fs.unlinkSync(RESULT); } catch (_) {}
-      fs.writeFileSync(MARKER, JSON.stringify({ from: fromVersion, to: tag, boots: 0, at: Date.now() }));
+      fs.writeFileSync(MARKER, JSON.stringify({ type: 'product', from: fromVersion, to: tag, boots: 0, at: Date.now() }));
     } catch (err) {
-      rollbackInstall('the update could not be recorded', fromVersion, tag);
+      rollbackInstall('the update could not be recorded', fromVersion, tag, 'product');
       remove(failedPanel);
       restoreServers();
       throw new Error(`could not record the update, the old version is still active (${err.message})`);
@@ -252,16 +311,118 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     process.exit(0);
   }
 
-  // Returns false when an update is already running.
-  function start() {
+  // A core-only update: same product version, only panel/core/ and core.lock move to what this product's
+  // own repo currently vendors (a tagged release when the product itself needs updating too, otherwise the
+  // default branch tip - see fetchBranchCompat). Every safety property of installRelease() applies here too:
+  // staged copy, atomic rename, a real start probe, and a rollback that leaves no mixed old/new core files.
+  async function selfUpdateCore() {
+    state.step = 'Looking up the compatible core version';
+    const ref = process.env.MEOW_UPDATE_CORE_REF || 'heads/master';
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meowmarism-core-update-'));
+    try {
+      return await installCoreOnly(ref, tmp);
+    } catch (err) {
+      remove(tmp);
+      throw err;
+    }
+  }
+
+  async function installCoreOnly(ref, tmp) {
+    const tarball = path.join(tmp, 'core.tar.gz');
+    state.step = 'Downloading core update';
+    if (process.env.MEOW_UPDATE_CORE_TARBALL) fs.copyFileSync(process.env.MEOW_UPDATE_CORE_TARBALL, tarball);
+    else await downloadFile(`https://github.com/${repo}/archive/refs/${ref}.tar.gz`, tarball);
+    state.step = 'Checking the download';
+    await new Promise((resolve, reject) => {
+      const p = spawn('tar', ['-xzf', tarball, '-C', tmp]);
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('could not extract the update'))));
+      p.on('error', reject);
+    });
+    const extracted = fs.readdirSync(tmp).find((n) => n.startsWith('meowmarism-') && fs.statSync(path.join(tmp, n)).isDirectory());
+    const source = extracted && path.join(tmp, extracted);
+    const lock = source && readJson(path.join(source, 'core.lock'));
+    if (!source || !fs.existsSync(path.join(source, 'panel', 'core')) || !lock || typeof lock.version !== 'string' || !shortCommit(lock.commit)) throw new Error('unexpected core layout');
+    try { checkSyntax(path.join(source, 'panel', 'core')); } catch (_) { throw new Error('the downloaded core update failed its syntax check'); }
+
+    state.step = 'Stopping servers';
+    const token = hooks.stop ? await hooks.stop() : null;
+    const restoreServers = () => { if (hooks.restore) hooks.restore(token); };
+
+    state.step = 'Installing core';
+    const liveCore = path.join(panelDir, 'core');
+    const newCore = path.join(panelDir, 'core.new');
+    const oldCore = path.join(panelDir, 'core.old');
+    const failedCore = path.join(panelDir, 'core.failed');
+    const lockFile = path.join(installDir, 'core.lock');
+    const oldLockFile = path.join(installDir, 'core.lock.old');
+    const fromCore = readJson(lockFile);
+    const toCore = `${lock.version} (${shortCommit(lock.commit)})`;
+    try {
+      remove(newCore); remove(oldCore); remove(oldLockFile); remove(failedCore);
+      fs.cpSync(path.join(source, 'panel', 'core'), newCore, { recursive: true });
+      retry(() => fs.renameSync(liveCore, oldCore));
+      try {
+        retry(() => fs.renameSync(newCore, liveCore));
+      } catch (err) {
+        retry(() => fs.renameSync(oldCore, liveCore));
+        throw err;
+      }
+      if (fs.existsSync(lockFile)) fs.copyFileSync(lockFile, oldLockFile);
+      fs.copyFileSync(path.join(source, 'core.lock'), lockFile);
+    } catch (err) {
+      try { restoreOldCore(); } catch (_) {}
+      remove(newCore); remove(failedCore); remove(oldLockFile);
+      restoreServers();
+      throw new Error(`installing the core update failed, the old core is still active (${err.message})`);
+    }
+
+    state.step = 'Testing the new version';
+    if (!(await probeNewVersion(panelDir))) {
+      rollbackInstall('the core update failed its start test', fromCore?.version || null, toCore, 'core');
+      remove(failedCore);
+      restoreServers();
+      throw new Error('the core update failed its start test, the old core is still active');
+    }
+    try {
+      try { fs.unlinkSync(RESULT); } catch (_) {}
+      fs.writeFileSync(MARKER, JSON.stringify({ type: 'core', from: fromCore?.version || null, to: toCore, boots: 0, at: Date.now() }));
+    } catch (err) {
+      rollbackInstall('the core update could not be recorded', fromCore?.version || null, toCore, 'core');
+      remove(failedCore);
+      restoreServers();
+      throw new Error(`could not record the core update, the old core is still active (${err.message})`);
+    }
+    remove(tmp);
+    state.step = 'Restarting';
+    process.exit(0);
+  }
+
+  // Returns false when an update is already running. With no argument, this decides product vs. core-only
+  // itself from the cached version check (so callers - the UI's single "Update now" button - never have to
+  // know which kind is needed); kind can be forced to 'product' or 'core' (used by the fault-injection tests).
+  function start(kind) {
     if (state.running) return false;
     state.running = true;
     state.error = null;
-    selfUpdate().catch((err) => { state.running = false; state.step = null; state.error = err.message || 'update failed'; });
+    (async () => {
+      let picked = kind;
+      if (!picked) {
+        // Explicit overrides (used by tests, and by an operator forcing a specific tarball) never trigger a
+        // network version check - only the normal "just tell me what to do" path does.
+        if (process.env.MEOW_UPDATE_TAG || process.env.MEOW_UPDATE_TARBALL) picked = 'product';
+        else if (process.env.MEOW_UPDATE_CORE_TARBALL) picked = 'core';
+        else {
+          const info = await versionInfo(true).catch(() => null);
+          picked = info?.productUpdateAvailable ? 'product' : info?.coreUpdateAvailable ? 'core' : 'product';
+        }
+      }
+      return picked === 'core' ? selfUpdateCore() : selfUpdate();
+    })().catch((err) => { state.running = false; state.step = null; state.error = err.message || 'update failed'; });
     return true;
   }
 
-  // First thing on boot: a version that keeps crashing is swapped back for the old one.
+  // First thing on boot: a version that keeps crashing is swapped back for the old one (whichever kind of
+  // update it was).
   function bootCheck() {
     if (process.env.MEOW_PROBE) return;
     const marker = readJson(MARKER);
@@ -270,7 +431,8 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
     try { fs.writeFileSync(MARKER, JSON.stringify(marker)); } catch (_) {}
     if (marker.boots > MAX_BOOTS) {
       try {
-        if (rollbackInstall('the new version kept crashing on startup', marker.from, marker.to)) {
+        const reason = marker.type === 'core' ? 'the new core kept crashing on startup' : 'the new version kept crashing on startup';
+        if (rollbackInstall(reason, marker.from, marker.to, marker.type)) {
           fs.unlinkSync(MARKER);
           process.exit(1);
         }
@@ -281,11 +443,18 @@ function createUpdater({ repo, panelDir, statePrefix, probePath = '/', hooks = {
 
   function confirmHealthy() {
     if (process.env.MEOW_PROBE || !fs.existsSync(MARKER)) return;
+    const marker = readJson(MARKER);
     const t = setTimeout(() => {
       try { fs.unlinkSync(MARKER); } catch (_) {}
-      fs.rmSync(path.join(installDir, 'panel.old'), { recursive: true, force: true });
-      fs.rmSync(path.join(installDir, 'package.json.old'), { force: true });
-      fs.rmSync(path.join(installDir, 'panel.failed'), { recursive: true, force: true });
+      if (marker?.type === 'core') {
+        fs.rmSync(path.join(panelDir, 'core.old'), { recursive: true, force: true });
+        fs.rmSync(path.join(installDir, 'core.lock.old'), { force: true });
+        fs.rmSync(path.join(panelDir, 'core.failed'), { recursive: true, force: true });
+      } else {
+        fs.rmSync(path.join(installDir, 'panel.old'), { recursive: true, force: true });
+        fs.rmSync(path.join(installDir, 'package.json.old'), { force: true });
+        fs.rmSync(path.join(installDir, 'panel.failed'), { recursive: true, force: true });
+      }
     }, CONFIRM_AFTER_MS);
     if (t.unref) t.unref();
   }

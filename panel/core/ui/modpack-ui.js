@@ -138,7 +138,8 @@
           <div><span>${esc(t('Mods'))}</span><b>${esc(String(s.modCount))}</b></div>
           <div><span>${esc(t('Download'))}</span><b>~${esc(gb(s.downloadBytes))}</b></div>
         </div>
-        ${s.skippedCount ? `<p class="hint">${esc(t('{n} files are ignored because Meowmarism manages them.', { n: s.skippedCount }))}</p>` : ''}
+        ${s.managedCount ? `<p class="hint">${esc(t('{n} files are ignored because Meowmarism manages them.', { n: s.managedCount }))}</p>` : ''}
+        ${s.environmentSkippedCount ? `<p class="hint" title="${esc((s.environmentSkipped || []).map((e) => e.path.replace(/^mods\//, '')).join('\n'))}">${esc(t('{n} mods are left out because Modrinth lists them as not for servers.', { n: s.environmentSkippedCount }))}</p>` : ''}
         <div class="field"><label for="mp-ram">${esc(t('Memory'))} <b id="mp-ram-out">${esc(mb(ram))}</b></label>
           <input id="mp-ram" type="range" min="1024" max="${max}" step="512" value="${ram}">
           <div class="hint">${esc(t('Meowmarism recommendation'))}: ${esc(mb(ram))} · ${esc(t('minimum'))} ${esc(mb(s.memory.minimumMB))}</div></div>

@@ -1,5 +1,6 @@
 // Stands in for Modrinth and the server-software install: fake packs, local .mrpack fixtures, no downloads.
 // MEOW_TEST_FAIL: software | file | rename makes that step fail. A ".hold-create" file in HOME pauses the software install.
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -15,8 +16,23 @@ const VERSIONS = {
 const FIXTURES = { v1: 'fixture.mrpack', vq: 'fixture-quilt.mrpack', vf: 'fixture-fabric.mrpack', vp: 'fixture-props.mrpack', vg: 'fixture-forge.mrpack', vu: 'fixture-forge-unknown.mrpack' };
 const PROJECT_OF = { v1: 'p1', vq: 'pq', vf: 'pf', vp: 'pp', vg: 'pg', vu: 'pu' };
 const fail = process.env.MEOW_TEST_FAIL;
+// MEOW_TEST_ENVIRONMENT: the Modrinth environment every fixture jar resolves to; "fail" makes the lookup itself fail.
+const JAR_HASH = crypto.createHash('sha512').update('jar').digest('hex');
 
+// MEOW_TEST_UPDATE: JSON { releaseTag, publishedAt, core: { version, commit } | null, branchProductVersion } stands in for GitHub in updater tests.
 module.exports = {
+  updaterFetchText: async (url) => {
+    const cfg = process.env.MEOW_TEST_UPDATE ? JSON.parse(process.env.MEOW_TEST_UPDATE) : null;
+    if (!cfg) throw new Error('no network in tests');
+    if (url.includes('/releases?per_page=')) return JSON.stringify(cfg.releaseTag ? [{ tag_name: cfg.releaseTag, draft: false, prerelease: false }] : []);
+    if (url.includes('/releases/tags/')) return JSON.stringify({ published_at: cfg.publishedAt || null });
+    if (url.endsWith('/HEAD/core.lock')) {
+      if (!cfg.core) throw new Error('404');
+      return JSON.stringify({ core: 'meowmarism-core', version: cfg.core.version, commit: cfg.core.commit });
+    }
+    if (url.endsWith('/HEAD/package.json')) return JSON.stringify({ version: cfg.branchProductVersion });
+    throw new Error(`unexpected url ${url}`);
+  },
   listLoaderVersions: async (loader, mc) => (mc ? (loader === 'forge' ? ['47.4.0', '47.3.0'] : ['1']) : { mcVersions: ['1.21.1', '1.20.1'] }),
   ensureJava: async () => null,
   installServerSoftware: async (loader, mcVersion, loaderVersion, ramMB, dir) => {
@@ -40,6 +56,11 @@ module.exports = {
       id, projectId: PROJECT_OF[id] || 'p1', versionNumber: '1.0',
       file: { url: `https://cdn.modrinth.com/data/x/${id}.mrpack`, filename: `${id}.mrpack`, size: 1, sha512: 'x' },
     }),
+  },
+  modrinthRequest: async (method, url, body) => {
+    const env = process.env.MEOW_TEST_ENVIRONMENT;
+    if (env === 'fail') throw new Error('Modrinth answered 503');
+    return env && body.hashes.includes(JAR_HASH) ? { [JAR_HASH]: { environment: env } } : {};
   },
   modpackDownload: async (url, dest) => {
     const id = /\/([\w-]+)\.mrpack$/.exec(url)[1];

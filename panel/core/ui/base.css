@@ -112,6 +112,16 @@ input, select { background: #0c0e12; border: 1px solid var(--line); color: var(-
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; }
 .badge.ok { background: rgba(88,185,120,.14); color: var(--green); }
 .badge.new { background: rgba(212,168,79,.16); color: var(--yellow); }
+.upd-component { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.upd-component:last-child { border-bottom: none; }
+.upd-component .upd-name { color: var(--muted); font-size: 12.5px; }
+.upd-component .upd-current { color: var(--text); font-weight: 650; font-size: 13px; }
+.upd-component .upd-sub { color: var(--muted); font-size: 11px; }
+.upd-diff { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.upd-diff:last-child { border-bottom: none; }
+.upd-diff .upd-name { color: var(--muted); }
+.upd-diff .upd-val { color: var(--text); font-weight: 600; }
+.upd-diff .upd-val.new { color: var(--yellow); }
 
 /* --- nicer remember-me toggle --- */
 .http-warn { display: none; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #6b5420; background: rgba(212,168,79,.1); color: var(--yellow); border-radius: 8px; font-size: 12.5px; line-height: 1.5; }

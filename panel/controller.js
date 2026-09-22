@@ -11,12 +11,15 @@
 // controller just links you there.
 const workerSecret = require('./lib/worker-secret');
 const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (_) { return String(s); } };
+// Tests replace the network-facing steps (version lists, downloads, Java, GitHub lookups) through a module named in MEOW_TEST_HOOKS.
+const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HOOKS) : {};
 const updater = require('./core/modules/updater').createUpdater({
   repo: 'meowmarism-official/meowmarism-lite',
   panelDir: __dirname,
   statePrefix: '.meowmarism',
   probePath: '/auth/status',
   hooks: { stop: stopServersForUpdate, restore: restoreAfterFailedUpdate },
+  ...(testHooks.updaterFetchText ? { fetchText: testHooks.updaterFetchText } : {}),
 });
 try { updater.bootCheck(); } catch (_) {}
 const http = require('http');
@@ -386,13 +389,12 @@ async function runRollback(inst, restoreWorld, log) {
   await restartWorkerFor(inst);
 }
 
-// Tests replace the network-facing steps (version lists, downloads, Java) through a module named in MEOW_TEST_HOOKS.
-const testHooks = process.env.MEOW_TEST_HOOKS ? require(process.env.MEOW_TEST_HOOKS) : {};
 
 const { inspectMrpack } = require('./core/modules/modpack');
+const { resolveEnvironments } = require('./core/modules/modpack-environment');
 const { installModpack } = require('./core/modules/modpack-install');
 const modpackApi = testHooks.modpackApi || require('./core/modules/modpack-api').createModpackApi();
-const modpackPreview = require('./core/modules/modpack-preview').createModpackPreview({ api: modpackApi, download: testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified });
+const modpackPreview = require('./core/modules/modpack-preview').createModpackPreview({ api: modpackApi, request: testHooks.modrinthRequest, download: testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified });
 
 async function installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin) {
   if (testHooks.installServerSoftware) return testHooks.installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin);
@@ -909,7 +911,7 @@ const server = http.createServer(async (req, res) => {
             const version = await modpackApi.getVersion(modpackReq.versionId);
             const file = path.join(packTmp, 'pack.mrpack');
             await (testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified)(version.file.url, file, version.file.sha512, version.file.size);
-            const inspected = inspectMrpack(file);
+            const { inspected } = await resolveEnvironments(inspectMrpack(file), { request: testHooks.modrinthRequest, log: createLog });
             if (!MODPACK_LOADERS.includes(inspected.loader)) throw new Error(`This pack needs ${LOADER_LABELS[inspected.loader] || inspected.loader}, which LITE cannot run yet.`);
             if (inspected.loader === 'forge') {
               const known = await listLoaderVersions('forge', inspected.minecraft);

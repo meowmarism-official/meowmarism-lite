@@ -109,6 +109,12 @@ function parseOverrides(zip, prefix, skipped) {
   return out;
 }
 
+// Mods a pack brings: jar files in mods/ from the download list and from both override folders.
+function countMods({ files, overrides, serverOverrides }) {
+  const isMod = (p) => /^mods\/.+\.jar$/i.test(p);
+  return new Set([...files.map((f) => f.path), ...overrides.map((o) => o.path), ...serverOverrides.map((o) => o.path)].filter(isMod)).size;
+}
+
 function inspectMrpack(source) {
   let buf = source;
   if (typeof source === 'string') {
@@ -123,14 +129,12 @@ function inspectMrpack(source) {
   const { files, skipped, downloadBytes } = parseFiles(index.files);
   const overrides = parseOverrides(zip, 'overrides/', skipped);
   const serverOverrides = parseOverrides(zip, 'server-overrides/', skipped);
-  const isMod = (p) => /^mods\/.+\.jar$/i.test(p);
-  const jars = new Set([...files.map((f) => f.path), ...overrides.map((o) => o.path), ...serverOverrides.map((o) => o.path)].filter(isMod));
   return {
     name: typeof index.name === 'string' ? index.name.slice(0, 100) : 'Modpack',
     versionId: typeof index.versionId === 'string' ? index.versionId.slice(0, 64) : '',
     ...deps,
     files, overrides, serverOverrides, skipped,
-    modCount: jars.size,
+    modCount: countMods({ files, overrides, serverOverrides }),
     downloadBytes,
   };
 }
@@ -165,4 +169,4 @@ function verifyDownload(entry, data) {
   if (crypto.createHash('sha512').update(data).digest('hex') !== entry.sha512) throw new Error(`checksum mismatch for ${entry.path}`);
 }
 
-module.exports = { inspectMrpack, buildInstallPlan, verifyDownload, safeRelativePath, ALLOWED_HOSTS };
+module.exports = { countMods, inspectMrpack, buildInstallPlan, verifyDownload, safeRelativePath, ALLOWED_HOSTS };

@@ -172,3 +172,32 @@ test('the instance only shows up after everything is installed, and the phases a
     assert.ok(!fs.existsSync(`${dirOf('Slow')}.creating`));
   });
 });
+
+test('mods Modrinth lists as client-only are left out and the log says so', async () => {
+  await withController({ MEOW_TEST_ENVIRONMENT: 'client_only' }, async ({ create, dirOf, h, cookie }) => {
+    const preview = (await h.json(cookie, 'GET', '/api/modpacks/versions/v1/preview')).body;
+    assert.equal(preview.environmentSkippedCount, 2);
+    assert.deepEqual(preview.environmentSkipped.map((e) => e.environment), ['client_only', 'client_only']);
+    assert.equal(preview.modCount, 0);
+    const log = await create({ name: 'Pack', modpack: { versionId: 'v1' } });
+    assert.equal(log.error, null);
+    assert.ok(log.lines.some((l) => l.includes('Skipping a.jar: client-only according to Modrinth')));
+    assert.ok(!fs.existsSync(path.join(dirOf('Pack'), 'mods', 'a.jar')) && !fs.existsSync(path.join(dirOf('Pack'), 'mods', 'b.jar')));
+    assert.equal(fs.readFileSync(path.join(dirOf('Pack'), 'config', 'a.cfg'), 'utf8'), 'x', 'overrides are not filtered');
+  });
+});
+
+test('a server-capable environment keeps the mods, and a failing Modrinth lookup does not stop the install', async () => {
+  await withController({ MEOW_TEST_ENVIRONMENT: 'client_only_server_optional' }, async ({ create, dirOf }) => {
+    const log = await create({ name: 'Pack', modpack: { versionId: 'v1' } });
+    assert.equal(log.error, null);
+    assert.ok(log.lines.some((l) => l.includes('Keeping a.jar: server support is optional')));
+    assert.ok(fs.existsSync(path.join(dirOf('Pack'), 'mods', 'a.jar')));
+  });
+  await withController({ MEOW_TEST_ENVIRONMENT: 'fail' }, async ({ create, dirOf }) => {
+    const log = await create({ name: 'Pack', modpack: { versionId: 'v1' } });
+    assert.equal(log.error, null);
+    assert.ok(log.lines.some((l) => /Could not ask Modrinth about 2 mods/.test(l)));
+    assert.ok(fs.existsSync(path.join(dirOf('Pack'), 'mods', 'a.jar')) && fs.existsSync(path.join(dirOf('Pack'), 'mods', 'b.jar')));
+  });
+});

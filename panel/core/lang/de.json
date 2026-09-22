@@ -849,7 +849,14 @@
   "Core commit": "Core-Commit",
   "Installation completed, but the server could not start.": "Die Installation ist abgeschlossen, aber der Server konnte nicht starten.",
   "The modpack may contain files that are not compatible with a dedicated server.": "Das Modpack enthält möglicherweise Dateien, die nicht mit einem Dedicated Server kompatibel sind.",
-  "View log": "Log ansehen"
+  "View log": "Log ansehen",
+  "{n} mods are left out because Modrinth lists them as not for servers.": "{n} Mods werden weggelassen, weil Modrinth sie nicht für Server vorsieht.",
+  "Meowmarism": "Meowmarism",
+  "Available": "Verfügbar",
+  "Up to date": "Aktuell",
+  "Everything is up to date.": "Alles ist aktuell.",
+  "The last update failed ({reason}) and was rolled back.": "Das letzte Update ist fehlgeschlagen ({reason}) und wurde zurückgerollt.",
+  "The core update failed ({reason}) and was rolled back.": "Das Core-Update ist fehlgeschlagen ({reason}) und wurde zurückgerollt."
  },
  "patterns": [
   [

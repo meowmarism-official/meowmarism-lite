@@ -106,12 +106,22 @@
       </div>
     </div>
     <div class="card">
-      <div class="kv-row"><div class="kv-key">Installed version</div><div class="kv-val" id="upd-current">-</div></div>
-      <div class="kv-row" id="upd-core-row" style="display:none"><div class="kv-key">Core</div><div class="kv-val" id="upd-core">-</div></div>
-      <div class="kv-row" id="upd-core-commit-row" style="display:none"><div class="kv-key">Core commit</div><div class="kv-val" id="upd-core-commit">-</div></div>
-      <div class="kv-row"><div class="kv-key">Latest release</div><div class="kv-val" id="upd-latest">-</div></div>
+      <div class="card-title">Installed</div>
+      <div class="upd-component">
+        <div class="upd-name" id="upd-name">Meowmarism ${cfg.edition || ''}</div>
+        <div class="upd-current" id="upd-current">-</div>
+      </div>
+      <div class="upd-component">
+        <div class="upd-name">Core</div>
+        <div class="upd-current" id="upd-core">-</div>
+        <div class="upd-sub" id="upd-core-commit"></div>
+      </div>
+    </div>
+    <div class="card" id="upd-available-card">
+      <div class="card-title">Available</div>
+      <p class="hint" id="upd-uptodate" style="margin-top:0;display:none">Everything is up to date.</p>
+      <div id="upd-diffs"></div>
       <div class="kv-row"><div class="kv-key">Released</div><div class="kv-val" id="upd-date">-</div></div>
-      <div class="kv-row"><div class="kv-key">Status</div><div class="kv-val" id="upd-status">-</div></div>
     </div>
     <div class="card">
       <div class="card-title">Updating</div>
@@ -185,23 +195,37 @@
     async function loadUpdatePage() {
       const v = await (await fetch(cfg.urls.version)).json();
       versionInfo = v;
-      $('upd-current').textContent = v.version ? `v${v.label || v.version}${v.commit ? ` (${v.commit})` : ''}` : 'unknown';
-      $('upd-core-row').style.display = v.core ? '' : 'none';
-      $('upd-core-commit-row').style.display = v.core && v.core.commit ? '' : 'none';
-      if (v.core) { $('upd-core').textContent = 'v' + v.core.version; $('upd-core-commit').textContent = v.core.commit || '-'; }
-      $('upd-latest').textContent = v.latestVersion ? `v${v.latestVersion}` : 'unknown';
+      $('upd-current').textContent = v.version ? `v${v.label || v.version}` : 'unknown';
+      if (v.core) { $('upd-core').textContent = `v${v.core.version}`; $('upd-core-commit').textContent = v.core.commit ? `commit ${v.core.commit}` : ''; }
+      else { $('upd-core').textContent = '-'; $('upd-core-commit').textContent = ''; }
+
+      const rows = [];
+      if (v.checkError && !v.latestVersion) {
+        rows.push(`<div class="upd-diff"><div class="upd-name">${esc(t('Meowmarism'))}</div><span class="badge">${esc(t('could not check GitHub'))}</span></div>`);
+      } else {
+        rows.push(diffRow(`${t('Meowmarism')} ${cfg.edition || ''}`.trim(), v.version, v.latestVersion, v.productUpdateAvailable));
+        if (v.core) rows.push(diffRow(t('Core'), v.core.version, (v.latestCore || v.core).version, v.coreUpdateAvailable));
+      }
+      const uptodate = !v.updateAvailable && !(v.checkError && !v.latestVersion);
+      $('upd-diffs').innerHTML = uptodate ? '' : rows.join('');
+      $('upd-diffs').style.display = uptodate ? 'none' : '';
+      $('upd-uptodate').style.display = uptodate ? '' : 'none';
       $('upd-date').textContent = v.publishedAt ? new Date(v.publishedAt).toLocaleDateString() : '-';
-      $('upd-status').innerHTML = v.checkError && !v.latestVersion ? `<span class="badge">${t('could not check GitHub')}</span>` : v.updateAvailable
-        ? '<span class="badge new">update available</span>'
-        : '<span class="badge ok">up to date</span>';
       $('upd-release-link').onclick = (e) => { e.preventDefault(); visitExternal(v.releaseUrl, 'the release notes on GitHub'); };
       $('upd-now').style.display = v.updateAvailable && panel.update ? '' : 'none';
       $('upd-now').disabled = false;
       try {
         const lr = (await (await fetch(cfg.urls.updateStatus)).json()).lastResult;
-        $('upd-warn').textContent = lr && lr.rolledBack ? t(`The last update to v${(lr.to || '').replace(/^v/, '')} failed (${lr.reason}) and was rolled back to v${lr.from}.`) : '';
+        $('upd-warn').textContent = lr && lr.rolledBack
+          ? t(lr.type === 'core' ? 'The core update failed ({reason}) and was rolled back.' : 'The last update failed ({reason}) and was rolled back.', { reason: lr.reason })
+          : '';
       } catch (_) {}
       $('upd-progress').textContent = '';
+    }
+    // label, installed version, target version, whether that component has an update; "Up to date" when it does not.
+    function diffRow(label, installed, target, available) {
+      const value = available ? `${esc('v' + installed)} &rarr; ${esc('v' + target)}` : esc(t('Up to date'));
+      return `<div class="upd-diff"><div class="upd-name">${esc(label)}</div><div class="upd-val${available ? ' new' : ''}">${value}</div></div>`;
     }
     $('upd-check').addEventListener('click', async () => {
       $('upd-check').disabled = true;
