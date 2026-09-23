@@ -75,6 +75,7 @@ function updateLifecycleUi() {
   else if (phase === 'error') note = 'Server process reported a start error';
   else if (isSleeping) note = 'No players for a while — sleeping until someone tries to join';
   else note = lastExitAt ? `Offline · last exit ${fmtDate(lastExitAt)}` : 'Server is not running';
+  $('btnCancelStart').style.display = phase === 'starting' ? '' : 'none';
   OVERVIEW_PAGE.update({ status: { phase, label, note } });
 }
 

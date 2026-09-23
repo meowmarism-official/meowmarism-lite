@@ -15,6 +15,7 @@ const SETTINGS = MeowSettings.mount({
 $('btnStart').onclick = () => post('/start').catch((e) => toast(e.message, 'error'));
 $('btnStop').onclick = async () => { if (await modalConfirm('Stop the server?', 'Players will be disconnected and the world is saved.', 'Stop', true)) post('/stop').catch(console.error); };
 $('btnRestart').onclick = async () => { if (await modalConfirm('Restart the server?', 'Players will be disconnected while it restarts.', 'Restart', true)) post('/restart').catch(console.error); };
+$('btnCancelStart').onclick = async () => { if (await modalConfirm('Cancel starting?', 'Force-kills the Minecraft process while it starts up. Use this if it hangs or you started it by mistake.', 'Cancel start', true)) post('/force-stop').catch((e) => toast(e.message, 'error')); };
 
 function updateHealth() {
   const disk = latest?.disk, mc = latest?.minecraft || {}, lag = mc.lag?.last, lagCount = mc.lag?.warningCount || 0;

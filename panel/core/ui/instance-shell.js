@@ -58,6 +58,7 @@
         <button class="btn primary" id="btnStart">Start</button>
         <button class="btn" id="btnRestart">Restart</button>
         <button class="btn danger" id="btnStop">Stop</button>
+        <button class="btn danger" id="btnCancelStart" style="display:none">Cancel start</button>
       </div>
     `;
 
