@@ -66,9 +66,20 @@ function saveConfig() {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(panelConfig, null, 2)); } catch (_) {}
 }
 
+// Re-reads panel-config.json and merges it into the existing panelConfig
+// object in place, so callers holding the old reference stay in sync.
+// Used before crash-restart decisions, since those must reflect the file
+// even if it was edited outside the panel API since process start.
+function reloadPanelConfig() {
+  try {
+    Object.assign(panelConfig, JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')));
+  } catch (_) { /* keep current in-memory values on read/parse failure */ }
+  return panelConfig;
+}
+
 module.exports = {
   SERVER_DIR, LOG_FILE, PROPERTIES_FILE, WORLD_DIR, BACKUP_DIR, CONFIG_FILE,
   HISTORY_FILE, METRICS_FILE, MODS_DIR, DISABLED_MODS_DIR, WHITELIST_FILE, OPS_FILE,
   BANNED_PLAYERS_FILE, INSTANCES_FILE, INSTANCE_LOADER, INSTANCE_MC_VERSION,
-  panelConfig, saveConfig, defaultPanelConfig,
+  panelConfig, saveConfig, reloadPanelConfig, defaultPanelConfig,
 };

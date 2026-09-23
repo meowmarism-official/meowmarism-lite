@@ -19,6 +19,7 @@ const {
   BANNED_PLAYERS_FILE, INSTANCES_FILE, panelConfig,
 } = cfg;
 const saveConfig = cfg.saveConfig;
+const reloadPanelConfig = cfg.reloadPanelConfig;
 
 // Instance creation/registry/lifecycle now lives entirely in controller.js -
 // this worker process only ever manages the one Minecraft install at
@@ -745,6 +746,7 @@ function onProcessExit({ code, signal, reason, intent }) {
 }
 
 function maybeAutoRestartAfterCrash() {
+  reloadPanelConfig();
   if (!panelConfig.crashAutoRestartEnabled) return;
   const now = Date.now();
   recentCrashTimestamps = recentCrashTimestamps.filter((t) => now - t < 3600000);
