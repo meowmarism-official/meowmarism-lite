@@ -132,7 +132,8 @@ test('creating from a modpack in the browser, through the phases to Ready and in
   assert.ok((await listed()).includes('e2epack'));
   assert.ok(!fs.existsSync(path.join(instancesRoot, 'e2epack.creating')));
   const entry = JSON.parse(fs.readFileSync(path.join(h.home, '.meowmarism-instances.json'), 'utf8')).find((i) => i.name === 'e2epack');
-  assert.deepEqual([entry.ramMB, entry.loader, entry.mcVersion, entry.loaderVersion, entry.port], [4096, 'neoforge', '1.21.1', '21.1.5', 25610]);
+  assert.deepEqual([entry.loader, entry.mcVersion, entry.loaderVersion, entry.port], ['neoforge', '1.21.1', '21.1.5', 25610]);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(instancesRoot, 'e2epack', 'panel-config.json'), 'utf8')).ramMaxMB, 4096);
   assert.match(fs.readFileSync(path.join(instancesRoot, 'e2epack', 'server.properties'), 'utf8'), /^server-port=25610$/m);
 
   await h.workerReady('e2epack');
