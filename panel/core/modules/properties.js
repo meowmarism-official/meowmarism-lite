@@ -67,9 +67,27 @@ function parseSettingValue(key, raw) {
   return value;
 }
 
+const UNESCAPES = { t: '\t', n: '\n', r: '\r', f: '\f' };
+
+// Inverse of java.util.Properties escaping, so "\:" is shown and edited as ":".
+function unescapePropertyValue(text) {
+  return text.replace(/\\(u[0-9a-fA-F]{4}|[\s\S])/g, (_, c) => {
+    if (c.length === 5) return String.fromCharCode(parseInt(c.slice(1), 16));
+    return UNESCAPES[c] ?? c;
+  });
+}
+
+function escapePropertyValue(text) {
+  return text
+    .replace(/[\\:=#!]/g, (c) => `\\${c}`)
+    .replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+    .replace(/^ /, '\\ ')
+    .replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+
 function serializeSettingValue(value) {
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return String(value);
+  return escapePropertyValue(String(value));
 }
 
 // file: path of server.properties; isRunning(): bool; command(text): sends a console command
@@ -86,7 +104,7 @@ function createProperties({ file, isRunning, command }) {
         if (!line || line.startsWith('#')) continue;
         const idx = line.indexOf('=');
         if (idx < 0) continue;
-        props[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+        props[line.slice(0, idx).trim()] = unescapePropertyValue(line.slice(idx + 1).trim());
       }
     } catch (_) {}
     return props;

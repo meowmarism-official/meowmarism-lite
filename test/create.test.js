@@ -45,10 +45,12 @@ test('a NeoForge pack becomes a complete instance with its source recorded', asy
     assert.deepEqual([meta.source.type, meta.source.projectId, meta.source.versionId, meta.loader], ['modrinth-modpack', 'p1', 'v1', 'neoforge']);
     assert.equal(fs.readFileSync(path.join(dir, 'eula.txt'), 'utf8'), 'eula=true\n');
     assert.match(fs.readFileSync(path.join(dir, 'server.properties'), 'utf8'), /^server-port=25570$/m);
-    assert.ok(fs.existsSync(path.join(dir, 'panel-config.json')));
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'panel-config.json'), 'utf8'));
+    assert.deepEqual([cfg.ramMinMB, cfg.ramMaxMB], [2048, 4096], 'the wizard heap size is stored in the panel config');
     assert.ok(!fs.existsSync(`${dir}.creating`));
     const entry = JSON.parse(fs.readFileSync(path.join(h.home, '.meowmarism-instances.json'), 'utf8')).find((i) => i.name === 'Pack');
     assert.deepEqual([entry.loader, entry.mcVersion, entry.loaderVersion], ['neoforge', '1.21.1', '21.1.5']);
+    assert.ok(!('ramMB' in entry), 'the heap size has a single home, panel-config.json');
     assert.ok(!('modpack' in entry) && !('source' in entry), 'the pack source lives only in .meowmarism-modpack.json');
     await h.workerReady('Pack');
     const pack = await h.until(async () => (await h.json(cookie, 'GET', '/instance/Pack/snapshot')).body.stats, 'the worker stats');

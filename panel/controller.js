@@ -194,10 +194,13 @@ async function installNeoForgeLike(mavenBase, groupPath, artifactId, version, di
     proc.on('error', reject);
   });
 }
+function heapSizes(ramMB) {
+  const max = Math.max(512, Math.round(ramMB));
+  return { min: Math.max(512, Math.round(max / 2)), max };
+}
 function writeJvmArgs(dir, ramMB) {
   if (ramMB == null) return;
-  const max = Math.max(512, Math.round(ramMB));
-  const min = Math.max(512, Math.round(max / 2));
+  const { min, max } = heapSizes(ramMB);
   fs.writeFileSync(path.join(dir, 'user_jvm_args.txt'), `-Xms${min}M\n-Xmx${max}M\n`);
 }
 async function installVanilla(mcVersion, dir, ramMB, log) {
@@ -485,14 +488,20 @@ const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purp
 const { withServerPort } = require('./core/modules/properties');
 
 // Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
-function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin }) {
+function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin, ramMB }) {
   fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n');
   const props = path.join(dir, 'server.properties');
   const text = fs.existsSync(props) ? fs.readFileSync(props, 'utf8') : 'motd=hosted by meowmarism :3\n';
   fs.writeFileSync(props, withServerPort(text, mcPort));
   const icon = path.join(dir, 'server-icon.png');
   if (!fs.existsSync(icon)) { try { fs.copyFileSync(path.join(__dirname, 'core', 'brand', 'server-icon.png'), icon); } catch (_) {} }
-  fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({ backupIntervalHours, maxBackups, autoStart: autoStart === true, ...(javaBin ? { javaPath: javaBin } : {}) }, null, 2));
+  // The heap size lives in panel-config.json from the start; user_jvm_args.txt is generated from it.
+  const heap = ramMB == null ? null : heapSizes(ramMB);
+  fs.writeFileSync(path.join(dir, 'panel-config.json'), JSON.stringify({
+    backupIntervalHours, maxBackups, autoStart: autoStart === true,
+    ...(heap ? { ramMinMB: heap.min, ramMaxMB: heap.max } : {}),
+    ...(javaBin ? { javaPath: javaBin } : {}),
+  }, null, 2));
 }
 
 // Leftovers of a creation that died with the panel.
@@ -947,12 +956,12 @@ const server = http.createServer(async (req, res) => {
             });
           }
           setCreatePhase('Finalizing instance', 92);
-          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin });
+          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin, ramMB });
           (testHooks.renameDir || fs.renameSync)(staging, dir);
           renamed = true;
           const current = loadInstances();
           if (current.some((i) => i.name === name)) throw new Error(`an instance named ${name} appeared while this one was being created`);
-          const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, ramMB, createdAt: Date.now() };
+          const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, createdAt: Date.now() };
           saveInstances([...current, inst]);
           registered = true;
           startWorker(inst);

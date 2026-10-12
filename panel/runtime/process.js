@@ -37,10 +37,8 @@ function createProcessRuntime(ctx) {
     hooks.willSpawn();
 
     const logStream = fs.createWriteStream(logFile, { flags: 'w' });
-    if (panelConfig.ramMaxMB) {
-      try { fs.writeFileSync(path.join(serverDir, 'user_jvm_args.txt'), launchLib.jvmArgsFile(panelConfig)); }
-      catch (err) { hooks.notice(`--- could not write JVM arguments: ${err.message} ---`); }
-    }
+    try { launchLib.syncJvmArgsFile(serverDir, panelConfig); }
+    catch (err) { hooks.notice(`--- could not write JVM arguments: ${err.message} ---`); }
     const launch = launchLib.buildLaunch(panelConfig, process.env);
     const proc = spawn(launch.cmd, launch.args, { cwd: serverDir, env: launch.env, stdio: ['pipe', 'pipe', 'pipe'] });
     child = proc;

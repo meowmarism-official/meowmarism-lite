@@ -42,6 +42,14 @@ function jvmArgsFile(cfg) {
   return lines.join('\n') + '\n';
 }
 
+// Keeps user_jvm_args.txt equal to the panel config. Does nothing until a heap
+// size is configured, so an installer-provided file is left alone.
+function syncJvmArgsFile(dir, cfg) {
+  if (!cfg.ramMaxMB) return false;
+  fs.writeFileSync(path.join(dir, 'user_jvm_args.txt'), jvmArgsFile(cfg));
+  return true;
+}
+
 function readDetectedMemory(dir) {
   try {
     const text = fs.readFileSync(path.join(dir, 'user_jvm_args.txt'), 'utf8');
@@ -106,4 +114,4 @@ function javaMajor(javaPath) {
   return value;
 }
 
-module.exports = { requiredJavaMajor, javaMajor, PRESETS, jvmArgsFile, readDetectedMemory, limitsMode, buildLaunch, parseExtraArgs, cgroupAvailable, tasksetAvailable };
+module.exports = { requiredJavaMajor, javaMajor, PRESETS, jvmArgsFile, syncJvmArgsFile, readDetectedMemory, limitsMode, buildLaunch, parseExtraArgs, cgroupAvailable, tasksetAvailable };

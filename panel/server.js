@@ -1700,7 +1700,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/config' && req.method === 'POST') {
+  // /api/startup is the same endpoint under the name its GET uses.
+  if ((url.pathname === '/api/config' || url.pathname === '/api/startup') && req.method === 'POST') {
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 16 * 1024) req.destroy(); });
     req.on('end', () => {
@@ -1759,6 +1760,10 @@ const server = http.createServer((req, res) => {
           panelConfig.hardMemLimitMB = m;
         }
         savePanelConfig();
+        if (['ramMaxMB', 'ramMinMB', 'jvmPreset', 'extraJvmArgs'].some((k) => data[k] !== undefined)) {
+          // A failed write is retried and reported at the next start.
+          try { launchLib.syncJvmArgsFile(SERVER_DIR, panelConfig); } catch (_) {}
+        }
         pushAudit('config.update', 'panel', Object.keys(data).join(', '));
         sendJson(res, 200, { ok: true, config: panelConfig });
       } catch (err) { sendJson(res, 400, { ok: false, error: err.message || 'invalid config' }); }
