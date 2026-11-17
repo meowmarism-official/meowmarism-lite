@@ -8,7 +8,7 @@ const { parseJfrText, summarizeProfile } = require('../core/modules/diagnostics'
 
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 60;
-const INSTALL_HINT = 'Profiling and the heap numbers need a JDK, not just a JRE. On Debian or Ubuntu: sudo apt install openjdk-21-jdk-headless';
+const INSTALL_HINT = 'The JDK tools (jcmd, jfr, jstat) are missing. The panel can download them, or install a JDK yourself, e.g. sudo apt install openjdk-21-jdk-headless';
 
 function findTool(name, dirs) {
   for (const dir of dirs) {
@@ -27,7 +27,7 @@ function run(exec, file, args, options) {
   });
 }
 
-// deps: { getPid(), javaPath(), execFile?, tmpDir?, wait?(ms), now? }
+// deps: { getPid(), javaPath(), extraDirs?(), execFile?, tmpDir?, wait?(ms), now? }
 function createProfiler(deps) {
   const exec = deps.execFile || execFile;
   const tmpDir = deps.tmpDir || os.tmpdir();
@@ -42,11 +42,12 @@ function createProfiler(deps) {
     if (pid) { try { dirs.push(path.dirname(fs.realpathSync(`/proc/${pid}/exe`))); } catch (_) {} }
     const javaPath = deps.javaPath();
     if (javaPath) dirs.push(path.dirname(javaPath));
+    dirs.push(...(deps.extraDirs ? deps.extraDirs() : []));
     dirs.push(...String(process.env.PATH || '').split(path.delimiter));
     const jcmd = findTool('jcmd', dirs);
     const jfr = findTool('jfr', dirs);
     const jstat = findTool('jstat', dirs);
-    return { jcmd, jfr, jstat, profile: !!(jcmd && jfr), hint: jcmd && jfr ? null : INSTALL_HINT };
+    return { jcmd, jfr, jstat, profile: !!(jcmd && jfr), installable: process.platform === 'linux', hint: jcmd && jfr ? null : INSTALL_HINT };
   }
 
   async function waitForFile(file, timeoutMs) {

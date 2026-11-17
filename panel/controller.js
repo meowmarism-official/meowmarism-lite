@@ -308,6 +308,52 @@ async function installJava(major, log) {
   return bin;
 }
 
+// JDK tools (jcmd, jfr, jstat) for profiling, downloaded next to the panel when the host only has a JRE.
+const jdkTools = require('./runtime/jdk-tools');
+const { findTool } = require('./runtime/profiler');
+const jdkJob = { running: false, done: false, error: null, lines: [], major: null };
+
+function neededJdkMajor() {
+  const majors = loadInstances().map((i) => launchLib.requiredJavaMajor(i.mcVersion)).filter(Boolean);
+  return majors.length ? Math.max(...majors) : jdkTools.DEFAULT_MAJOR;
+}
+
+function jdkToolsPresent(major) {
+  if (jdkTools.installed(DATA_ROOT, major)) return true;
+  const dirs = String(process.env.PATH || '').split(path.delimiter);
+  return !!(findTool('jcmd', dirs) && findTool('jfr', dirs));
+}
+
+async function installJdkTools() {
+  if (jdkJob.running) return false;
+  const major = neededJdkMajor();
+  Object.assign(jdkJob, { running: true, done: false, error: null, lines: [], major });
+  try {
+    await jdkTools.install({
+      dataRoot: DATA_ROOT, major, log: (line) => { jdkJob.lines.push(line); console.log(`[jdk-tools] ${line}`); },
+      download: downloadFile,
+      extract: (tarball, dir) => new Promise((resolve, reject) => {
+        const p = spawn('tar', ['-xzf', tarball, '-C', dir, '--strip-components=1']);
+        p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('could not unpack the JDK'))));
+        p.on('error', reject);
+      }),
+    });
+  } catch (err) {
+    jdkJob.error = err.message;
+    jdkJob.lines.push(`failed: ${err.message}`);
+    console.log(`[jdk-tools] failed: ${err.message}`);
+  } finally {
+    jdkJob.running = false;
+    jdkJob.done = true;
+  }
+  return true;
+}
+
+// After a start or an update the panel fetches the tools itself when none are found. MEOW_AUTO_JDK=0 turns that off.
+if (process.platform === 'linux' && process.env.MEOW_AUTO_JDK !== '0') {
+  setTimeout(() => { if (!jdkToolsPresent(neededJdkMajor())) installJdkTools(); }, 30000).unref();
+}
+
 function workerJson(port, p, method = 'GET', timeoutMs = 10000, jsonBody = null) {
   return new Promise((resolve) => {
     const req = http.request({ host: '127.0.0.1', port, path: p, method, timeout: timeoutMs, headers: jsonBody ? { 'Content-Type': 'application/json', [workerSecret.HEADER]: workerSecret.get() } : { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
@@ -760,6 +806,19 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/update' && req.method === 'POST') {
     if (!canPanel(req, 'update')) { sendJson(res, 403, { error: 'not allowed to update' }); return; }
     if (!updater.start()) { sendJson(res, 409, { error: 'an update is already running' }); return; }
+    sendJson(res, 202, { ok: true });
+    return;
+  }
+  if (url.pathname === '/api/jdk-tools' && req.method === 'GET') {
+    const major = neededJdkMajor();
+    sendJson(res, 200, { present: jdkToolsPresent(major), major, installable: process.platform === 'linux', ...jdkJob });
+    return;
+  }
+  if (url.pathname === '/api/jdk-tools' && req.method === 'POST') {
+    if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed to install tools' }); return; }
+    if (process.platform !== 'linux') { sendJson(res, 400, { ok: false, error: 'installing the JDK tools is only available on Linux' }); return; }
+    if (jdkJob.running) { sendJson(res, 409, { ok: false, error: 'the JDK tools are already being installed' }); return; }
+    installJdkTools();
     sendJson(res, 202, { ok: true });
     return;
   }

@@ -2,8 +2,8 @@
 const fs = require('fs');
 const { execFile } = require('child_process');
 
-// deps: { getChild: () => ChildProcess | null, hasJstat: () => boolean }
-function createProcessMetrics({ getChild, hasJstat }) {
+// deps: { getChild: () => ChildProcess | null, hasJstat: () => boolean, jstatPath?: () => string }
+function createProcessMetrics({ getChild, hasJstat, jstatPath }) {
   let cachedPid = null;
   let cachedPidAt = 0;
   let prevCpu = null;
@@ -146,7 +146,7 @@ function createProcessMetrics({ getChild, hasJstat }) {
     const stale = javaCache.pid !== serverPid || now - javaCache.at >= 5000;
     if (stale && !javaProbeInFlight && hasJstat()) {
       javaProbeInFlight = true;
-      execFile('jstat', ['-gc', String(serverPid)], { timeout: 900 }, (err, stdout) => {
+      execFile(jstatPath ? jstatPath() : 'jstat', ['-gc', String(serverPid)], { timeout: 900 }, (err, stdout) => {
         javaProbeInFlight = false;
         const sampledAt = Date.now();
         if (err) { javaCache = { pid: serverPid, at: sampledAt, data: null }; return; }

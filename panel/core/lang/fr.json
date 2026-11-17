@@ -284,7 +284,10 @@
   "All threads: who uses the time": "Tous les threads : qui consomme le temps",
   "Threads": "Threads",
   "Tick timing": "Durées de tick",
-  "Lag warnings": "Avertissements de lag"
+  "Lag warnings": "Avertissements de lag",
+  "Install JDK tools": "Installer les outils du JDK",
+  "Installing…": "Installation…",
+  "Downloads about 200 MB into the panel data folder. The server keeps its own Java.": "Télécharge environ 200 Mo dans le dossier de données du panneau. Le serveur garde son propre Java."
  },
  "patterns": [
   [

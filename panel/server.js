@@ -50,6 +50,7 @@ const workerSecret = require('./lib/worker-secret');
 const startupTimers = require('./core/modules/startup-timer').createStartupTimers();
 const diagnostics = require('./core/modules/diagnostics');
 const { createProfiler } = require('./runtime/profiler');
+const jdkTools = require('./runtime/jdk-tools');
 const serverIcon = require('./core/modules/server-icon').createServerIcon({ dir: SERVER_DIR, defaultIcon: path.join(__dirname, 'core', 'brand', 'server-icon.png') });
 let startedAt = null;
 let lastExitAt = null;
@@ -289,8 +290,11 @@ function scanFeatures(force = false) {
   };
   // Run off the sync path - these can take up to 350ms each and would
   // otherwise stall the event loop (and every SSE stream) for that long.
-  execFile('jstat', ['-help'], { timeout: 350 }, (err) => { detectedFeatures.jstat = !err; });
-  execFile('jcmd', ['-h'], { timeout: 350 }, (err) => { detectedFeatures.jcmd = !err; });
+  try {
+    const found = profiler.tools();
+    detectedFeatures.jstat = !!found.jstat;
+    detectedFeatures.jcmd = !!found.jcmd;
+  } catch (_) {}
   return detectedFeatures;
 }
 
@@ -484,6 +488,7 @@ const runtime = require('./runtime').createRuntime({
   mcVersion: INSTANCE_MC_VERSION,
   panelConfig,
   hasJstat: () => scanFeatures().jstat,
+  jstatPath: () => profiler.tools().jstat || 'jstat',
   hooks: {
     getPhase: () => serverPhase,
     startAttempt: () => { lastStartBlock = null; startupTimers.begin('server'); applyQueuedSettings(); },
@@ -892,9 +897,11 @@ function readTemperature() {
 const procMetrics = runtime.metrics;
 function findCachedServerPid() { return procMetrics.pid(); }
 
+const DATA_ROOT_DIR = process.env.MEOWMARISM_DATA_DIR || path.join(os.homedir(), 'meowmarism');
 const profiler = createProfiler({
   getPid: () => (child ? findCachedServerPid() : null),
   javaPath: () => panelConfig.javaPath,
+  extraDirs: () => jdkTools.toolDirs(DATA_ROOT_DIR),
 });
 
 function buildDiagnostics(refresh) {
@@ -912,7 +919,7 @@ function buildDiagnostics(refresh) {
     tps: diagnostics.tpsFrom(lastTick),
     lag: { count: lagWarningCount, events: lagEvents },
     java: child ? getJavaRuntimeStats(findCachedServerPid()) : null,
-    tools: { profile: found.profile, jstat: !!found.jstat, hint: found.hint },
+    tools: { profile: found.profile, jstat: !!found.jstat, installable: found.installable, hint: found.hint },
     profile: profiler.state(),
   };
 }

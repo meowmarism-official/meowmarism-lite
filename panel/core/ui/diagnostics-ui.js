@@ -1,5 +1,5 @@
 // Performance diagnostics card: tick timing, lag warnings, JVM numbers and a timed profile. Shared by every product.
-// cfg: { el, load({ refresh }) -> state, startProfile(seconds) -> state, t, esc, toast, isVisible() }
+// cfg: { el, load({ refresh }) -> state, startProfile(seconds) -> state, toolsStatus() -> { running, error, lines } and installTools() (both optional), t, esc, toast, isVisible() }
 // state: { running, phase, tick, tps, lag: { count, events }, java, tools: { profile, hint }, profile: { state, seconds, startedAt, error, result } }
 (function () {
   function mount(cfg) {
@@ -7,6 +7,7 @@
     let state = null;
     let seconds = 10;
     let timer = null;
+    let install = null;
 
     cfg.el.innerHTML = `<div class="diag"><div class="diag-grid" id="diagGrid"></div><div class="card diag-profile" id="diagProfile"></div></div>`;
     const grid = cfg.el.querySelector('#diagGrid');
@@ -59,7 +60,7 @@
       for (const s of [10, 20, 30]) head += `<button class="btn ${seconds === s ? 'primary' : ''}" data-seconds="${s}" ${busy ? 'disabled' : ''}>${s} s</button>`;
       head += `<button class="btn primary" id="diagStart" ${busy || !state?.running || !tools.profile ? 'disabled' : ''}>${esc(t('Start profile'))}</button></div></div>`;
       let body = `<div class="card-body">`;
-      if (!tools.profile) body += `<div class="hint">${esc(tools.hint || t('Profiling needs a JDK with jcmd and jfr.'))}</div>`;
+      if (!tools.profile) body += toolsMissing(tools);
       else if (!state?.running) body += `<div class="hint">${esc(t('Start the server to take a profile.'))}</div>`;
       else if (p.state === 'running') body += `<div class="hint">${esc(t('Recording'))} ${p.seconds} s… ${bar(Math.min(100, ((Date.now() - p.startedAt) / (p.seconds * 1000)) * 100))}</div>`;
       else if (p.state === 'reading') body += `<div class="hint">${esc(t('Reading the recording…'))}</div>`;
@@ -67,6 +68,16 @@
       else if (p.state === 'done' && p.result) body += resultBody(p.result);
       else body += `<div class="hint">${esc(t('Records what the server threads are busy with and shows who uses the time. Run it while the lag happens.'))}</div>`;
       return `${head}${body}</div>`;
+    }
+
+    function toolsMissing(tools) {
+      let html = `<div class="hint">${esc(tools.hint || t('Profiling needs a JDK with jcmd and jfr.'))}</div>`;
+      if (!tools.installable || !cfg.installTools) return html;
+      const inst = install || {};
+      html += `<div class="diag-install"><button class="btn primary" id="diagInstall" ${inst.running ? 'disabled' : ''}>${esc(inst.running ? t('Installing…') : t('Install JDK tools'))}</button> <span class="card-meta">${esc(t('Downloads about 200 MB into the panel data folder. The server keeps its own Java.'))}</span></div>`;
+      if (inst.lines?.length) html += `<div class="diag-log">${inst.lines.slice(-4).map((l) => esc(l)).join('<br>')}</div>`;
+      if (inst.error) html += `<div class="hint bad">${esc(inst.error)}</div>`;
+      return html;
     }
 
     function resultBody(r) {
@@ -86,6 +97,10 @@
       grid.innerHTML = card(t('Tick timing'), tickCard()) + card(t('Lag warnings'), lagCard()) + card('JVM', jvmCard());
       profileCard.innerHTML = profileBody();
       profileCard.querySelectorAll('[data-seconds]').forEach((b) => { b.onclick = () => { seconds = Number(b.dataset.seconds); render(); }; });
+      const installBtn = profileCard.querySelector('#diagInstall');
+      if (installBtn) installBtn.onclick = async () => {
+        try { await cfg.installTools(); install = await cfg.toolsStatus(); render(); } catch (e) { toast(e.message, 'error'); }
+      };
       const start = profileCard.querySelector('#diagStart');
       if (start) start.onclick = async () => {
         try { state = await cfg.startProfile(seconds); render(); } catch (e) { toast(e.message, 'error'); }
@@ -94,7 +109,11 @@
 
     async function refresh(force = false) {
       if (!force && cfg.isVisible && !cfg.isVisible()) return;
-      try { state = await cfg.load({ refresh: true }); render(); } catch (_) {}
+      try {
+        state = await cfg.load({ refresh: true });
+        if (cfg.toolsStatus && state && state.tools && !state.tools.profile) install = await cfg.toolsStatus();
+        render();
+      } catch (_) {}
     }
 
     function schedule() {

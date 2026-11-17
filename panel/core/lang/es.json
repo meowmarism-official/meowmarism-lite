@@ -284,7 +284,10 @@
   "All threads: who uses the time": "Todos los hilos: quién consume el tiempo",
   "Threads": "Hilos",
   "Tick timing": "Tiempos de tick",
-  "Lag warnings": "Avisos de lag"
+  "Lag warnings": "Avisos de lag",
+  "Install JDK tools": "Instalar herramientas del JDK",
+  "Installing…": "Instalando…",
+  "Downloads about 200 MB into the panel data folder. The server keeps its own Java.": "Descarga unos 200 MB en la carpeta de datos del panel. El servidor mantiene su propio Java."
  },
  "patterns": [
   [

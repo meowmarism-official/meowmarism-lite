@@ -892,7 +892,10 @@
   "The server thread was not sampled.": "Der Server-Thread wurde nicht gemessen.",
   "Server thread: busiest methods": "Server-Thread: Aufwendigste Methoden",
   "All threads: who uses the time": "Alle Threads: Wer verbraucht die Zeit",
-  "Tick timing": "Tick-Zeiten"
+  "Tick timing": "Tick-Zeiten",
+  "Install JDK tools": "JDK-Werkzeuge installieren",
+  "Installing…": "Installiere…",
+  "Downloads about 200 MB into the panel data folder. The server keeps its own Java.": "Lädt etwa 200 MB in den Datenordner des Panels. Der Server behält sein eigenes Java."
  },
  "patterns": [
   [

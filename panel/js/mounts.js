@@ -7,6 +7,11 @@ const DIAGNOSTICS = MeowDiagnostics.mount({
   el: $('page-performance').appendChild(document.createElement('div')),
   load: async () => (await fetch('/api/diagnostics?refresh=1', { cache: 'no-store' })).json(),
   startProfile: (seconds) => post('/api/diagnostics/profile', { seconds }),
+  toolsStatus: async () => (await fetch('/_meta/api/jdk-tools', { cache: 'no-store' })).json(),
+  installTools: async () => {
+    const r = await fetch('/_meta/api/jdk-tools', { method: 'POST' });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  },
   isVisible: () => $('page-performance').classList.contains('active'),
   toast: (message, type) => toast(message, type),
   t: window.t, esc,

@@ -52,7 +52,7 @@ async function start({ instances = ['inst1'], config = {}, hooks = null, env = {
   require(path.join(REPO, 'panel', 'lib', 'db.js')).createUserStore(path.join(home, '.meowmarism-controller-users.json')).upsertOwner('owner', 'ownerpass123');
 
   const child = spawn(process.execPath, [path.join(REPO, 'panel', 'controller.js')], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase), ...(hooks ? { MEOW_TEST_HOOKS: hooks } : {}), ...env },
+    env: { ...process.env, MEOW_AUTO_JDK: '0', HOME: home, USERPROFILE: home, CONTROLLER_PORT: String(controllerPort), WORKER_PORT_BASE: String(workerBase), ...(hooks ? { MEOW_TEST_HOOKS: hooks } : {}), ...env },
     cwd: path.join(REPO, 'panel'),
     stdio: 'ignore',
   });
