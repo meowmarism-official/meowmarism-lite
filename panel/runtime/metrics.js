@@ -53,7 +53,8 @@ function createProcessMetrics({ getChild, hasJstat }) {
     return java?.pid || rootPid;
   }
 
-  function pid() {
+  // force skips the two second cache, for the moment the exact java pid matters (stop).
+  function pid(force = false) {
     const child = getChild();
     if (!child?.pid) {
       cachedPid = null;
@@ -61,7 +62,7 @@ function createProcessMetrics({ getChild, hasJstat }) {
       return null;
     }
     const now = Date.now();
-    if (cachedPid && now - cachedPidAt < 2000 && fs.existsSync(`/proc/${cachedPid}/stat`)) return cachedPid;
+    if (!force && cachedPid && now - cachedPidAt < 2000 && fs.existsSync(`/proc/${cachedPid}/stat`)) return cachedPid;
     cachedPid = findServerPid();
     cachedPidAt = now;
     return cachedPid;

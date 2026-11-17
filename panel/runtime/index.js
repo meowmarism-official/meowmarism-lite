@@ -6,7 +6,7 @@ const { createProcessMetrics } = require('./metrics');
 // ctx: everything createProcessRuntime takes, plus hasJstat()
 function createRuntime(ctx) {
   let metrics = null;
-  const proc = createProcessRuntime({ ...ctx, serverPid: () => (metrics ? metrics.pid() : null) });
+  const proc = createProcessRuntime({ ...ctx, serverPid: (force) => (metrics ? metrics.pid(force) : null) });
   metrics = createProcessMetrics({ getChild: proc.getChild, hasJstat: ctx.hasJstat });
   const stats = () => {
     const s = metrics.stats();
