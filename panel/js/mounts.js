@@ -3,6 +3,14 @@ const $ = (id) => document.getElementById(id) || document.createElement('div');
 
 const OVERVIEW_PAGE = MeowResources.mountOverview({ el: $('page-overview'), t: window.t, onViewLog: () => showPage('console', { push: true }) });
 const PERF_PAGE = MeowResources.mountPerformance({ el: $('page-performance'), t: window.t });
+const DIAGNOSTICS = MeowDiagnostics.mount({
+  el: $('page-performance').appendChild(document.createElement('div')),
+  load: async () => (await fetch('/api/diagnostics?refresh=1', { cache: 'no-store' })).json(),
+  startProfile: (seconds) => post('/api/diagnostics/profile', { seconds }),
+  isVisible: () => $('page-performance').classList.contains('active'),
+  toast: (message, type) => toast(message, type),
+  t: window.t, esc,
+});
 const SERVER_ICON = MeowServerIcon.mount({
   el: $('serverIconRoot'),
   src: () => `${window.__BASE || ''}/api/server-icon?ts=${Date.now()}`,

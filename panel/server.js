@@ -48,6 +48,8 @@ const INSTANCE_ID = crypto.randomUUID();
 let child = null;
 const workerSecret = require('./lib/worker-secret');
 const startupTimers = require('./core/modules/startup-timer').createStartupTimers();
+const diagnostics = require('./core/modules/diagnostics');
+const { createProfiler } = require('./runtime/profiler');
 const serverIcon = require('./core/modules/server-icon').createServerIcon({ dir: SERVER_DIR, defaultIcon: path.join(__dirname, 'core', 'brand', 'server-icon.png') });
 let startedAt = null;
 let lastExitAt = null;
@@ -79,6 +81,9 @@ let lagWarningCount = 0;
 let lastLagWarning = null;
 let lastTps = null;
 let lastMspt = null;
+let lastTick = null;
+let lastTickProbeAt = 0;
+let lagEvents = [];
 let lastWorldStats = null;
 let lastCrash = null;
 let recentCrashTimestamps = [];
@@ -409,6 +414,8 @@ function detectServerLifecycle(line) {
   if (lagMatch) {
     lagWarningCount++;
     lastLagWarning = { at: Date.now(), delayMs: Number(lagMatch[1]), ticksBehind: Number(lagMatch[2]) };
+    lagEvents.push(lastLagWarning);
+    if (lagEvents.length > 100) lagEvents.shift();
     pushTimeline('lag', 'Server fell behind', `${lastLagWarning.ticksBehind} ticks · ${lastLagWarning.delayMs} ms`, lastLagWarning.delayMs >= 5000 ? 'error' : 'warn', lastLagWarning);
   }
 
@@ -417,6 +424,8 @@ function detectServerLifecycle(line) {
     const vals = tpsLine.slice(-3);
     lastTps = { at: Date.now(), one: vals[0] ?? null, five: vals[1] ?? vals[0] ?? null, fifteen: vals[2] ?? vals[1] ?? vals[0] ?? null };
   }
+  const tickInfo = diagnostics.parseTickQuery(text);
+  if (tickInfo) lastTick = { ...(lastTick || {}), ...tickInfo, at: Date.now() };
   const msptMatch = text.match(/\bMSPT\b[^0-9]*([0-9]+(?:\.[0-9]+)?)/i);
   if (msptMatch) lastMspt = { at: Date.now(), current: Number(msptMatch[1]) };
   const worldMatch = text.match(/(?:chunks?|loaded chunks?)\D+(\d+).*?(?:entities|entity count)\D+(\d+)/i);
@@ -718,6 +727,8 @@ function onProcessSpawned(proc, launch) {
   players.clear();
   lastTps = null;
   lastLagWarning = null;
+  lastTick = null;
+  lagEvents = [];
   procMetrics.reset();
 
   pushTimeline('start', 'Server starting', `Launcher PID ${proc.pid}`, 'info');
@@ -880,6 +891,31 @@ function readTemperature() {
 
 const procMetrics = runtime.metrics;
 function findCachedServerPid() { return procMetrics.pid(); }
+
+const profiler = createProfiler({
+  getPid: () => (child ? findCachedServerPid() : null),
+  javaPath: () => panelConfig.javaPath,
+});
+
+function buildDiagnostics(refresh) {
+  const now = Date.now();
+  if (refresh && child && serverPhase === 'ready' && now - lastTickProbeAt > 10_000) {
+    lastTickProbeAt = now;
+    sendCommand('tick query');
+  }
+  const found = profiler.tools();
+  return {
+    at: now,
+    running: !!child,
+    phase: serverPhase,
+    tick: lastTick,
+    tps: diagnostics.tpsFrom(lastTick),
+    lag: { count: lagWarningCount, events: lagEvents },
+    java: child ? getJavaRuntimeStats(findCachedServerPid()) : null,
+    tools: { profile: found.profile, jstat: !!found.jstat, hint: found.hint },
+    profile: profiler.state(),
+  };
+}
 function processFastStats() { return procMetrics.stats(); }
 function processOpenFiles(pid) { return procMetrics.openFiles(pid); }
 function getJavaRuntimeStats(pid) { return procMetrics.javaStats(pid); }
@@ -1379,7 +1415,7 @@ function requiredCap(method, p) {
   if (p.startsWith('/api/backups/') && method === 'GET') return 'backups';
   if (method === 'GET' || method === 'HEAD') return 'view';
   if (p === '/start' || p === '/stop' || p === '/restart' || p === '/force-stop' || p === '/api/restart-plan') return 'power';
-  if (p === '/command' || p === '/player-action') return 'console';
+  if (p === '/command' || p === '/player-action' || p === '/api/diagnostics/profile') return 'console';
   if (p === '/api/mods/toggle') return 'mods';
   if (p === '/api/backup' || p.startsWith('/api/backups')) return 'backups';
   return 'settings';
@@ -1558,6 +1594,30 @@ const server = http.createServer((req, res) => {
         sendJson(res, 200, { ok: true, settings: state });
       } catch (err) {
         sendJson(res, 400, { ok: false, error: err.message || 'invalid settings' });
+      }
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/diagnostics' && req.method === 'GET') {
+    sendJson(res, 200, buildDiagnostics(url.searchParams.get('refresh') === '1'));
+    return;
+  }
+
+  if (url.pathname === '/api/diagnostics/profile' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 1024) req.destroy();
+    });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body || '{}');
+        const started = profiler.start(data.seconds);
+        pushAudit('diagnostics.profile', 'server', `${started.seconds}s`);
+        sendJson(res, 202, { ok: true, ...buildDiagnostics(false) });
+      } catch (err) {
+        sendJson(res, 409, { ok: false, error: err.message });
       }
     });
     return;
