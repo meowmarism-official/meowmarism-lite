@@ -856,7 +856,12 @@
   "Up to date": "Aktuell",
   "Everything is up to date.": "Alles ist aktuell.",
   "The last update failed ({reason}) and was rolled back.": "Das letzte Update ist fehlgeschlagen ({reason}) und wurde zurückgerollt.",
-  "The core update failed ({reason}) and was rolled back.": "Das Core-Update ist fehlgeschlagen ({reason}) und wurde zurückgerollt."
+  "The core update failed ({reason}) and was rolled back.": "Das Core-Update ist fehlgeschlagen ({reason}) und wurde zurückgerollt.",
+  "Queued for the next restart": "Für den nächsten Neustart vorgemerkt",
+  "active now": "aktuell aktiv",
+  "Queued change discarded": "Vorgemerkte Änderung verworfen",
+  "setting is applied when the server starts": "Einstellung wird beim Start des Servers übernommen",
+  "settings are applied when the server starts": "Einstellungen werden beim Start des Servers übernommen"
  },
  "patterns": [
   [

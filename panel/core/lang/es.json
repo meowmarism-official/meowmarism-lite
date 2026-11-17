@@ -244,7 +244,13 @@
   "Up to date": "Actualizado",
   "Everything is up to date.": "Todo está actualizado.",
   "The last update failed ({reason}) and was rolled back.": "La última actualización falló ({reason}) y se revirtió.",
-  "The core update failed ({reason}) and was rolled back.": "La actualización del core falló ({reason}) y se revirtió."
+  "The core update failed ({reason}) and was rolled back.": "La actualización del core falló ({reason}) y se revirtió.",
+  "Queued for the next restart": "En cola para el próximo reinicio",
+  "active now": "activo ahora",
+  "Discard": "Descartar",
+  "Queued change discarded": "Cambio en cola descartado",
+  "setting is applied when the server starts": "ajuste se aplica al iniciar el servidor",
+  "settings are applied when the server starts": "ajustes se aplican al iniciar el servidor"
  },
  "patterns": [
   [

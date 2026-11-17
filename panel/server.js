@@ -180,6 +180,7 @@ let latestStats = null;
 let fastSamples = [];
 const propertiesApi = require('./core/modules/properties').createProperties({
   file: PROPERTIES_FILE,
+  queueFile: path.join(SERVER_DIR, 'panel-queued-settings.json'),
   isRunning: () => !!child,
   command: (text) => sendCommand(text),
 });
@@ -190,6 +191,18 @@ const accessApi = require('./core/modules/access').createAccess({
 });
 const readServerProperties = () => propertiesApi.read();
 const buildSettingsState = () => propertiesApi.state();
+function applyQueuedSettings() {
+  try {
+    const { count, keys } = propertiesApi.applyQueued();
+    if (!count) return;
+    broadcast(`--- applied ${count} queued setting${count === 1 ? '' : 's'}: ${keys.join(', ')} ---`);
+    pushTimeline('settings', 'Queued settings applied', `${count} setting${count === 1 ? '' : 's'} written before the start`, 'info', { keys });
+    broadcastEvent('settings', propertiesApi.state());
+  } catch (err) {
+    broadcast(`--- could not apply queued settings: ${err.message} ---`);
+  }
+}
+
 function applySettingsPatch(patch) {
   const state = propertiesApi.apply(patch);
   latestStats = null;
@@ -464,7 +477,7 @@ const runtime = require('./runtime').createRuntime({
   hasJstat: () => scanFeatures().jstat,
   hooks: {
     getPhase: () => serverPhase,
-    startAttempt: () => { lastStartBlock = null; startupTimers.begin('server'); },
+    startAttempt: () => { lastStartBlock = null; startupTimers.begin('server'); applyQueuedSettings(); },
     blocked: (msg) => {
       lastStartBlock = msg;
       broadcast(`--- cannot start: ${msg} ---`);
@@ -1531,6 +1544,13 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const parsed = JSON.parse(body || '{}');
+        if (parsed.discard) {
+          const state = propertiesApi.discardQueued(parsed.discard === true ? undefined : parsed.discard);
+          pushAudit('settings.discard', 'server.properties', Array.isArray(parsed.discard) ? parsed.discard.join(', ') : 'all');
+          broadcastEvent('settings', state);
+          sendJson(res, 200, { ok: true, settings: state });
+          return;
+        }
         const patch = parsed.settings || parsed;
         const state = applySettingsPatch(patch);
         pushAudit('settings.apply', 'server.properties', Object.entries(patch).map(([k,v]) => `${k}=${v}`).join(', ').slice(0, 500));

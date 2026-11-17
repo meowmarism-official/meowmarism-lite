@@ -91,9 +91,32 @@ function serializeSettingValue(value) {
 }
 
 // file: path of server.properties; isRunning(): bool; command(text): sends a console command
-function createProperties({ file, isRunning, command }) {
+// queueFile (optional): while the server runs, settings that need a restart are kept here and written to the file by applyQueued() at the next start.
+function createProperties({ file, isRunning, command, queueFile }) {
   let seq = 0;
   const pending = new Set();
+  let queued = loadQueue();
+
+  function loadQueue() {
+    if (!queueFile) return {};
+    try {
+      const saved = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+      const clean = {};
+      for (const [key, raw] of Object.entries(saved)) {
+        try { clean[key] = parseSettingValue(key, raw); } catch (_) {}
+      }
+      return clean;
+    } catch (_) { return {}; }
+  }
+
+  function saveQueue() {
+    if (!queueFile) return;
+    if (!Object.keys(queued).length) { try { fs.unlinkSync(queueFile); } catch (_) {} return; }
+    const tmp = `${queueFile}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(queued, null, 2), { mode: 0o644 });
+    fs.renameSync(tmp, queueFile);
+  }
 
   function read() {
     const props = {};
@@ -113,15 +136,23 @@ function createProperties({ file, isRunning, command }) {
   function state() {
     const props = read();
     const values = {};
+    const active = {};
     for (const [key, schema] of Object.entries(SETTINGS_SCHEMA)) {
       const raw = Object.prototype.hasOwnProperty.call(props, key) ? props[key] : schema.default;
       try { values[key] = parseSettingValue(key, raw); }
       catch (_) { values[key] = schema.default; }
+      active[key] = values[key];
+    }
+    const queuedView = {};
+    for (const [key, value] of Object.entries(queued)) {
+      queuedView[key] = { value, active: active[key] };
+      values[key] = value;
     }
     return {
       seq,
       values,
-      pendingRestart: [...pending],
+      queued: queuedView,
+      pendingRestart: [...new Set([...pending, ...Object.keys(queued)])],
       fields: Object.entries(SETTINGS_SCHEMA).map(([key, schema]) => ({
         key, label: schema.label, group: schema.group, type: schema.type,
         options: schema.options || null, min: schema.min ?? null, max: schema.max ?? null,
@@ -156,8 +187,23 @@ function createProperties({ file, isRunning, command }) {
     const parsed = {};
     for (const [key, raw] of Object.entries(patch)) parsed[key] = parseSettingValue(key, raw);
     if (!Object.keys(parsed).length) return state();
-    write(parsed);
+    const direct = {};
+    const files = read();
     for (const [key, value] of Object.entries(parsed)) {
+      const schema = SETTINGS_SCHEMA[key];
+      if (queueFile && schema.restart && !schema.live && isRunning()) {
+        const raw = Object.prototype.hasOwnProperty.call(files, key) ? files[key] : schema.default;
+        let active;
+        try { active = parseSettingValue(key, raw); } catch (_) { active = schema.default; }
+        if (String(active) === String(value)) delete queued[key]; else queued[key] = value;
+      } else {
+        direct[key] = value;
+        delete queued[key];
+      }
+    }
+    if (Object.keys(direct).length) write(direct);
+    saveQueue();
+    for (const [key, value] of Object.entries(direct)) {
       const schema = SETTINGS_SCHEMA[key];
       if (schema.restart) {
         if (isRunning()) pending.add(key); else pending.delete(key);
@@ -170,7 +216,26 @@ function createProperties({ file, isRunning, command }) {
     return state();
   }
 
-  return { read, state, apply, clearPending: () => pending.clear(), bump: () => { seq++; }, schema: SETTINGS_SCHEMA };
+  // Writes the queued settings into server.properties. Call right before the server starts.
+  function applyQueued() {
+    const keys = Object.keys(queued);
+    if (!keys.length) return { count: 0, keys };
+    write(queued);
+    queued = {};
+    saveQueue();
+    seq++;
+    return { count: keys.length, keys };
+  }
+
+  // keys: array of setting names, or nothing for all
+  function discardQueued(keys) {
+    for (const key of Array.isArray(keys) ? keys : Object.keys(queued)) delete queued[key];
+    saveQueue();
+    seq++;
+    return state();
+  }
+
+  return { read, state, apply, applyQueued, discardQueued, clearPending: () => pending.clear(), bump: () => { seq++; }, schema: SETTINGS_SCHEMA };
 }
 
 // Sets server-port in server.properties text and leaves every other line alone (also with CRLF files).

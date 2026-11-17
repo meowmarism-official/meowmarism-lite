@@ -1,5 +1,5 @@
 // server.properties editor: grouped fields with descriptions, unsaved-change tracking, restart banner. Shared by every product.
-// cfg: { el, load() -> the settings state, save(patch) -> { settings }, restart(), t, esc, toast, confirm(title, message, label, danger) }
+// cfg: { el, load() -> the settings state, save(patch) -> { settings }, discard(keys) -> { settings } (optional), restart(), t, esc, toast, confirm(title, message, label, danger) }
 (function () {
   function mount(cfg) {
     const { t, esc, toast } = cfg;
@@ -21,8 +21,10 @@
       const type = f.type === 'number' ? 'number' : 'text';
       control = `<input class="setting-input" type="${type}" data-setting="${esc(f.key)}" value="${esc(value ?? '')}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} ${f.step != null ? `step="${f.step}"` : ''} ${f.maxLength != null ? `maxlength="${f.maxLength}"` : ''}>`;
     }
-    const badge = f.restartRequired ? '<span class="setting-badge restart">restart</span>' : f.liveApply ? '<span class="setting-badge live">live</span>' : '';
-    return `<div class="setting-row" data-row="${esc(f.key)}"><div><div class="setting-name">${esc(f.label)} <span class="setting-badges">${badge}</span></div><div class="setting-desc">${esc(f.description || '')}</div></div><div class="setting-control">${control}${f.suffix ? `<span class="setting-suffix">${esc(f.suffix)}</span>` : ''}</div></div>`;
+    const queued = settingsState?.queued?.[f.key];
+    const badge = queued ? '<span class="setting-badge queued">queued</span>' : f.restartRequired ? '<span class="setting-badge restart">restart</span>' : f.liveApply ? '<span class="setting-badge live">live</span>' : '';
+    const queuedNote = queued ? `<div class="setting-queued">${esc(t('Queued for the next restart'))} · ${esc(t('active now'))}: ${esc(queued.active)}${cfg.discard ? ` <button type="button" class="link-btn" data-discard="${esc(f.key)}">${esc(t('Discard'))}</button>` : ''}</div>` : '';
+    return `<div class="setting-row${queued ? ' queued' : ''}" data-row="${esc(f.key)}"><div><div class="setting-name">${esc(f.label)} <span class="setting-badges">${badge}</span></div><div class="setting-desc">${esc(f.description || '')}</div>${queuedNote}</div><div class="setting-control">${control}${f.suffix ? `<span class="setting-suffix">${esc(f.suffix)}</span>` : ''}</div></div>`;
   }
   function renderSettings(state, { preserveDirty = false } = {}) {
     if (!state) return;
@@ -39,6 +41,11 @@
       const field = state.fields.find((f) => f.key === el.dataset.setting), event = field?.type === 'text' ? 'input' : 'change';
       el.addEventListener(event, () => markSettingDirty(el.dataset.setting));
     });
+    $('settingsGrid').querySelectorAll('[data-discard]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try { const result = await cfg.discard([btn.dataset.discard]); renderSettings(result.settings, { preserveDirty: dirtySettings.size > 0 }); toast(t('Queued change discarded')); } catch (e) { toast(e.message, 'error'); }
+      });
+    });
     for (const key of dirtySettings) $('settingsGrid').querySelector(`[data-row="${CSS.escape(key)}"]`)?.classList.add('dirty');
     updateSettingsUi();
   }
@@ -52,11 +59,11 @@
     updateSettingsUi();
   }
   function updateSettingsUi() {
-    const dirty = dirtySettings.size, pending = settingsState?.pendingRestart?.length || 0;
+    const dirty = dirtySettings.size, pending = settingsState?.pendingRestart?.length || 0, queuedCount = Object.keys(settingsState?.queued || {}).length;
     $('btnSaveSettings').disabled = !dirty; $('btnResetSettings').disabled = !dirty;
     $('settingsStatus').textContent = dirty ? `${dirty} unsaved change${dirty === 1 ? '' : 's'}` : `Synced · ${settingsState?.fields?.length || 0} settings`;
     $('restartBanner').classList.toggle('show', !!pending);
-    $('restartBannerText').innerHTML = pending ? `<strong>Restart required.</strong> ${pending} saved setting${pending === 1 ? '' : 's'} waiting to become active.` : '<strong>Restart required.</strong>';
+    $('restartBannerText').innerHTML = queuedCount ? `<strong>${esc(t('Queued for the next restart'))}.</strong> ${queuedCount} ${esc(t(queuedCount === 1 ? 'setting is applied when the server starts' : 'settings are applied when the server starts'))}.` : pending ? `<strong>Restart required.</strong> ${pending} saved setting${pending === 1 ? '' : 's'} waiting to become active.` : '<strong>Restart required.</strong>';
     const preview = $('pendingPreview'), list = $('pendingList');
     if (preview && list) {
       preview.classList.toggle('show', dirty > 0);

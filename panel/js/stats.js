@@ -8,6 +8,7 @@ const SETTINGS = MeowSettings.mount({
   el: $('settingsRoot'),
   load: async () => (await fetch(`${window.__BASE || ''}/api/settings`)).json(),
   save: (patch) => post('/api/settings', { settings: patch }),
+  discard: (keys) => post('/api/settings', { discard: keys }),
   restart: () => post('/restart'),
   t, esc, toast,
   confirm: (title, message, label, danger) => modalConfirm(title, message, label, danger),
