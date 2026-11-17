@@ -40,6 +40,8 @@ function defaultPanelConfig() {
     crashAutoRestartEnabled: true,
     crashAutoRestartDelaySec: 15,
     maxCrashRestartsPerHour: 3,
+    stopTimeoutSec: 120,
+    stopAfterSaveSec: 20,
     autoStart: false,
     ramMinMB: null,
     ramMaxMB: null,

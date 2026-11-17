@@ -160,7 +160,7 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
     saveMetrics();
     if (child && child.stdin && child.stdin.writable) {
       const forceExit = setTimeout(() => process.exit(0), 20000);
-      child.once('exit', () => { clearTimeout(forceExit); process.exit(0); });
+      runtime.whenStopped(() => { clearTimeout(forceExit); process.exit(0); });
       child.stdin.write('stop\n');
     } else {
       process.exit(0);
@@ -477,6 +477,7 @@ const runtime = require('./runtime').createRuntime({
     line: (text, isErr) => broadcast(isErr ? `[stderr] ${text}` : text),
     spawnError: onProcessError,
     stopping: onProcessStopping,
+    lingering: onProcessLingering,
     exited: onProcessExit,
   },
 });
@@ -770,13 +771,21 @@ function onProcessStopping(intent) {
   broadcastStatus();
 }
 
+function onProcessLingering(pid) {
+  serverPhase = 'stopping';
+  broadcast(`--- launcher exited, waiting for the server process (pid ${pid}) to end ---`);
+  pushTimeline('stop_wait', 'Waiting for the server process', `pid ${pid} is still running`, 'warn');
+  broadcastStatus();
+}
+
 function restartServer(intent = 'restart') {
   restartCount++;
   clearRestartPlan('restart executing');
   pushAudit('server.restart', 'server', intent);
   if (child) {
-    child.once('exit', () => setTimeout(startServer, 700));
-    return stopServer(intent);
+    const stopping = stopServer(intent);
+    if (stopping) runtime.whenStopped(() => setTimeout(startServer, 700));
+    return stopping;
   }
   return startServer();
 }
