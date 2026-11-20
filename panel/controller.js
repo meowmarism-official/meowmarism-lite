@@ -313,6 +313,16 @@ const jdkTools = require('./runtime/jdk-tools');
 const { findTool } = require('./runtime/profiler');
 const jdkJob = { running: false, done: false, error: null, lines: [], major: null };
 
+// JSON body of a request, at most 64 KB; an empty or invalid body gives an empty object.
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 64 * 1024) req.destroy(); });
+    req.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch (_) { resolve({}); } });
+    req.on('error', () => resolve({}));
+  });
+}
+
 function neededJdkMajor() {
   const majors = loadInstances().map((i) => launchLib.requiredJavaMajor(i.mcVersion)).filter(Boolean);
   return majors.length ? Math.max(...majors) : jdkTools.DEFAULT_MAJOR;
@@ -466,6 +476,24 @@ let instanceCreateInProgress = false;
 const RESTART_FILE = path.join(os.homedir(), '.meowmarism-restart.json');
 const panelSettings = createPanelSettings({ file: path.join(os.homedir(), '.meowmarism-controller-settings.json') });
 const { load: loadSettings, save: saveSettings, clientIp, isHttps } = panelSettings;
+
+// Optional HTTP API (/api/v1): off until switched on in Update > Optional features.
+const apiTokens = require('./core/modules/api-tokens').createApiTokens({ file: path.join(os.homedir(), '.meowmarism-api-tokens.json') });
+const apiHooks = require('./core/modules/api-webhooks').createWebhooks({ file: path.join(os.homedir(), '.meowmarism-api-webhooks.json') });
+const apiHub = require('./core/modules/api-events').createEventHub();
+const { SCOPES: API_SCOPES } = require('./core/modules/api-tokens');
+const { EVENT_TYPES: API_EVENTS } = require('./core/modules/api-events');
+const api = require('./api').createApi({
+  tokens: apiTokens, webhooks: apiHooks, hub: apiHub,
+  isEnabled: () => panelSettings.feature('api'),
+  loadInstances: () => loadInstances(),
+  workerUp: (inst) => workers.has(inst.id),
+  workerSecret,
+  version: () => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version; } catch (_) { return null; } },
+  clientIp,
+  sendJson: (res, status, data) => sendJson(res, status, data),
+});
+api.start();
 function instanceAutoStarts(inst) {
   try { return JSON.parse(fs.readFileSync(path.join(inst.dir, 'panel-config.json'), 'utf8')).autoStart === true; }
   catch (_) { return false; }
@@ -789,6 +817,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (await api.handle(req, res, url)) return;
+
   // Everything past this point - the instance list, instance creation, and
   // every proxied /instance/:id/* request - requires a controller session
   // once an account exists. Nothing is reachable without logging in first.
@@ -809,6 +839,50 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 202, { ok: true });
     return;
   }
+  if (url.pathname === '/api/optional-features' && req.method === 'GET') {
+    if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    sendJson(res, 200, {
+      enabled: panelSettings.feature('api'),
+      baseUrl: `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/api/v1`,
+      scopes: API_SCOPES, events: API_EVENTS, instances: loadInstances().map((i) => i.name),
+      tokens: apiTokens.list(), webhooks: apiHooks.list(),
+    });
+    return;
+  }
+  if (url.pathname === '/api/optional-features' && req.method === 'POST') {
+    if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const data = await readBody(req);
+    if (typeof data.api !== 'boolean') { sendJson(res, 400, { ok: false, error: 'api must be true or false' }); return; }
+    const current = loadSettings();
+    saveSettings({ ...current, features: { ...current.features, api: data.api } });
+    sendJson(res, 200, { ok: true, enabled: panelSettings.feature('api') });
+    return;
+  }
+  const adminMatch = url.pathname.match(/^\/api\/api-admin\/(tokens|webhooks)(?:\/([a-f0-9]+))?(\/test)?$/);
+  if (adminMatch) {
+    if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const [, kind, id, test] = adminMatch;
+    try {
+      if (req.method === 'POST' && !id) {
+        const data = await readBody(req);
+        sendJson(res, 201, { ok: true, ...(kind === 'tokens' ? apiTokens.create(data) : apiHooks.add(data)) });
+        return;
+      }
+      if (req.method === 'POST' && kind === 'webhooks' && id && test) {
+        const ok = await apiHooks.test(id);
+        sendJson(res, ok === null ? 404 : 200, { ok: ok === true });
+        return;
+      }
+      if (req.method === 'DELETE' && id) {
+        const removed = kind === 'tokens' ? apiTokens.revoke(id) : apiHooks.remove(id);
+        sendJson(res, removed ? 200 : 404, { ok: removed });
+        return;
+      }
+    } catch (err) { sendJson(res, 400, { ok: false, error: err.message }); return; }
+    sendJson(res, 405, { ok: false });
+    return;
+  }
+
   if (url.pathname === '/api/jdk-tools' && req.method === 'GET') {
     const major = neededJdkMajor();
     sendJson(res, 200, { present: jdkToolsPresent(major), major, installable: process.platform === 'linux', ...jdkJob });

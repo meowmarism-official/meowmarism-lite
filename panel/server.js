@@ -904,6 +904,28 @@ const profiler = createProfiler({
   extraDirs: () => jdkTools.toolDirs(DATA_ROOT_DIR),
 });
 
+// Compact state of this instance for the HTTP API and its events.
+function buildSummary() {
+  const proc = child ? processFastStats() : null;
+  return {
+    running: !!child,
+    phase: serverPhase,
+    startedAt,
+    readyAt,
+    startupDurationMs,
+    minecraftVersion,
+    players: playerStats(),
+    tps: lastTick ? diagnostics.tpsFrom(lastTick) : (lastTps ? lastTps.one : null),
+    mspt: lastTick ? lastTick.avgMs : (lastMspt ? lastMspt.current : null),
+    tick: lastTick,
+    lag: { count: lagWarningCount, last: lastLagWarning },
+    crashAt: lastCrash ? lastCrash.at : null,
+    cpuPercent: proc ? proc.cpuPercent : null,
+    memoryMB: proc ? proc.rssMB : null,
+    java: child ? getJavaRuntimeStats(findCachedServerPid()) : null,
+  };
+}
+
 function buildDiagnostics(refresh) {
   const now = Date.now();
   if (refresh && child && serverPhase === 'ready' && now - lastTickProbeAt > 10_000) {
@@ -1416,7 +1438,7 @@ function viewOf(req) {
 }
 
 function requiredCap(method, p) {
-  if (method === 'GET' && (p === '/log' || p === '/api/player-history')) return 'console';
+  if (method === 'GET' && (p === '/log' || p === '/api/player-history' || p === '/api/console')) return 'console';
   if (p.startsWith('/api/modrinth')) return 'mods';
   if (p.startsWith('/api/files')) return 'files';
   if (p.startsWith('/api/backups/') && method === 'GET') return 'backups';
@@ -1603,6 +1625,17 @@ const server = http.createServer((req, res) => {
         sendJson(res, 400, { ok: false, error: err.message || 'invalid settings' });
       }
     });
+    return;
+  }
+
+  if (url.pathname === '/api/summary' && req.method === 'GET') {
+    sendJson(res, 200, buildSummary());
+    return;
+  }
+
+  if (url.pathname === '/api/console' && req.method === 'GET') {
+    const wanted = Math.min(1000, Math.max(1, Number(url.searchParams.get('lines')) || 200));
+    sendJson(res, 200, { lines: ringBuffer.slice(-wanted) });
     return;
   }
 

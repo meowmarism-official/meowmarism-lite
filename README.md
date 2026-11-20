@@ -34,6 +34,8 @@ No framework, no database, no external services required. Manage multiple Minecr
 | **Automation** | Daily scheduled restart with an in-chat warning countdown, crash auto-restart with a loop guard, sleep mode (stops when empty, wakes on the next join attempt) |
 | **Accounts** | Local accounts with fine-grained per-instance permissions, brute-force protection, HTTPS behind a reverse proxy |
 | **Events & Audit** | Full timeline of server lifecycle events and every panel action taken |
+| **Performance diagnostics** | TPS and tick times, lag warnings, JVM numbers and a timed profile that shows who uses the time |
+| **HTTP API** (optional) | Tokens with scopes, server control, in-game commands, console, metrics, events and signed webhooks. Off until you switch it on under Update, see [docs/api.md](docs/api.md) |
 
 ---
 

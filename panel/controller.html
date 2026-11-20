@@ -9,12 +9,14 @@
 <link rel="stylesheet" href="/core/ui/base.css">
 <link rel="stylesheet" href="/core/ui/sidebar.css">
 <link rel="stylesheet" href="/core/ui/users-ui.css">
+<link rel="stylesheet" href="/core/ui/api-ui.css">
 <link rel="stylesheet" href="/core/ui/modpack-ui.css">
 <script src="/i18n.js"></script>
 <script src="/core/ui/loaders.js"></script>
 <script src="/core/ui/instances-ui.js"></script>
 <script src="/core/ui/system-ui.js"></script>
 <script src="/core/ui/shell.js"></script>
+<script src="/core/ui/api-ui.js"></script>
 <script src="/core/ui/wizard-ui.js"></script>
 <script src="/core/ui/modpack-ui.js"></script>
 <script src="/core/ui/users-ui.js"></script>
@@ -105,7 +107,27 @@ const SHELL = MeowShell.mount({
   t: window.t, esc,
   confirm: (title, message, label) => modalConfirm(title, message, label),
   pagesEl: document.querySelector('.wrap'),
-  onPage: (page) => { if (page === 'users') loadUsers(); },
+  onPage: (page) => { if (page === 'users') loadUsers(); if (page === 'update') API_UI.load(); },
+});
+
+// --- optional HTTP API (Update > Optional features) ---
+async function apiCall(method, url, body) {
+  const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+const API_UI = MeowApi.mount({
+  el: $('optionalRoot'), t: window.t, esc,
+  toast: (message, type) => { if (type === 'error') modalAlert('Error', message); },
+  confirm: (title, message, label) => modalConfirm(title, message, label),
+  load: async () => (await fetch('/api/optional-features', { cache: 'no-store' })).json(),
+  setEnabled: (api) => apiCall('POST', '/api/optional-features', { api }),
+  createToken: (body) => apiCall('POST', '/api/api-admin/tokens', body),
+  revokeToken: (id) => apiCall('DELETE', `/api/api-admin/tokens/${id}`),
+  createWebhook: (body) => apiCall('POST', '/api/api-admin/webhooks', body),
+  removeWebhook: (id) => apiCall('DELETE', `/api/api-admin/webhooks/${id}`),
+  testWebhook: (id) => apiCall('POST', `/api/api-admin/webhooks/${id}/test`),
 });
 const { showPage, pageFromPath } = SHELL;
 let currentRole = null;

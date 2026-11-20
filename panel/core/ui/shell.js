@@ -134,6 +134,7 @@
       <p class="hint" id="upd-progress"></p>
       <p class="hint" id="upd-warn" style="color:var(--red)"></p>
     </div>
+    <div id="optionalRoot"></div>
   </section>`);
 
     async function visitExternal(url, what) {

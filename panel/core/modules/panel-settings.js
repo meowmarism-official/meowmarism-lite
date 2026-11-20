@@ -1,6 +1,13 @@
 // Panel-wide settings and reverse-proxy awareness: client IPs and HTTPS detection behind a trusted proxy.
 const fs = require('fs');
 
+// Optional features are switched on and off here, by name; only true and false are kept.
+function cleanFeatures(features) {
+  const out = {};
+  if (features && typeof features === 'object') for (const [name, value] of Object.entries(features)) if (typeof value === 'boolean') out[name] = value;
+  return out;
+}
+
 // file: JSON settings path; env: environment variable that forces proxy trust ('1')
 function createPanelSettings({ file, env = 'MEOWMARISM_TRUST_PROXY' }) {
   let cache = null;
@@ -9,13 +16,13 @@ function createPanelSettings({ file, env = 'MEOWMARISM_TRUST_PROXY' }) {
     if (!cache) {
       let saved = {};
       try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
-      cache = { trustProxy: saved.trustProxy === true };
+      cache = { trustProxy: saved.trustProxy === true, features: cleanFeatures(saved.features) };
     }
-    return { ...cache };
+    return { ...cache, features: { ...cache.features } };
   }
 
   function save(next) {
-    cache = { trustProxy: next.trustProxy === true };
+    cache = { trustProxy: next.trustProxy === true, features: cleanFeatures(next.features !== undefined ? next.features : load().features) };
     try { fs.writeFileSync(file, JSON.stringify(cache, null, 2), { mode: 0o600 }); } catch (_) {}
   }
 
@@ -33,7 +40,9 @@ function createPanelSettings({ file, env = 'MEOWMARISM_TRUST_PROXY' }) {
     return !!req.socket.encrypted || (trustProxy() && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');
   }
 
-  return { load, save, trustProxy, clientIp, isHttps };
+  const feature = (name) => load().features[name] === true;
+
+  return { load, save, trustProxy, feature, clientIp, isHttps };
 }
 
 module.exports = { createPanelSettings };

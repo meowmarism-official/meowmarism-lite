@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.17",
-  "commit": "221c4f6a1119434c015f0db3786bb0810691265f",
+  "commit": "a8a50a7ccab8fd24e6b7cbb4954a4de0082b41a5",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -17,6 +17,9 @@
     "panel/core/tokens/tokens.css",
     "panel/core/tokens/tokens.json",
     "panel/core/modules/access.js",
+    "panel/core/modules/api-events.js",
+    "panel/core/modules/api-tokens.js",
+    "panel/core/modules/api-webhooks.js",
     "panel/core/modules/backup.js",
     "panel/core/modules/build-info.js",
     "panel/core/modules/create-log.js",
@@ -48,6 +51,8 @@
     "panel/core/modules/zip-read.js",
     "panel/core/ui/access-ui.css",
     "panel/core/ui/access-ui.js",
+    "panel/core/ui/api-ui.css",
+    "panel/core/ui/api-ui.js",
     "panel/core/ui/automation-ui.js",
     "panel/core/ui/backups-ui.js",
     "panel/core/ui/base.css",
