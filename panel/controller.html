@@ -158,6 +158,8 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+// Loaders whose server software is chosen by the Minecraft version alone.
+const NO_LOADER_VERSION = ['vanilla', 'paper', 'purpur'];
 async function loadMcVersions(loader) {
   const sel = $('w-mc');
   sel.innerHTML = '<option value="">Loading...</option>';
@@ -168,7 +170,7 @@ async function loadMcVersions(loader) {
 }
 async function loadLoaderVersions(loader, mc) {
   const sel = $('w-loaderVersion');
-  const noLoaderVersion = ['vanilla', 'paper', 'purpur'].includes(loader);
+  const noLoaderVersion = NO_LOADER_VERSION.includes(loader);
   $('w-loaderVersionField').style.display = noLoaderVersion ? 'none' : '';
   if (noLoaderVersion) { sel.disabled = true; sel.innerHTML = '<option value="">(not needed)</option>'; return; }
   sel.disabled = true; sel.innerHTML = '<option value="">Loading...</option>';
@@ -211,7 +213,7 @@ const WIZ = MeowWizard.mount({
       validate: () => {
         if (!$('w-name').value.trim()) return 'Pick an instance name';
         if (!$('w-mc').value) return 'Pick a Minecraft version';
-        if ($('w-loader').value !== 'vanilla' && !$('w-loaderVersion').value) return 'Pick a loader version';
+        if (!NO_LOADER_VERSION.includes($('w-loader').value) && !$('w-loaderVersion').value) return 'Pick a loader version';
         return null;
       } },
     { title: 'Modpack', hint: 'Search Modrinth and pick a version.', html: '<div id="w-modpack"></div>', when: () => modpackMode(), validate: () => PICKER.validate() },

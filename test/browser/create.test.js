@@ -52,6 +52,28 @@ test('the dialog starts at the source choice and the blank server flow is intact
   await close();
 });
 
+test('Paper and Purpur need no loader version, Fabric still does', opts, async () => {
+  await open({});
+  await waitFor(() => document.querySelector('#w-source .source-card'));
+  await page.click('#w-next1');
+  await page.type('#w-name', 'paper-test');
+  for (const loader of ['paper', 'purpur']) {
+    await page.select('#w-loader', loader);
+    await waitFor(() => document.querySelectorAll('#w-mc option').length > 0 && document.getElementById('w-mc').value);
+    await page.click('#w-next2');
+    assert.ok(await visible('step4'), `${loader} moves on to the next step without a loader version`);
+    await page.click('#w-back4');
+    assert.ok(await visible('step2'));
+  }
+  await page.select('#w-loader', 'forge');
+  await waitFor(() => document.getElementById('w-loaderVersion').value);
+  await page.$eval('#w-loaderVersion', (el) => { el.innerHTML = '<option value="">none found</option>'; });
+  await page.click('#w-next2');
+  assert.ok(await visible('step2'), 'a loader that needs a version still stops without one');
+  assert.deepEqual(problems, []);
+  await close();
+});
+
 test('the modpack flow: source, search, unsupported Quilt, version summary, memory handed on', opts, async () => {
   await open({});
   await waitFor(() => document.querySelector('#w-source .source-card'));
