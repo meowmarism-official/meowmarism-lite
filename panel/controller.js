@@ -858,7 +858,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, { ok: true, enabled: panelSettings.feature('api') });
     return;
   }
-  const adminMatch = url.pathname.match(/^\/api\/api-admin\/(tokens|webhooks)(?:\/([a-f0-9]+))?(\/test)?$/);
+  const adminMatch = url.pathname.match(/^\/api\/api-admin\/(tokens|webhooks)(?:\/([a-f0-9]+))?(\/test|\/renew)?$/);
   if (adminMatch) {
     if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
     const [, kind, id, test] = adminMatch;
@@ -866,6 +866,16 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && !id) {
         const data = await readBody(req);
         sendJson(res, 201, { ok: true, ...(kind === 'tokens' ? apiTokens.create(data) : apiHooks.add(data)) });
+        return;
+      }
+      if (req.method === 'POST' && kind === 'tokens' && id && test === '/renew') {
+        const renewed = apiTokens.renew(id, await readBody(req));
+        sendJson(res, renewed ? 200 : 404, renewed ? { ok: true, ...renewed } : { ok: false, error: 'no such token' });
+        return;
+      }
+      if (req.method === 'PATCH' && kind === 'tokens' && id) {
+        const updated = apiTokens.update(id, await readBody(req));
+        sendJson(res, updated ? 200 : 404, updated ? { ok: true, ...updated } : { ok: false, error: 'no such token' });
         return;
       }
       if (req.method === 'POST' && kind === 'webhooks' && id && test) {
@@ -946,7 +956,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (['/', '/server', '/users', '/update', '/settings', '/system'].includes(url.pathname) && req.method === 'GET') {
+  if (['/', '/server', '/users', '/api', '/update', '/settings', '/system'].includes(url.pathname) && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(path.join(__dirname, 'controller.html')));
     return;

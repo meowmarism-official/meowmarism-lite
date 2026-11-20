@@ -38,11 +38,11 @@ function createApiTokens({ file, now = Date.now }) {
 
   const view = (t) => ({
     id: t.id, name: t.name, scopes: t.scopes, instances: t.instances, createdAt: t.createdAt,
-    lastUsedAt: t.lastUsedAt, expiresAt: t.expiresAt,
+    lastUsedAt: t.lastUsedAt, expiresAt: t.expiresAt, renewedAt: t.renewedAt || null,
   });
 
   // The returned token is the only time the secret exists in clear text.
-  function create({ name, scopes, instances = null, expiresInDays = null }) {
+  function clean({ name, scopes, instances = null }) {
     const label = String(name || '').trim();
     if (!label || label.length > 60) throw new Error('name must be 1 to 60 characters');
     const list = [...new Set(Array.isArray(scopes) ? scopes : [])];
@@ -55,16 +55,46 @@ function createApiTokens({ file, now = Date.now }) {
       allow = [...new Set(instances)];
       if (!allow.length) allow = null;
     }
-    let expiresAt = null;
-    if (expiresInDays != null) {
-      const days = Number(expiresInDays);
-      if (!Number.isFinite(days) || days <= 0 || days > 3650) throw new Error('expiry must be between 1 and 3650 days');
-      expiresAt = now() + Math.round(days * 86400000);
-    }
+    return { name: label, scopes: list, instances: allow };
+  }
+
+  function expiry(days) {
+    if (days == null) return null;
+    const n = Number(days);
+    if (!Number.isFinite(n) || n <= 0 || n > 3650) throw new Error('expiry must be between 1 and 3650 days');
+    return now() + Math.round(n * 86400000);
+  }
+
+  function create(input) {
+    const fields = clean(input);
+    const expiresAt = expiry(input.expiresInDays);
     const id = crypto.randomBytes(8).toString('hex');
     const secret = crypto.randomBytes(24).toString('base64url');
-    const record = { id, name: label, scopes: list, instances: allow, createdAt: now(), lastUsedAt: null, expiresAt, hash: sha256(secret) };
+    const record = { id, ...fields, createdAt: now(), lastUsedAt: null, expiresAt, hash: sha256(secret) };
     tokens.push(record);
+    save();
+    return { token: `mmk_${id}_${secret}`, ...view(record) };
+  }
+
+  // Changes name, scopes, instances and, when given, the expiry (null = never); the secret stays.
+  function update(id, input) {
+    const record = tokens.find((t) => t.id === id);
+    if (!record) return null;
+    const fields = clean({ name: input.name ?? record.name, scopes: input.scopes ?? record.scopes, instances: input.instances !== undefined ? input.instances : record.instances });
+    const expiresAt = 'expiresInDays' in input ? expiry(input.expiresInDays) : record.expiresAt;
+    Object.assign(record, fields, { expiresAt });
+    save();
+    return view(record);
+  }
+
+  // A new secret for the same token; the old one stops working. expiresInDays restarts the expiry when given.
+  function renew(id, input = {}) {
+    const record = tokens.find((t) => t.id === id);
+    if (!record) return null;
+    const secret = crypto.randomBytes(24).toString('base64url');
+    record.hash = sha256(secret);
+    record.renewedAt = now();
+    if ('expiresInDays' in input) record.expiresAt = expiry(input.expiresInDays);
     save();
     return { token: `mmk_${id}_${secret}`, ...view(record) };
   }
@@ -96,7 +126,7 @@ function createApiTokens({ file, now = Date.now }) {
     return true;
   }
 
-  return { create, verify, list, revoke };
+  return { create, update, renew, verify, list, revoke };
 }
 
 // A token may act on an instance when its allow-list is empty or names it.

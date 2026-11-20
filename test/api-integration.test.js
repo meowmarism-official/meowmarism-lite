@@ -77,6 +77,20 @@ test('a token without a scope is refused by the controller and an unknown token 
   assert.equal((await api('GET', '/instances', undefined, 'mmk_0000000000000000_' + 'b'.repeat(32))).status, 401);
 });
 
+test('a token can be edited and renewed from the panel', opts, async () => {
+  const made = await h.json(owner, 'POST', '/api/api-admin/tokens', { name: 'tmp', scopes: ['read'] });
+  const id = made.body.id;
+  const edited = await h.json(owner, 'PATCH', `/api/api-admin/tokens/${id}`, { name: 'tmp2', scopes: ['read', 'power'] });
+  assert.equal(edited.status, 200);
+  assert.deepEqual(edited.body.scopes, ['read', 'power']);
+  assert.equal((await api('GET', '/instances', undefined, made.body.token)).status, 200);
+  const renewed = await h.json(owner, 'POST', `/api/api-admin/tokens/${id}/renew`, {});
+  assert.equal(renewed.status, 200);
+  assert.equal((await api('GET', '/instances', undefined, made.body.token)).status, 401);
+  assert.equal((await api('GET', '/instances', undefined, renewed.body.token)).status, 200);
+  assert.equal((await h.json(owner, 'PATCH', '/api/api-admin/tokens/ffffffffffffffff', { name: 'x' })).status, 404);
+});
+
 test('the event stream delivers an event after a stop', opts, async () => {
   const controller = new AbortController();
   const res = await fetch(`${h.base}/api/v1/events`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });

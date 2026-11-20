@@ -102,12 +102,13 @@ const SHELL = MeowShell.mount({
   brandSub: 'Official version',
   logoutHref: '/auth/logout',
   updateHint: 'Updating stops running servers briefly, installs the newest release, and starts the ones that were running again.',
-  paths: { server: '/server', users: '/users', settings: '/settings', system: '/system', update: '/update' },
+  api: true,
+  paths: { server: '/server', users: '/users', api: '/api', settings: '/settings', system: '/system', update: '/update' },
   urls: { version: '/api/version', update: '/api/update', updateStatus: '/api/update-status', settings: '/api/settings', system: '/api/system-info' },
   t: window.t, esc,
   confirm: (title, message, label) => modalConfirm(title, message, label),
   pagesEl: document.querySelector('.wrap'),
-  onPage: (page) => { if (page === 'users') loadUsers(); if (page === 'update') API_UI.load(); },
+  onPage: (page) => { if (page === 'users') loadUsers(); if (page === 'update') API_TOGGLE.load(); if (page === 'api') API_UI.load(); },
 });
 
 // --- optional HTTP API (Update > Optional features) ---
@@ -117,8 +118,8 @@ async function apiCall(method, url, body) {
   if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
   return data;
 }
-const API_UI = MeowApi.mount({
-  el: $('optionalRoot'), t: window.t, esc,
+const apiHandlers = {
+  t: window.t, esc,
   toast: (message, type) => { if (type === 'error') modalAlert('Error', message); },
   confirm: (title, message, label) => modalConfirm(title, message, label),
   load: async () => (await fetch('/api/optional-features', { cache: 'no-store' })).json(),
@@ -128,7 +129,11 @@ const API_UI = MeowApi.mount({
   createWebhook: (body) => apiCall('POST', '/api/api-admin/webhooks', body),
   removeWebhook: (id) => apiCall('DELETE', `/api/api-admin/webhooks/${id}`),
   testWebhook: (id) => apiCall('POST', `/api/api-admin/webhooks/${id}/test`),
-});
+  updateToken: (id, body) => apiCall('PATCH', `/api/api-admin/tokens/${id}`, body),
+  renewToken: (id, body) => apiCall('POST', `/api/api-admin/tokens/${id}/renew`, body),
+};
+const API_UI = MeowApi.mount({ ...apiHandlers, mode: 'page', el: $('apiRoot') });
+const API_TOGGLE = MeowApi.mount({ ...apiHandlers, mode: 'toggle', el: $('optionalRoot') });
 const { showPage, pageFromPath } = SHELL;
 let currentRole = null;
 

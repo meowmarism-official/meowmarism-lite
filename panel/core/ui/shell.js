@@ -31,6 +31,10 @@
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="side-label">Manage users</span>
     </button>
+    <button class="side-item" data-page="api" id="navApi" style="display:none" title="API">
+      <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      <span class="side-label">API</span>
+    </button>
     <button class="side-item" data-page="settings" id="navSettings" style="display:none" title="Settings">
       <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
       <span class="side-label">Settings</span>
@@ -136,6 +140,7 @@
     </div>
     <div id="optionalRoot"></div>
   </section>`);
+    cfg.pagesEl.insertAdjacentHTML('beforeend', `  <section class="page" id="page-api"><div id="apiRoot"></div></section>`);
 
     async function visitExternal(url, what) {
       if (await cfg.confirm('Leave this panel?', `Do you want to visit ${what}? This opens in a new tab.`, 'Visit')) window.open(url, '_blank', 'noopener');
@@ -147,10 +152,10 @@
     });
     if (cfg.onLogout) $('navLogout').addEventListener('click', cfg.onLogout);
 
-    const PAGES = ['server', 'users', 'settings', 'system', 'update'];
+    const PAGES = ['server', 'users', 'api', 'settings', 'system', 'update'];
     const system = cfg.urls.system && window.MeowSystem ? MeowSystem.mount({ el: $('systemRoot'), load: async () => (await fetch(cfg.urls.system)).json(), t, esc }) : null;
     function showPage(page, { push = true } = {}) {
-      if (!PAGES.includes(page) || ((page === 'users' || page === 'settings' || page === 'system') && (!panel.users || (page === 'system' && !system)))) page = 'server';
+      if (!PAGES.includes(page) || ((page === 'users' || page === 'api' || page === 'settings' || page === 'system') && (!panel.users || (page === 'system' && !system)))) page = 'server';
       document.querySelectorAll('.side-item[data-page]').forEach((b) => b.classList.toggle('active', b.dataset.page === page));
       document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `page-${page}`));
       if (cfg.paths && push && location.pathname !== cfg.paths[page]) history.pushState({}, '', cfg.paths[page]);
@@ -268,6 +273,7 @@
       $('sideAccountRole').textContent = account.role || '';
       $('sideAvatar').textContent = account.username ? account.username.slice(0, 1) : '?';
       $('navUsers').style.display = panel.users ? '' : 'none';
+      $('navApi').style.display = panel.users && cfg.api ? '' : 'none';
       $('navSettings').style.display = panel.users ? '' : 'none';
       $('navSystem').style.display = panel.users && system ? '' : 'none';
       refreshUpdateIndicator();
