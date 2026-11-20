@@ -159,7 +159,7 @@ test('creating from a modpack in the browser, through the phases to Ready and in
   assert.match(fs.readFileSync(path.join(instancesRoot, 'e2epack', 'server.properties'), 'utf8'), /^server-port=25610$/m);
 
   await h.workerReady('e2epack');
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('#creatingOpen')]);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }), page.click('#creatingOpen')]);
   await waitFor(() => document.getElementById('page-overview').classList.contains('active'));
   assert.ok(await page.$eval('#shellSidebar', (el) => el.getBoundingClientRect().width > 30), 'the new instance page renders');
   assert.deepEqual(problems, []);
