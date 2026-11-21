@@ -487,6 +487,8 @@ const runtime = require('./runtime').createRuntime({
   serverDir: SERVER_DIR,
   logFile: LOG_FILE,
   propertiesFile: PROPERTIES_FILE,
+  port: () => serverPort(),
+  portSetting: IS_PROXY ? 'bind in velocity.toml' : undefined,
   mcVersion: INSTANCE_MC_VERSION,
   panelConfig,
   hasJstat: () => scanFeatures().jstat,

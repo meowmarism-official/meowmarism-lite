@@ -189,6 +189,14 @@ function createApi(deps) {
     return send(ctx.res, 200, { ok: true, ...deps.instances.network.apply(ctx.inst, ctx.body, (name) => allowsInstance(ctx.token, name)) });
   }), { noWorker: true });
 
+  // Startup configuration of an instance: memory, JVM flags, Java path, auto start.
+  route('GET', '/instances/([^/]+)/config', 'settings', async (ctx) => answer(ctx.res, await callWorker(ctx.inst, ['view', 'settings'], 'GET', '/api/config')));
+  route('POST', '/instances/([^/]+)/config', 'settings', async (ctx) => {
+    const launch = ['extraJvmArgs', 'javaPath'].some((k) => ctx.body[k] !== undefined);
+    if (launch && !hasScope(ctx.token, 'files')) return fail(ctx.res, 403, 'changing Java or JVM arguments needs the files scope too');
+    return answer(ctx.res, await callWorker(ctx.inst, launch ? ['view', 'settings', 'files'] : ['view', 'settings'], 'POST', '/api/config', ctx.body));
+  });
+
   // Mods and plugins of one instance, through its panel.
   const modCaps = ['view', 'mods'];
   const mods = (method, sub, workerPath, { body = false, slow = false } = {}) => route(method, `/instances/([^/]+)/mods${sub}`, 'mods', async (ctx) => answer(ctx.res, await callWorker(ctx.inst, modCaps, method, workerPath(ctx), body ? ctx.body : undefined, slow ? 180000 : 30000)));

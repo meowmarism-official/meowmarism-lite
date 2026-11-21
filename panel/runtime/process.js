@@ -30,7 +30,7 @@ function seconds(value, fallback) {
   return Number.isFinite(n) && n >= 5 ? n : fallback;
 }
 
-// ctx: { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks, serverPid? }
+// ctx: { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks, serverPid?, port()?, portSetting? }
 function createProcessRuntime(ctx) {
   const { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks } = ctx;
   let child = null;
@@ -54,9 +54,9 @@ function createProcessRuntime(ctx) {
       return `Minecraft ${mcVersion} needs Java ${needJava}, but ${haveJava == null ? 'no Java was found' : `Java ${haveJava} is installed`}. Install Java ${needJava} under Automation > Startup.`;
     }
     hooks.releasePort();
-    const mcPort = Number((fs.existsSync(propertiesFile) ? fs.readFileSync(propertiesFile, 'utf8').match(/^server-port\s*=\s*(\d+)/m) : null)?.[1]) || 25565;
+    const mcPort = ctx.port ? ctx.port() : (Number((fs.existsSync(propertiesFile) ? fs.readFileSync(propertiesFile, 'utf8').match(/^server-port\s*=\s*(\d+)/m) : null)?.[1]) || 25565);
     if (portBusy(mcPort)) {
-      return `Port ${mcPort} is already used by another program. Change the port under Settings (server-port) or stop the program that uses it.`;
+      return `Port ${mcPort} is already used by another program. Change the port under ${ctx.portSetting || 'Settings (server-port)'} or stop the program that uses it.`;
     }
     return null;
   }

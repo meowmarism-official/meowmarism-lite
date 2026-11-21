@@ -85,6 +85,8 @@ An instance is `{ name, loader, mcVersion, port, panel: "on" | "off", running, p
 | `GET /api/v1/instances/:name/files/content?path=server.properties` | `files` |
 | `POST /api/v1/instances/:name/diagnostics/profile` with `{ "seconds": 10 }` | `console` |
 
+`GET /api/v1/instances/:name/config` and `POST` (scope `settings`) read and change the startup configuration: `ramMinMB`, `ramMaxMB`, `jvmPreset` (`default` or `aikar`), `cpuCores`, `hardMemLimitMB`, `autoStart`, and the automation values such as `crashAutoRestartEnabled`. `extraJvmArgs` and `javaPath` also need the `files` scope, because they decide what code the server starts with. The changes apply the next time the server starts.
+
 A setting that needs a restart is not written while the server runs. The answer lists it under `queued`; it is applied before the next start.
 
 ### Instances

@@ -358,3 +358,16 @@ test('a token limited to instances cannot delete templates and only saves from i
   assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/template', { token: limited, body: { name: 'x' } })).status, 404);
   assert.strictEqual((await t.request('POST', '/api/v1/instances/creative/template', { token: limited, body: { name: 'x' } })).status, 201);
 });
+
+test('the startup configuration is read and changed through the settings scope, Java and JVM flags also need files', async () => {
+  const t = rig();
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/config', { token: t.make(['read']) })).status, 403);
+  const token = t.make(['settings']);
+  await t.request('GET', '/api/v1/instances/survival/config', { token });
+  await t.request('POST', '/api/v1/instances/survival/config', { token, body: { ramMaxMB: 4096 } });
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/config', { token, body: { extraJvmArgs: '-Dfoo=bar' } })).status, 403);
+  const both = t.make(['settings', 'files']);
+  await t.request('POST', '/api/v1/instances/survival/config', { token: both, body: { extraJvmArgs: '-Dfoo=bar' } });
+  assert.deepStrictEqual(t.state.calls.map((c) => [c.method, c.path, c.caps.join()]), [['GET', '/api/config', 'view,settings'], ['POST', '/api/config', 'view,settings'], ['POST', '/api/config', 'view,settings,files']]);
+  assert.deepStrictEqual(t.state.calls[2].body, { extraJvmArgs: '-Dfoo=bar' });
+});
