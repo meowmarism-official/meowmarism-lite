@@ -260,22 +260,7 @@ async function installPaperLike(loader, mcVersion, dir, ramMB, log) {
   writeJvmArgs(dir, ramMB);
   return build;
 }
-// Starts the fresh proxy once so Velocity writes velocity.toml and forwarding.secret, then stops it.
-async function generateVelocityConfig(dir, javaBin, log) {
-  if (fs.existsSync(path.join(dir, 'velocity.toml')) && fs.existsSync(path.join(dir, 'forwarding.secret'))) return;
-  log('generating the Velocity configuration');
-  const proc = spawn(javaBin || 'java', ['-jar', 'server.jar'], { cwd: dir, stdio: 'ignore' });
-  const exited = new Promise((resolve) => proc.once('exit', resolve));
-  const ready = () => fs.existsSync(path.join(dir, 'velocity.toml')) && fs.existsSync(path.join(dir, 'forwarding.secret'));
-  const deadline = Date.now() + 90000;
-  while (Date.now() < deadline && !ready()) await Promise.race([exited, new Promise((r) => setTimeout(r, 300))]);
-  await new Promise((r) => setTimeout(r, 1500));
-  proc.kill('SIGTERM');
-  const killer = setTimeout(() => proc.kill('SIGKILL'), 10000);
-  await exited;
-  clearTimeout(killer);
-  if (!ready()) throw new Error('Velocity did not write its configuration');
-}
+const { generateVelocityConfig } = require('./runtime/velocity-config');
 async function installVelocity(version, dir, ramMB, log, javaBin) {
   log('looking up the latest Velocity build');
   const latest = JSON.parse(await httpsGetText(`${VELOCITY_PROJECT}/versions/${version}/builds/latest`));
@@ -316,7 +301,7 @@ async function ensureJava(mcVersion, log) {
   if (!need) return '';
   const have = launchLib.javaMajor();
   if (have != null && have >= need) return '';
-  log(`Minecraft ${mcVersion} needs Java ${need}, this host has ${have == null ? 'none' : `Java ${have}`}`);
+  log(`Version ${mcVersion} needs Java ${need}, this host has ${have == null ? 'none' : `Java ${have}`}`);
   return installJava(need, log);
 }
 
@@ -441,7 +426,7 @@ async function startDatabase() {
     dbJob.done = true;
   }
 }
-if (process.env.MEOW_AUTO_DB !== '0') setTimeout(() => { if (panelSettings.feature('database') && dbEngine.tools()) startDatabase(); }, 3000).unref();
+if (process.env.MEOW_AUTO_DB !== '0') setTimeout(() => { if (panelSettings.feature('database')) startDatabase(); }, 3000).unref();
 
 const dbTarget = (kind, instance) => {
   const db = kind === 'shared' ? sqlDb.SHARED_DB : sqlDb.instanceDbName(instance);
@@ -497,6 +482,7 @@ async function createInstance(data, accept) {
     if (fs.existsSync(dir) || fs.existsSync(staging)) throw new Error(`${dir} already exists`);
     instanceCreateInProgress = true;
     creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], important: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
+    creationMarker.begin(DATA_ROOT, name);
     accept();
     let renamed = false, registered = false, packTmp = null;
     try {
@@ -521,7 +507,7 @@ async function createInstance(data, accept) {
         createLog(`Using ${LOADER_LABELS[loader]}${loaderVersion ? ` ${loaderVersion}` : ''} for Minecraft ${mcVersion}`);
       }
       setCreatePhase('Preparing Java', 10);
-      const javaBin = await ensureJava(loader === 'velocity' ? '1.21' : mcVersion, createLog);
+      const javaBin = await ensureJava(mcVersion, createLog);
       setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
       let builtVersion;
       if (tpl) {
@@ -572,6 +558,7 @@ async function createInstance(data, accept) {
     } finally {
       if (packTmp) { try { fs.rmSync(packTmp, { recursive: true, force: true }); } catch (_) {} }
       instanceCreateInProgress = false;
+      creationMarker.end(DATA_ROOT);
       creationLog.done = true;
     }
   } catch (err) {
@@ -772,7 +759,7 @@ const api = require('./api').createApi({
   database: { status: () => databaseStatus(), handle: (request) => databaseHandle(request) },
   instances: {
     create: (data) => requestCreate(data),
-    creation: () => creationLog || { done: true, lines: [], important: [], progress: 0 },
+    creation: () => creationLog || { done: true, idle: true, error: null, lines: [], important: [], progress: 0 },
     versions: (loader, mc) => listLoaderVersions(loader, mc),
     remove: (inst, options) => removeInstance(inst, options),
     upgrade: (inst, data, rollback) => startUpgradeJob(inst, data, rollback),
@@ -857,6 +844,7 @@ const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purp
 const { withServerPort } = require('./core/modules/properties');
 const proxyCfg = require('./core/modules/proxy');
 const proxyNetwork = require('./core/modules/proxy-network');
+const creationMarker = require('./lib/creation-marker');
 const templatesStore = require('./templates').createTemplates({ root: path.join(DATA_ROOT, 'templates') });
 
 // Adds a server to a proxy's network next to the ones already linked.
@@ -900,6 +888,7 @@ function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, au
 }
 
 // Leftovers of a creation that died with the panel.
+creationLog = creationMarker.interrupted(DATA_ROOT);
 try {
   for (const entry of fs.readdirSync(INSTANCES_ROOT)) if (entry.endsWith('.creating')) fs.rmSync(path.join(INSTANCES_ROOT, entry), { recursive: true, force: true });
 } catch (_) {}
@@ -1403,7 +1392,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/create-log' && req.method === 'GET') {
-    sendJson(res, 200, creationLog || { done: true, lines: [], important: [], progress: 0 });
+    sendJson(res, 200, creationLog || { done: true, idle: true, error: null, lines: [], important: [], progress: 0 });
     return;
   }
 

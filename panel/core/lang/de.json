@@ -1055,7 +1055,8 @@
   "Create and add": "Erstellen und hinzufügen",
   "Build new servers from a template and add them to this network in one step.": "Baue neue Server aus einem Template und füge sie in einem Schritt diesem Netzwerk hinzu.",
   "No templates yet. Save a server as a template on its Manage page.": "Noch keine Templates. Speichere einen Server auf seiner Manage-Seite als Template.",
-  "Starting": "Startet"
+  "Starting": "Startet",
+  "Retry": "Erneut versuchen"
  },
  "patterns": [
   [

@@ -450,7 +450,8 @@
   "Create and add": "Crear y añadir",
   "Build new servers from a template and add them to this network in one step.": "Crea servidores nuevos desde una plantilla y añádelos a esta red en un paso.",
   "No templates yet. Save a server as a template on its Manage page.": "Aún no hay plantillas. Guarda un servidor como plantilla en su página Manage.",
-  "Starting": "Iniciando"
+  "Starting": "Iniciando",
+  "Retry": "Reintentar"
  },
  "patterns": [
   [

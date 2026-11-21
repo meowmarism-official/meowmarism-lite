@@ -82,7 +82,7 @@
       }
       const hint = !db.installed && !db.canDownload ? t('Needs mariadb-server installed on this host; the panel then runs it for you.') : t('Installs and runs a MariaDB for you: one database per server and one shared by the whole network. Off until you switch it on.');
       return `<div class="api-feature" style="border-top:1px solid var(--line);margin-top:8px"><div><strong>${esc(t('Database'))}</strong><div class="hint" style="margin-top:2px">${esc(hint)}</div>${line ? `<div class="card-meta" style="margin-top:4px">${esc(line)}</div>` : ''}</div>
-        <button class="btn ${db.enabled ? '' : 'primary'}" id="dbToggle" ${busy ? 'disabled' : ''}>${esc(db.enabled ? t('Disable') : t('Enable'))}</button></div>`;
+        <div class="row">${db.enabled && !db.running && !busy ? `<button class="btn primary" id="dbRetry">${esc(t('Retry'))}</button>` : ''}<button class="btn ${db.enabled ? '' : 'primary'}" id="dbToggle" ${busy ? 'disabled' : ''}>${esc(db.enabled ? t('Disable') : t('Enable'))}</button></div></div>`;
     }
 
     function renderToggle() {
@@ -154,6 +154,7 @@
     }
 
     function wire() {
+      $('dbRetry')?.addEventListener('click', () => act(() => cfg.database.setEnabled(true)));
       $('dbToggle')?.addEventListener('click', () => act(async () => {
         if (db.enabled && !(await cfg.confirm(t('Disable the database?'), t('The database server stops. Your data is kept and comes back when you enable it again.'), t('Disable')))) return;
         await cfg.database.setEnabled(!db.enabled);

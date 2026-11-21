@@ -412,9 +412,11 @@ EOF
 
 
 wait_panel() {
-  local i
+  local i code
   for i in $(seq 1 40); do
-    if curl -fs -o /dev/null "http://127.0.0.1:${CONTROLLER_PORT}/"; then return 0; fi
+    # Any HTTP answer counts: the panel replies 401 until someone logs in.
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${CONTROLLER_PORT}/" 2>/dev/null || true)"
+    if [ -n "$code" ] && [ "$code" != "000" ]; then return 0; fi
     sleep 0.5
   done
   echo "the panel did not answer on port ${CONTROLLER_PORT}"

@@ -86,12 +86,13 @@ function buildLaunch(cfg, baseEnv) {
   return { cmd: inner[0], args: inner.slice(1), env, mode };
 }
 
-// Minimum Java major a Minecraft version needs; null when unknown (never block on a guess).
+// Minimum Java major a Minecraft version (or a Velocity version, 3.x and up to 25.x) needs; null when unknown (never block on a guess).
 function requiredJavaMajor(mcVersion) {
   const m = String(mcVersion || '').match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
   if (!m) return null;
   const major = Number(m[1]), minor = Number(m[2]), patch = Number(m[3] || 0);
   if (major >= 26) return 25;
+  if (major >= 2) return major >= 4 ? 25 : 17;
   if (major !== 1) return null;
   if (minor >= 21 || (minor === 20 && patch >= 5)) return 21;
   if (minor >= 18) return 17;
