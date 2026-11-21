@@ -125,7 +125,8 @@ function nextFreePort(instances) {
 
 const PAPER_PROJECT = 'https://fill.papermc.io/v3/projects/paper';
 const PURPUR_PROJECT = 'https://api.purpurmc.org/v2/purpur';
-const BUILD_LOADERS = ['vanilla', 'paper', 'purpur'];
+const VELOCITY_PROJECT = 'https://fill.papermc.io/v3/projects/velocity';
+const BUILD_LOADERS = ['vanilla', 'paper', 'purpur', 'velocity'];
 
 async function listLoaderVersions(loader, mcFilter) {
   if (testHooks.listLoaderVersions) return testHooks.listLoaderVersions(loader, mcFilter);
@@ -138,6 +139,12 @@ async function listLoaderVersions(loader, mcFilter) {
       versions = JSON.parse(await httpsGetText(PURPUR_PROJECT)).versions;
     }
     versions = versions.filter((v) => /^\d+\.\d+(\.\d+)?$/.test(v)).sort((a, b) => compareSemver(b, a));
+    if (mcFilter) return versions.includes(mcFilter) ? [mcFilter] : [];
+    return { mcVersions: versions, grouped: Object.fromEntries(versions.map((v) => [v, [v]])) };
+  }
+  if (loader === 'velocity') {
+    const groups = JSON.parse(await httpsGetText(VELOCITY_PROJECT)).versions;
+    const versions = Object.values(groups).flat().filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => compareSemver(b, a));
     if (mcFilter) return versions.includes(mcFilter) ? [mcFilter] : [];
     return { mcVersions: versions, grouped: Object.fromEntries(versions.map((v) => [v, [v]])) };
   }
@@ -252,6 +259,34 @@ async function installPaperLike(loader, mcVersion, dir, ramMB, log) {
   fs.writeFileSync(path.join(dir, 'run.sh'), '#!/usr/bin/env sh\njava @user_jvm_args.txt -jar server.jar "$@"\n', { mode: 0o755 });
   writeJvmArgs(dir, ramMB);
   return build;
+}
+// Starts the fresh proxy once so Velocity writes velocity.toml and forwarding.secret, then stops it.
+async function generateVelocityConfig(dir, javaBin, log) {
+  if (fs.existsSync(path.join(dir, 'velocity.toml')) && fs.existsSync(path.join(dir, 'forwarding.secret'))) return;
+  log('generating the Velocity configuration');
+  const proc = spawn(javaBin || 'java', ['-jar', 'server.jar'], { cwd: dir, stdio: 'ignore' });
+  const exited = new Promise((resolve) => proc.once('exit', resolve));
+  const ready = () => fs.existsSync(path.join(dir, 'velocity.toml')) && fs.existsSync(path.join(dir, 'forwarding.secret'));
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline && !ready()) await Promise.race([exited, new Promise((r) => setTimeout(r, 300))]);
+  await new Promise((r) => setTimeout(r, 1500));
+  proc.kill('SIGTERM');
+  const killer = setTimeout(() => proc.kill('SIGKILL'), 10000);
+  await exited;
+  clearTimeout(killer);
+  if (!ready()) throw new Error('Velocity did not write its configuration');
+}
+async function installVelocity(version, dir, ramMB, log, javaBin) {
+  log('looking up the latest Velocity build');
+  const latest = JSON.parse(await httpsGetText(`${VELOCITY_PROJECT}/versions/${version}/builds/latest`));
+  const dl = latest.downloads && latest.downloads['server:default'];
+  if (!dl) throw new Error(`no Velocity build for ${version}`);
+  log(`downloading velocity build ${latest.id}`);
+  await downloadFile(dl.url, path.join(dir, 'server.jar'));
+  fs.writeFileSync(path.join(dir, 'run.sh'), '#!/usr/bin/env sh\njava @user_jvm_args.txt -jar server.jar "$@"\n', { mode: 0o755 });
+  writeJvmArgs(dir, ramMB);
+  await generateVelocityConfig(dir, javaBin, log);
+  return String(latest.id);
 }
 const SNAPSHOT_FILES = ['run.sh', 'run.bat', 'user_jvm_args.txt', 'server.jar', 'fabric-server-launch.jar', 'args_extra.txt'];
 const upgrades = new Map();
@@ -460,6 +495,7 @@ async function installServerSoftware(loader, mcVersion, loaderVersion, ramMB, di
   if (testHooks.installServerSoftware) return testHooks.installServerSoftware(loader, mcVersion, loaderVersion, ramMB, dir, log, javaBin);
   fs.mkdirSync(dir, { recursive: true });
   if (loader === 'paper' || loader === 'purpur') return installPaperLike(loader, mcVersion, dir, ramMB, log);
+  if (loader === 'velocity') return installVelocity(mcVersion, dir, ramMB, log, javaBin);
   if (loader === 'vanilla') { await installVanilla(mcVersion, dir, ramMB, log); return; }
   if (loader === 'fabric') { await installFabric(mcVersion, loaderVersion, dir, ramMB, log); return; }
   if (loader === 'forge') await installNeoForgeLike('https://maven.minecraftforge.net', 'net/minecraftforge', 'forge', `${mcVersion}-${loaderVersion}`, dir, log, javaBin);
@@ -557,16 +593,22 @@ function setCreatePhase(label, progress) {
 }
 
 const MODPACK_LOADERS = ['fabric', 'forge', 'neoforge'];
-const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purpur: 'Purpur', fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge' };
+const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purpur: 'Purpur', velocity: 'Velocity', fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge' };
 
 const { withServerPort } = require('./core/modules/properties');
+const proxyCfg = require('./core/modules/proxy');
 
 // Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
-function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin, ramMB }) {
-  fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n');
-  const props = path.join(dir, 'server.properties');
-  const text = fs.existsSync(props) ? fs.readFileSync(props, 'utf8') : 'motd=hosted by meowmarism :3\n';
-  fs.writeFileSync(props, withServerPort(text, mcPort));
+function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin, ramMB, loader }) {
+  if (loader === 'velocity') {
+    const toml = path.join(dir, 'velocity.toml');
+    if (fs.existsSync(toml)) fs.writeFileSync(toml, proxyCfg.withForwardingMode(proxyCfg.withBindPort(fs.readFileSync(toml, 'utf8'), mcPort), 'modern'));
+  } else {
+    fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n');
+    const props = path.join(dir, 'server.properties');
+    const text = fs.existsSync(props) ? fs.readFileSync(props, 'utf8') : 'motd=hosted by meowmarism :3\n';
+    fs.writeFileSync(props, withServerPort(text, mcPort));
+  }
   const icon = path.join(dir, 'server-icon.png');
   if (!fs.existsSync(icon)) { try { fs.copyFileSync(path.join(__dirname, 'core', 'brand', 'server-icon.png'), icon); } catch (_) {} }
   // The heap size lives in panel-config.json from the start; user_jvm_args.txt is generated from it.
@@ -1030,7 +1072,7 @@ const server = http.createServer(async (req, res) => {
         const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
         if (modpackReq && !/^[\w-]{1,64}$/.test(modpackReq.versionId)) throw new Error('invalid modpack');
         const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
-        let loader = ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
+        let loader = ['vanilla', 'paper', 'purpur', 'velocity', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
         let mcVersion = String(data.mcVersion || '').trim();
         let loaderVersion = String(data.loaderVersion || '').trim();
         let mcPort = Number(data.port);
@@ -1083,7 +1125,7 @@ const server = http.createServer(async (req, res) => {
             createLog(`Using ${LOADER_LABELS[loader]}${loaderVersion ? ` ${loaderVersion}` : ''} for Minecraft ${mcVersion}`);
           }
           setCreatePhase('Preparing Java', 10);
-          const javaBin = await ensureJava(mcVersion, createLog);
+          const javaBin = await ensureJava(loader === 'velocity' ? '1.21' : mcVersion, createLog);
           setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
           const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
           if (pack) {
@@ -1099,7 +1141,7 @@ const server = http.createServer(async (req, res) => {
             });
           }
           setCreatePhase('Finalizing instance', 92);
-          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin, ramMB });
+          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin, ramMB, loader });
           (testHooks.renameDir || fs.renameSync)(staging, dir);
           renamed = true;
           const current = loadInstances();

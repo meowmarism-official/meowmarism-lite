@@ -94,6 +94,18 @@ function createPlayerTracker(hooks = {}) {
       players.delete(match[1]);
       return;
     }
+    // Velocity logs "[connected player] Name (/ip:port) has connected" and "... has disconnected".
+    match = line.match(/\]: \[connected player\] ([A-Za-z0-9_]{1,16}) \(.*?\) has (connected|disconnected)\s*$/);
+    if (match) {
+      if (match[2] === 'connected') {
+        join(match[1], 'log', true);
+        players.set(match[1], { name: match[1], joinedAt: getHistory(match[1]).activeSince || Date.now(), lastSeenAt: Date.now(), source: 'log' });
+      } else {
+        leave(match[1], 'log', true);
+        players.delete(match[1]);
+      }
+      return;
+    }
     match = line.match(/There are\s+(\d+)\s+of a max of\s+(\d+)\s+players online:\s*(.*)$/i);
     if (match) {
       const names = match[3].split(',').map((n) => n.trim()).filter((n) => NAME_RE.test(n));

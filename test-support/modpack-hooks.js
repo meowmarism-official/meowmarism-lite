@@ -39,6 +39,10 @@ module.exports = {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'run.sh'), '#!/bin/sh\n# launcher made by the runtime\nexit 0\n', { mode: 0o755 });
     fs.writeFileSync(path.join(dir, '.installed-with.json'), JSON.stringify({ loader, mcVersion, loaderVersion }));
+    if (loader === 'velocity') {
+      fs.writeFileSync(path.join(dir, 'velocity.toml'), 'config-version = "2.7"\nbind = "0.0.0.0:25565"\nplayer-info-forwarding-mode = "NONE"\n\n[servers]\nlobby = "127.0.0.1:30066"\ntry = [\n    "lobby"\n]\n');
+      fs.writeFileSync(path.join(dir, 'forwarding.secret'), 'secret');
+    }
     // Stands in for a real Forge install, which logs hundreds of "Patching ..." lines after any earlier
     // modpack environment decisions have already been logged.
     if (process.env.MEOW_TEST_NOISY_LOG && log) for (let i = 0; i < 400; i++) log(`Patching net/minecraft/noisy/Line${i} 1/1`);

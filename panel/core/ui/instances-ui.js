@@ -21,7 +21,7 @@
         ? `<button class="btn" data-act="restart" data-id="${name}">Restart</button><button class="btn danger" data-act="stop" data-id="${name}">Stop</button>`
         : `<button class="btn ${i.canOpen ? '' : 'primary grow'}" data-act="start" data-id="${name}">Start</button>`;
     }
-    const sub = `${esc(L.label)}${i.loaderVersion && i.loader !== 'paper' && i.loader !== 'purpur' && i.loader !== 'vanilla' ? ' ' + esc(i.loaderVersion) : ''} · ${esc(i.mcVersion || '-')}`;
+    const sub = `${esc(L.label)}${i.loaderVersion && !['paper', 'purpur', 'vanilla', 'velocity'].includes(i.loader) ? ' ' + esc(i.loaderVersion) : ''} · ${esc(i.mcVersion || '-')}`;
     return `<article class="inst-card${i.running ? ' is-on' : ''}">
     <div class="inst-head">
       <div class="inst-logo" style="--lc:${L.color}" title="${esc(L.label)}">${MeowLoaders.svg(i.loader || 'vanilla', 26)}</div>

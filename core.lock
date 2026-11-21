@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.19",
-  "commit": "ce53e88254669812092c06fe1630fab4c383047e",
+  "commit": "9f4926c573a83c4964868bb81fd0d0197b810fc7",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -37,6 +37,7 @@
     "panel/core/modules/panel-settings.js",
     "panel/core/modules/players.js",
     "panel/core/modules/properties.js",
+    "panel/core/modules/proxy.js",
     "panel/core/modules/ratelimit.js",
     "panel/core/modules/runtime-contract.js",
     "panel/core/modules/safety.js",

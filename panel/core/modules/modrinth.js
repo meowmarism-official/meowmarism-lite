@@ -18,7 +18,7 @@ function loadersFor(loader) {
   if (loader === 'vanilla') return [];
   return [loader];
 }
-const projectTypeFor = (loader) => (loader === 'paper' || loader === 'purpur' ? 'plugin' : 'mod');
+const projectTypeFor = (loader) => (['paper', 'purpur', 'velocity'].includes(loader) ? 'plugin' : 'mod');
 
 function request(method, url, body, redirects = 3) {
   return new Promise((resolve, reject) => {

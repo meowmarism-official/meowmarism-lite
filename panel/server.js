@@ -196,6 +196,8 @@ const accessApi = require('./core/modules/access').createAccess({
   command: (text) => sendCommand(text),
 });
 const readServerProperties = () => propertiesApi.read();
+const IS_PROXY = INSTANCE_LOADER === 'velocity';
+const proxyCfg = require('./core/modules/proxy');
 const buildSettingsState = () => propertiesApi.state();
 function applyQueuedSettings() {
   try {
@@ -435,7 +437,7 @@ function detectServerLifecycle(line) {
   const worldMatch = text.match(/(?:chunks?|loaded chunks?)\D+(\d+).*?(?:entities|entity count)\D+(\d+)/i);
   if (worldMatch) lastWorldStats = { at: Date.now(), chunks: Number(worldMatch[1]), entities: Number(worldMatch[2]) };
 
-  const readyMatch = text.match(/Done \(([0-9.]+)s\)!.*(?:help|type)/i);
+  const readyMatch = text.match(IS_PROXY ? /Done \(([0-9.]+)s\)!\s*$/i : /Done \(([0-9.]+)s\)!.*(?:help|type)/i);
   if (readyMatch && child) {
     const now = Date.now();
     const parsedMs = Math.round(Number(readyMatch[1]) * 1000);
@@ -618,9 +620,15 @@ function mcPacket(id, dataBuf) {
   return Buffer.concat([mcVarInt(body.length), body]);
 }
 
+// Port the Minecraft server (or the proxy) listens on.
+function serverPort() {
+  if (IS_PROXY) {
+    try { return proxyCfg.readBindPort(fs.readFileSync(path.join(SERVER_DIR, 'velocity.toml'), 'utf8')) || 25565; } catch (_) { return 25565; }
+  }
+  return Number(readServerProperties()['server-port']) || 25565;
+}
 function sleepPort() {
-  const props = readServerProperties();
-  return Number(props['server-port']) || 25565;
+  return serverPort();
 }
 
 const SLEEP_MAX_PACKET = 8 * 1024;
@@ -983,7 +991,7 @@ function networkStats() {
 }
 
 function playerStats() {
-  return tracker.stats(Number(readServerProperties()['max-players']) || null);
+  return tracker.stats(IS_PROXY ? null : Number(readServerProperties()['max-players']) || null);
 }
 
 function ema(prev, next, alpha) {
@@ -1198,7 +1206,7 @@ function buildAggregatedStats(samples) {
     } : null,
     minecraft: {
       motd: props.motd || null,
-      port: Number(props['server-port']) || 25565,
+      port: serverPort(),
       difficulty: props.difficulty || null,
       gamemode: props.gamemode || null,
       viewDistance: Number(props['view-distance']) || null,

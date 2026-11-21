@@ -7,6 +7,7 @@
     neoforge: { label: 'NeoForge', color: '#e68c3a', body: '<path d="M3 8h13c0 3-2 4-4 4l.7 3H15v3H6v-3h2.3L9 12C5.5 12 3 11 3 8z"/><path d="M19 3v5M16.5 5.5h5"/>' },
     paper: { label: 'Paper', color: '#cfd6e4', body: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/>' },
     purpur: { label: 'Purpur', color: '#b678ea', body: '<path d="M6 4h12l3 5-9 11L3 9z"/><path d="M3 9h18M9 4l3 16M15 4l-3 16"/>' },
+    velocity: { label: 'Velocity', color: '#4fc3d9', body: '<circle cx="12" cy="12" r="2.5"/><circle cx="4.5" cy="6" r="1.8"/><circle cx="4.5" cy="18" r="1.8"/><circle cx="19.5" cy="12" r="1.8"/><path d="M6 7l4.2 3.5M6 17l4.2-3.5M14.5 12h3.2"/>' },
   };
   function info(loader) {
     var key = String(loader || 'vanilla').toLowerCase();

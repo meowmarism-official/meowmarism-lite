@@ -29,7 +29,7 @@ async function swLoad() {
 }
 async function upgFillLoaders() {
   const c = swState.current;
-  const noVersion = ['vanilla', 'paper', 'purpur'].includes(c.loader);
+  const noVersion = ['vanilla', 'paper', 'purpur', 'velocity'].includes(c.loader);
   $('upgLoaderWrap').style.display = noVersion ? 'none' : '';
   if (noVersion) return;
   $('upgLoader').innerHTML = `<option>${t('Loading...')}</option>`;

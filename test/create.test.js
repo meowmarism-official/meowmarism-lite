@@ -214,3 +214,19 @@ test('an early environment-skip message survives hundreds of noisy installer lin
     assert.ok(log.important.length <= 100, `the important log is bounded too (saw ${log.important.length})`);
   });
 });
+
+test('a Velocity proxy gets its port and modern forwarding, and no Minecraft server files', async () => {
+  await withController({}, async ({ create, names, dirOf, h, cookie }) => {
+    const log = await create({ name: 'Proxy', loader: 'velocity', mcVersion: '3.4.0', port: 25571, ramMB: 1024 });
+    assert.equal(log.error, null);
+    assert.ok((await names()).includes('Proxy'));
+    const dir = dirOf('Proxy');
+    const toml = fs.readFileSync(path.join(dir, 'velocity.toml'), 'utf8');
+    assert.match(toml, /^bind = "0\.0\.0\.0:25571"$/m);
+    assert.match(toml, /^player-info-forwarding-mode = "modern"$/m);
+    assert.ok(!fs.existsSync(path.join(dir, 'eula.txt')) && !fs.existsSync(path.join(dir, 'server.properties')));
+    await h.workerReady('Proxy');
+    const entry = (await h.json(cookie, 'GET', '/api/instances')).body.instances.find((i) => i.name === 'Proxy');
+    assert.deepEqual([entry.loader, entry.mcVersion, entry.port], ['velocity', '3.4.0', 25571]);
+  });
+});

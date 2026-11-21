@@ -186,9 +186,10 @@ document.addEventListener('click', async (e) => {
 });
 
 // Loaders whose server software is chosen by the Minecraft version alone.
-const NO_LOADER_VERSION = ['vanilla', 'paper', 'purpur'];
+const NO_LOADER_VERSION = ['vanilla', 'paper', 'purpur', 'velocity'];
 async function loadMcVersions(loader) {
   const sel = $('w-mc');
+  $('w-mc').previousElementSibling.textContent = loader === 'velocity' ? 'Velocity version' : 'Minecraft version';
   sel.innerHTML = '<option value="">Loading...</option>';
   const r = await fetch(`/api/loader-versions?loader=${encodeURIComponent(loader)}`);
   const data = await r.json();
@@ -229,6 +230,7 @@ const WIZ = MeowWizard.mount({
             <option value="vanilla" selected>Vanilla</option>
             <option value="paper">Paper</option>
             <option value="purpur">Purpur</option>
+            <option value="velocity">Velocity (proxy)</option>
             <option value="fabric">Fabric</option>
             <option value="forge">Forge</option>
             <option value="neoforge">NeoForge</option>
