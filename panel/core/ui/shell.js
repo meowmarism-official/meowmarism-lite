@@ -35,6 +35,10 @@
       <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       <span class="side-label">API</span>
     </button>
+    <button class="side-item" data-page="database" id="navDb" style="display:none" title="Database">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      <span class="side-label">Database</span>
+    </button>
     <button class="side-item" data-page="settings" id="navSettings" style="display:none" title="Settings">
       <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
       <span class="side-label">Settings</span>
@@ -140,7 +144,8 @@
     </div>
     <div id="optionalRoot"></div>
   </section>`);
-    cfg.pagesEl.insertAdjacentHTML('beforeend', `  <section class="page" id="page-api"><div id="apiRoot"></div></section>`);
+    cfg.pagesEl.insertAdjacentHTML('beforeend', `  <section class="page" id="page-api"><div id="apiRoot"></div></section>
+  <section class="page" id="page-database"><div id="databaseRoot"></div></section>`);
 
     async function visitExternal(url, what) {
       if (await cfg.confirm('Leave this panel?', `Do you want to visit ${what}? This opens in a new tab.`, 'Visit')) window.open(url, '_blank', 'noopener');
@@ -152,10 +157,27 @@
     });
     if (cfg.onLogout) $('navLogout').addEventListener('click', cfg.onLogout);
 
-    const PAGES = ['server', 'users', 'api', 'settings', 'system', 'update'];
+    const PAGES = ['server', 'users', 'api', 'database', 'settings', 'system', 'update'];
+    // Optional features (API, database) only show their menu while they are switched on.
+    let features = { loaded: false, api: false, database: false };
+    const featureOff = (page) => features.loaded && ((page === 'api' && !features.api) || (page === 'database' && !features.database));
+    function applyFeatures() {
+      $('navApi').style.display = panel.users && cfg.api && features.api ? '' : 'none';
+      $('navDb').style.display = panel.users && cfg.database && features.database ? '' : 'none';
+    }
+    async function refreshFeatures() {
+      if (!cfg.urls.features) return;
+      try {
+        const f = await (await fetch(cfg.urls.features, { cache: 'no-store' })).json();
+        features = { loaded: true, api: !!f.api, database: !!f.database };
+      } catch (_) { return; }
+      applyFeatures();
+      const active = document.querySelector('.side-item[data-page].active');
+      if (active && featureOff(active.dataset.page)) showPage('server');
+    }
     const system = cfg.urls.system && window.MeowSystem ? MeowSystem.mount({ el: $('systemRoot'), load: async () => (await fetch(cfg.urls.system)).json(), t, esc }) : null;
     function showPage(page, { push = true } = {}) {
-      if (!PAGES.includes(page) || ((page === 'users' || page === 'api' || page === 'settings' || page === 'system') && (!panel.users || (page === 'system' && !system)))) page = 'server';
+      if (!PAGES.includes(page) || featureOff(page) || ((page === 'users' || page === 'api' || page === 'database' || page === 'settings' || page === 'system') && (!panel.users || (page === 'system' && !system)))) page = 'server';
       document.querySelectorAll('.side-item[data-page]').forEach((b) => b.classList.toggle('active', b.dataset.page === page));
       document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === `page-${page}`));
       if (cfg.paths && push && location.pathname !== cfg.paths[page]) history.pushState({}, '', cfg.paths[page]);
@@ -273,14 +295,15 @@
       $('sideAccountRole').textContent = account.role || '';
       $('sideAvatar').textContent = account.username ? account.username.slice(0, 1) : '?';
       $('navUsers').style.display = panel.users ? '' : 'none';
-      $('navApi').style.display = panel.users && cfg.api ? '' : 'none';
+      applyFeatures();
+      refreshFeatures();
       $('navSettings').style.display = panel.users ? '' : 'none';
       $('navSystem').style.display = panel.users && system ? '' : 'none';
       refreshUpdateIndicator();
     }
 
     loadVersion();
-    return { showPage, pageFromPath, setAccount, loadVersion, visitExternal };
+    return { showPage, pageFromPath, setAccount, loadVersion, visitExternal, refreshFeatures };
   }
   window.MeowShell = { mount };
 })();

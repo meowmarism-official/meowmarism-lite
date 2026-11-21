@@ -35,7 +35,7 @@ function readJson(req, limit = 64 * 1024) {
 }
 
 // deps: { tokens, webhooks, hub, isEnabled(), loadInstances(), workerUp(inst), workerSecret, version(), clientIp(req), database: { status(), handle(request) },
-//         instances: { create, creation, versions, remove, upgrade, upgradeStatus, network: { describe, apply } }, callWorker? }
+//         instances: { create, creation, versions, remove, upgrade, upgradeStatus, templates: { list, save, remove }, network: { describe, apply } }, callWorker? }
 function createApi(deps) {
   const { tokens, webhooks, hub, isEnabled, loadInstances, workerUp, version, clientIp } = deps;
   const windows = new Map();
@@ -159,6 +159,12 @@ function createApi(deps) {
       return send(ctx.res, 202, { ok: true, note: 'the instance is being built, follow GET /api/v1/creation' });
     });
   });
+  route('GET', '/templates', 'instances', async ({ res }) => send(res, 200, { ok: true, templates: deps.instances.templates.list() }));
+  route('DELETE', '/templates/([A-Za-z0-9_-]+)', 'instances', (ctx) => {
+    if (ctx.token.instances) return fail(ctx.res, 403, 'deleting templates needs a token without instance limits');
+    return deps.instances.templates.remove(ctx.params[0]) ? send(ctx.res, 200, { ok: true }) : fail(ctx.res, 404, 'no such template');
+  });
+  route('POST', '/instances/([^/]+)/template', 'instances', (ctx) => guard(ctx, async () => send(ctx.res, 201, { ok: true, template: await deps.instances.templates.save(ctx.inst, ctx.body) })), { noWorker: true });
   route('GET', '/creation', 'instances', async ({ res }) => send(res, 200, { ok: true, ...deps.instances.creation() }));
   route('DELETE', '/instances/([^/]+)', 'instances', (ctx) => guard(ctx, async () => {
     if (ctx.body.confirm !== ctx.inst.name) return fail(ctx.res, 400, 'confirm must be the name of the instance');

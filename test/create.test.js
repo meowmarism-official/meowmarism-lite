@@ -295,3 +295,51 @@ test('an AI-style flow through the API: build a proxy and a server, link them, d
     assert.ok(!(await names()).includes('Hub'));
   });
 });
+
+test('a server template builds new servers that are linked to a proxy', async () => {
+  await withController({}, async ({ create, dirOf, h, cookie, names }) => {
+    assert.equal((await create({ name: 'Proxy', loader: 'velocity', mcVersion: '3.4.0', port: 25591, ramMB: 1024 })).error, null);
+    assert.equal((await create({ name: 'Hub', loader: 'paper', mcVersion: '1.21.1', port: 25592, ramMB: 2048 })).error, null);
+    const hubDir = dirOf('Hub');
+    fs.mkdirSync(path.join(hubDir, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(hubDir, 'config', 'paper-global.yml'), 'proxies:\n  velocity:\n    enabled: false\n    online-mode: true\n    secret: \'\'\n');
+    fs.mkdirSync(path.join(hubDir, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(hubDir, 'plugins', 'lobby.jar'), 'jar');
+    fs.mkdirSync(path.join(hubDir, 'world'), { recursive: true });
+    fs.writeFileSync(path.join(hubDir, 'world', 'level.dat'), 'world');
+    fs.mkdirSync(path.join(hubDir, 'logs'), { recursive: true });
+    fs.writeFileSync(path.join(hubDir, 'logs', 'latest.log'), 'log');
+
+    const saved = await h.json(cookie, 'POST', '/api/templates', { instance: 'Hub', name: 'lobby', description: 'the lobby' });
+    assert.equal(saved.status, 201, JSON.stringify(saved.body));
+    assert.deepEqual((await h.json(cookie, 'GET', '/api/templates')).body.templates.map((t) => [t.name, t.loader, t.mcVersion]), [['lobby', 'paper', '1.21.1']]);
+    assert.equal((await h.json(cookie, 'POST', '/api/templates', { instance: 'Hub', name: 'lobby' })).status, 400, 'names are unique');
+
+    for (const expectedName of ['Lobby', 'Lobby02']) {
+      const made = await h.json(cookie, 'POST', '/api/instances', { name: 'Lobby', template: 'lobby', proxy: 'Proxy' });
+      assert.equal(made.status, 202, JSON.stringify(made.body));
+      const log = await h.until(async () => { const l = (await h.json(cookie, 'GET', '/api/create-log')).body; return l.done && l; }, 'the build to finish');
+      assert.equal(log.error, null);
+      assert.equal(log.name, expectedName);
+      assert.deepEqual([log.link.errors, log.link.changed, log.link.proxyChanged], [[], [expectedName], true]);
+      const dir = dirOf(expectedName);
+      assert.equal(fs.readFileSync(path.join(dir, 'plugins', 'lobby.jar'), 'utf8'), 'jar');
+      assert.equal(fs.readFileSync(path.join(dir, 'world', 'level.dat'), 'utf8'), 'world');
+      assert.ok(!fs.existsSync(path.join(dir, 'logs')));
+      const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'panel-config.json'), 'utf8'));
+      assert.equal(cfg.ramMaxMB, 2048, 'the heap size comes from the template');
+    }
+    const toml = fs.readFileSync(path.join(dirOf('Proxy'), 'velocity.toml'), 'utf8');
+    const ports = (await h.json(cookie, 'GET', '/api/instances')).body.instances.filter((i) => i.name.startsWith('Lobby')).map((i) => i.port);
+    assert.equal(new Set(ports).size, 2, 'every copy gets its own port');
+    assert.match(toml, /^Lobby = "127\.0\.0\.1:\d+"$/m);
+    assert.match(toml, /^Lobby02 = "127\.0\.0\.1:\d+"$/m);
+    assert.match(fs.readFileSync(path.join(dirOf('Lobby02'), 'server.properties'), 'utf8'), /^online-mode=false$/m);
+
+    assert.equal((await h.json(cookie, 'POST', '/api/instances', { name: 'X', template: 'nope' })).status, 400);
+    assert.equal((await h.json(cookie, 'POST', '/api/instances', { name: 'X', template: 'lobby', proxy: 'Hub' })).status, 400, 'only a proxy can be linked');
+    assert.equal((await h.json(cookie, 'DELETE', '/api/templates/lobby')).status, 200);
+    assert.deepEqual((await h.json(cookie, 'GET', '/api/templates')).body.templates, []);
+    assert.ok((await names()).includes('Lobby02'), 'servers built from a template stay when it is deleted');
+  });
+});

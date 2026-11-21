@@ -98,6 +98,16 @@ const NETWORK = MeowNetwork.mount({
     return data;
   },
   t, esc, toast,
+  templates: {
+    list: async () => (await fetch(`${location.origin}/_meta/api/templates`, { cache: 'no-store' })).json(),
+    remove: async (name) => { const r = await fetch(`${location.origin}/_meta/api/templates/${encodeURIComponent(name)}`, { method: 'DELETE' }); if (!r.ok) throw new Error(t('Could not remove the template')); },
+    add: async (body) => {
+      const r = await fetch(`${location.origin}/_meta/api/instances`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, proxy: INST_NAME }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    },
+    creation: async () => (await fetch(`${location.origin}/_meta/api/create-log`, { cache: 'no-store' })).json(),
+  },
 });
 
 // --- Database (optional feature) ---

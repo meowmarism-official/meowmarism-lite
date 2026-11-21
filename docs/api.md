@@ -99,6 +99,10 @@ Scope `instances`. Creating an instance needs a token that is not limited to ins
 | `GET /api/v1/instances/:name/software` | | Installed version and the state of a running upgrade |
 | `POST /api/v1/instances/:name/software` | `{ "mcVersion", "loaderVersion?", "allowDowngrade?" }` | Changes the Minecraft or loader version with a backup first. The server must be stopped |
 | `POST /api/v1/instances/:name/software/rollback` | `{ "restoreWorld?": true }` | Goes back to the version before the last upgrade |
+| `GET /api/v1/templates` | | Saved templates |
+| `POST /api/v1/instances/:name/template` | `{ "name", "includeWorld?": true, "description?" }` | Saves a stopped instance as a template: software, plugins or mods, configs and, unless `includeWorld` is false, the world |
+| `DELETE /api/v1/templates/:name` | | Deletes a template; servers built from it stay. Needs a token without instance limits |
+| `POST /api/v1/instances` with `{ "template", "name", "proxy?", "entry?", "port?", "ramMB?" }` | | Builds a server from a template, without any download. With `proxy` (the name of a Velocity instance) it is also linked to that network; `entry` makes it the entry server. The finished build reports what to restart under `link` in `GET /api/v1/creation` |
 | `GET /api/v1/instances/:name/network` | | A proxy: which servers are behind it, the entry server, forced hosts |
 | `POST /api/v1/instances/:name/network` | `{ "servers": ["Hub"], "tryOrder": ["Hub"], "forcedHosts": { "play.example.com": ["Hub"] } }` | Links Paper and Purpur servers (1.19+) to a proxy and sets up secure forwarding on both sides. The answer lists what needs a restart and what failed |
 

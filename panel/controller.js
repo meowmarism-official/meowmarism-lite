@@ -461,12 +461,18 @@ async function createInstance(data, accept) {
   try {
     const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
     if (modpackReq && !/^[\w-]{1,64}$/.test(modpackReq.versionId)) throw new Error('invalid modpack');
+    const tpl = data.template ? templatesStore.get(String(data.template)) : null;
+    if (data.template && !tpl) throw new Error('no such template');
+    if (tpl && modpackReq) throw new Error('a template and a modpack cannot be combined');
+    const proxyInst = data.proxy ? loadInstances().find((i) => i.name === String(data.proxy) && i.loader === 'velocity') : null;
+    if (data.proxy && !proxyInst) throw new Error('no such proxy');
     const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
     let loader = ['vanilla', 'paper', 'purpur', 'velocity', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
     let mcVersion = String(data.mcVersion || '').trim();
     let loaderVersion = String(data.loaderVersion || '').trim();
-    let mcPort = Number(data.port);
-    const ramMB = Math.min(32768, Math.max(1024, Number(data.ramMB) || 4096));
+    if (tpl) { loader = tpl.loader; mcVersion = tpl.mcVersion; loaderVersion = tpl.loaderVersion || ''; }
+    let mcPort = Number(data.port) || (tpl ? 25565 : NaN);
+    const ramMB = Math.min(32768, Math.max(1024, Number(data.ramMB) || (tpl && tpl.ramMB) || 4096));
     const backupIntervalHours = Math.min(168, Math.max(1, Number(data.backupIntervalHours) || 6));
     const maxBackups = Math.min(100, Math.max(1, Number(data.maxBackups) || 10));
     if (!rawName) throw new Error('invalid instance name');
@@ -517,7 +523,12 @@ async function createInstance(data, accept) {
       setCreatePhase('Preparing Java', 10);
       const javaBin = await ensureJava(loader === 'velocity' ? '1.21' : mcVersion, createLog);
       setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
-      const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
+      let builtVersion;
+      if (tpl) {
+        setCreatePhase('Copying the template', 40);
+        createLog(`copying the template ${tpl.name}`);
+        templatesStore.restore(tpl.name, staging);
+      } else builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
       if (pack) {
         setCreatePhase('Downloading modpack files', 45);
         await installModpack({
@@ -539,6 +550,15 @@ async function createInstance(data, accept) {
       const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, createdAt: Date.now() };
       saveInstances([...current, inst]);
       registered = true;
+      if (proxyInst) {
+        try {
+          creationLog.link = linkToProxy(proxyInst, inst, data.entry === true);
+          createLog(`linked to the proxy ${proxyInst.name}`);
+        } catch (err) {
+          creationLog.link = { changed: [], proxyChanged: false, errors: [{ name: inst.name, error: err.message }] };
+          createLog(`could not link to the proxy: ${err.message}`);
+        }
+      }
       startWorker(inst);
       setCreatePhase('Ready', 100);
       creationLog.progress = 100;
@@ -757,6 +777,11 @@ const api = require('./api').createApi({
     remove: (inst, options) => removeInstance(inst, options),
     upgrade: (inst, data, rollback) => startUpgradeJob(inst, data, rollback),
     upgradeStatus: (inst) => upgradeStatusOf(inst),
+    templates: {
+      list: () => templatesStore.list(),
+      save: (inst, data) => saveTemplateFrom(inst, data),
+      remove: (name) => templatesStore.remove(name),
+    },
     network: {
       describe: (inst) => proxyNetwork.describe(inst.dir, loadInstances().filter((i) => i.id !== inst.id)),
       apply: (inst, request, allowed) => proxyNetwork.apply(inst.dir, loadInstances().filter((i) => i.id !== inst.id && allowed(i.name)), { servers: request.servers, tryOrder: request.tryOrder, forcedHosts: request.forcedHosts }),
@@ -832,6 +857,25 @@ const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purp
 const { withServerPort } = require('./core/modules/properties');
 const proxyCfg = require('./core/modules/proxy');
 const proxyNetwork = require('./core/modules/proxy-network');
+const templatesStore = require('./templates').createTemplates({ root: path.join(DATA_ROOT, 'templates') });
+
+// Adds a server to a proxy's network next to the ones already linked.
+function linkToProxy(proxy, added, entry) {
+  const others = loadInstances().filter((i) => i.id !== proxy.id);
+  const state = proxyNetwork.describe(proxy.dir, others);
+  const servers = [...state.backends.filter((b) => b.linked).map((b) => b.name), added.name];
+  const tryOrder = entry ? [added.name, ...state.tryOrder.filter((n) => n !== added.name)] : state.tryOrder;
+  return proxyNetwork.apply(proxy.dir, others, { servers, tryOrder, forcedHosts: state.forcedHosts });
+}
+
+// Saves a stopped instance as a template.
+async function saveTemplateFrom(inst, data) {
+  const status = workers.has(inst.id) ? await fetchWorkerStatus(inst.panelPort) : null;
+  if (status && status.running) throw Object.assign(new Error('stop the server first, so its files do not change while they are copied'), { code: 409 });
+  let ramMB = null;
+  try { ramMB = JSON.parse(fs.readFileSync(path.join(inst.dir, 'panel-config.json'), 'utf8')).ramMaxMB || null; } catch (_) {}
+  return templatesStore.save({ name: String(data.name || ''), inst, includeWorld: data.includeWorld !== false, description: data.description, ramMB });
+}
 
 // Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
 function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin, ramMB, loader }) {
@@ -1138,6 +1182,42 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (url.pathname === '/api/templates' && req.method === 'GET') {
+    if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    sendJson(res, 200, { templates: templatesStore.list() });
+    return;
+  }
+  if (url.pathname === '/api/templates' && req.method === 'POST') {
+    if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const data = await readBody(req);
+    const inst = loadInstances().find((i) => i.name === String(data.instance || ''));
+    if (!inst) { sendJson(res, 404, { ok: false, error: 'no such instance' }); return; }
+    if (!capsFor(req, inst.name).includes('files')) { sendJson(res, 403, { ok: false, error: 'saving a template needs the Files permission' }); return; }
+    try { sendJson(res, 201, { ok: true, template: await saveTemplateFrom(inst, data) }); } catch (err) { sendJson(res, err.code || 400, { ok: false, error: err.message }); }
+    return;
+  }
+  const templateMatch = url.pathname.match(/^\/api\/templates\/([^/]+)$/);
+  if (templateMatch && req.method === 'DELETE') {
+    if (!canPanel(req, 'create')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const removed = templatesStore.remove(safeDecode(templateMatch[1]));
+    sendJson(res, removed ? 200 : 404, { ok: removed });
+    return;
+  }
+
+  if (url.pathname === '/api/features' && req.method === 'GET') {
+    sendJson(res, 200, { api: panelSettings.feature('api'), database: panelSettings.feature('database') });
+    return;
+  }
+  if (url.pathname === '/api/database/overview' && req.method === 'GET') {
+    if (!canPanel(req, 'users')) { sendJson(res, 403, { ok: false, error: 'only owners can see all databases' }); return; }
+    if (!panelSettings.feature('database') || !dbEngine.status().running) { sendJson(res, 200, { databases: [] }); return; }
+    try {
+      const sizes = await dbEngine.sizes();
+      const entry = (id, label, db) => ({ id, label, exists: !!dbEngine.connection(db), tables: (sizes[db] || {}).tables || 0, bytes: (sizes[db] || {}).bytes || 0 });
+      sendJson(res, 200, { databases: [entry('shared', 'Network', sqlDb.SHARED_DB), ...loadInstances().map((i) => entry(`server:${i.name}`, i.name, sqlDb.instanceDbName(i.name)))] });
+    } catch (err) { sendJson(res, 500, { ok: false, error: err.message }); }
+    return;
+  }
   if (url.pathname === '/api/database/status' && req.method === 'GET') {
     sendJson(res, 200, { ...databaseStatus(), shared: canPanel(req, 'users'), job: canPanel(req, 'update') ? dbJob : { running: dbJob.running } });
     return;
@@ -1289,7 +1369,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (['/', '/server', '/users', '/api', '/update', '/settings', '/system'].includes(url.pathname) && req.method === 'GET') {
+  if (['/', '/server', '/users', '/api', '/database', '/update', '/settings', '/system'].includes(url.pathname) && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(path.join(__dirname, 'controller.html')));
     return;

@@ -36,6 +36,11 @@ function rig({ enabled = true, up = ['survival', 'creative'], summaries = {} } =
       remove: async (inst, options) => { state.instCalls.push(['remove', inst.name, options]); return { status: 200, body: { ok: true, deletedFiles: options.files, deletedBackups: false } }; },
       upgrade: async (inst, data, rollback) => { state.instCalls.push(['upgrade', inst.name, data, rollback]); if (data.mcVersion === 'bad') throw new Error('that Minecraft version is not available for this loader'); },
       upgradeStatus: (inst) => ({ running: false, lines: [], current: { mcVersion: inst.mcVersion } }),
+      templates: {
+        list: () => [{ name: 'lobby', loader: 'paper', mcVersion: '1.21.1' }],
+        save: async (inst, data) => { state.instCalls.push(['template', inst.name, data]); if (!data.name) throw new Error('a template name has 1 to 40 letters, digits, - or _'); return { name: data.name, sourceInstance: inst.name }; },
+        remove: (name) => { state.instCalls.push(['template-remove', name]); return name === 'lobby'; },
+      },
       network: {
         describe: (inst) => ({ backends: [], tryOrder: [], forcedHosts: {}, port: 25565, ready: true, proxy: inst.name }),
         apply: (inst, request, allowed) => { state.instCalls.push(['network', inst.name, request, allowed('survival'), allowed('creative')]); return { changed: [], proxyChanged: true, errors: [] }; },
@@ -331,4 +336,25 @@ test('mods and plugins go through the instance panel with the mods capability', 
     ['POST', '/api/modrinth/update', 'view,mods'],
   ]);
   assert.deepStrictEqual(t.state.calls[2].body, { projectId: 'AANobbMI' });
+});
+
+test('templates are listed, saved from an instance and deleted through the API', async () => {
+  const t = rig({ up: [] });
+  const token = t.make(['instances']);
+  assert.strictEqual((await t.request('GET', '/api/v1/templates', { token: t.make(['read']) })).status, 403);
+  assert.deepStrictEqual((await t.request('GET', '/api/v1/templates', { token })).data.templates.map((x) => x.name), ['lobby']);
+  const saved = await t.request('POST', '/api/v1/instances/survival/template', { token, body: { name: 'hub', includeWorld: false } });
+  assert.deepStrictEqual([saved.status, saved.data.template.sourceInstance], [201, 'survival']);
+  assert.deepStrictEqual(t.state.instCalls.at(-1), ['template', 'survival', { name: 'hub', includeWorld: false }]);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/template', { token, body: {} })).status, 400);
+  assert.strictEqual((await t.request('DELETE', '/api/v1/templates/lobby', { token })).status, 200);
+  assert.strictEqual((await t.request('DELETE', '/api/v1/templates/nope', { token })).status, 404);
+});
+
+test('a token limited to instances cannot delete templates and only saves from its own instances', async () => {
+  const t = rig({ up: [] });
+  const limited = t.make(['instances'], { instances: ['creative'] });
+  assert.strictEqual((await t.request('DELETE', '/api/v1/templates/lobby', { token: limited })).status, 403);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/template', { token: limited, body: { name: 'x' } })).status, 404);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/creative/template', { token: limited, body: { name: 'x' } })).status, 201);
 });

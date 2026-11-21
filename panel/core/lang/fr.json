@@ -433,7 +433,24 @@
   "This server": "Ce serveur",
   "Whole network": "Tout le réseau",
   "Search, install, update and switch mods and plugins": "Rechercher, installer, mettre à jour et activer mods et plugins",
-  "Create, upgrade and delete instances and link servers to a proxy": "Créer, mettre à jour et supprimer des instances et relier des serveurs à un proxy"
+  "Create, upgrade and delete instances and link servers to a proxy": "Créer, mettre à jour et supprimer des instances et relier des serveurs à un proxy",
+  "Databases": "Bases de données",
+  "Not created": "Non créée",
+  "Template": "Modèle",
+  "Templates": "Modèles",
+  "Save this server as a template, to build new servers from it. Stop the server first.": "Enregistrez ce serveur comme modèle pour en créer de nouveaux. Arrêtez d’abord le serveur.",
+  "Template name": "Nom du modèle",
+  "Include the world": "Inclure le monde",
+  "Save as template": "Enregistrer comme modèle",
+  "Template saved": "Modèle enregistré",
+  "Could not remove the template": "Impossible de supprimer le modèle",
+  "Add server": "Ajouter un serveur",
+  "a number is added when the name is taken": "un numéro est ajouté si le nom est pris",
+  "Make it the entry server": "En faire le serveur d’entrée",
+  "Create and add": "Créer et ajouter",
+  "Build new servers from a template and add them to this network in one step.": "Créez de nouveaux serveurs depuis un modèle et ajoutez-les à ce réseau en une étape.",
+  "No templates yet. Save a server as a template on its Manage page.": "Pas encore de modèles. Enregistrez un serveur comme modèle sur sa page Manage.",
+  "Starting": "Démarrage"
  },
  "patterns": [
   [

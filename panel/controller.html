@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="/core/ui/sidebar.css">
 <link rel="stylesheet" href="/core/ui/users-ui.css">
 <link rel="stylesheet" href="/core/ui/api-ui.css">
+<link rel="stylesheet" href="/core/ui/database-ui.css">
+<link rel="stylesheet" href="/core/ui/network-ui.css">
 <link rel="stylesheet" href="/core/ui/modpack-ui.css">
 <script src="/i18n.js"></script>
 <script src="/core/ui/loaders.js"></script>
@@ -17,6 +19,7 @@
 <script src="/core/ui/system-ui.js"></script>
 <script src="/core/ui/shell.js"></script>
 <script src="/core/ui/api-ui.js"></script>
+<script src="/core/ui/database-ui.js"></script>
 <script src="/core/ui/wizard-ui.js"></script>
 <script src="/core/ui/modpack-ui.js"></script>
 <script src="/core/ui/users-ui.js"></script>
@@ -103,12 +106,13 @@ const SHELL = MeowShell.mount({
   logoutHref: '/auth/logout',
   updateHint: 'Updating stops running servers briefly, installs the newest release, and starts the ones that were running again.',
   api: true,
-  paths: { server: '/server', users: '/users', api: '/api', settings: '/settings', system: '/system', update: '/update' },
-  urls: { version: '/api/version', update: '/api/update', updateStatus: '/api/update-status', settings: '/api/settings', system: '/api/system-info' },
+  database: true,
+  paths: { server: '/server', users: '/users', api: '/api', database: '/database', settings: '/settings', system: '/system', update: '/update' },
+  urls: { features: '/api/features', version: '/api/version', update: '/api/update', updateStatus: '/api/update-status', settings: '/api/settings', system: '/api/system-info' },
   t: window.t, esc,
   confirm: (title, message, label) => modalConfirm(title, message, label),
   pagesEl: document.querySelector('.wrap'),
-  onPage: (page) => { if (page === 'users') loadUsers(); if (page === 'update') API_TOGGLE.load(); if (page === 'api') API_UI.load(); },
+  onPage: (page) => { if (page === 'users') loadUsers(); if (page === 'update') API_TOGGLE.load(); if (page === 'api') API_UI.load(); if (page === 'database') DB_PAGE.load(); },
 });
 
 // --- optional HTTP API (Update > Optional features) ---
@@ -132,9 +136,21 @@ const apiHandlers = {
   updateToken: (id, body) => apiCall('PATCH', `/api/api-admin/tokens/${id}`, body),
   renewToken: (id, body) => apiCall('POST', `/api/api-admin/tokens/${id}/renew`, body),
 };
+const DB_PAGE = MeowDatabase.mount({
+  el: $('databaseRoot'), t: window.t, esc,
+  toast: (message, type) => { if (type === 'error') modalAlert('Error', message); },
+  confirm: (title, message, label) => modalConfirm(title, message, label),
+  status: async () => (await fetch('/api/database/status', { cache: 'no-store' })).json(),
+  targets: () => [],
+  overview: async () => (await fetch('/api/database/overview', { cache: 'no-store' })).json(),
+  api: async (target, method, sub, body) => {
+    const base = target === 'shared' ? '/api/database/shared' : `/api/database/server/${encodeURIComponent(target.slice(7))}`;
+    return apiCall(method, `${base}${sub || ''}`, body);
+  },
+});
 const API_UI = MeowApi.mount({ ...apiHandlers, mode: 'page', el: $('apiRoot') });
 const API_TOGGLE = MeowApi.mount({
-  ...apiHandlers, mode: 'toggle', el: $('optionalRoot'),
+  ...apiHandlers, mode: 'toggle', el: $('optionalRoot'), onChange: () => SHELL.refreshFeatures(),
   database: {
     status: async () => (await fetch('/api/database/status', { cache: 'no-store' })).json(),
     setEnabled: (enabled) => apiCall('POST', '/api/database/enable', { enabled }),

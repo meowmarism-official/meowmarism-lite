@@ -105,6 +105,12 @@
             <div class="hint" id="swLast" style="margin:8px 0"></div>
             <div class="settings-actions"><button class="btn primary" id="btnUpgrade">Upgrade...</button> <button class="btn" id="btnRollback" style="display:none">Roll back</button></div>
           </div></article>
+          <article class="card span-6"><div class="card-head"><div class="card-title">Template</div></div><div class="card-body">
+            <div class="hint" style="margin-bottom:8px">Save this server as a template, to build new servers from it. Stop the server first.</div>
+            <div class="cmd-row" style="margin-bottom:6px"><label class="hint" style="width:100%">Template name<input class="compact-input" id="tplName" maxlength="40" placeholder="lobby"></label></div>
+            <label class="hint" style="display:block;margin-bottom:8px"><input type="checkbox" id="tplWorld" checked> Include the world</label>
+            <div class="settings-actions"><button class="btn primary" id="btnSaveTemplate">Save as template</button></div>
+          </div></article>
           <article class="card span-12" style="border-color:#5a2f2f"><div class="card-head"><div class="card-title" style="color:#f1a0a0">Danger zone</div></div><div class="card-body">
             <div class="hint" style="margin-bottom:10px">Deleting the instance removes it from the panel and deletes its folder with the world, mods and configuration. The Minecraft server has to be stopped. This cannot be undone.</div>
             <div class="settings-actions"><button class="btn danger" id="btnDeleteInstance">Delete instance...</button></div>

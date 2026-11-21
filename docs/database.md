@@ -17,6 +17,8 @@ Each page shows host, port, database, user, password and a JDBC URL to give to a
 
 ## What you can do
 
+The **Database** menu of the panel (owners) lists every database with its size and opens any of them. It and the API menu only show while the feature is switched on.
+
 Create databases, create tables (column types, size, required, default, auto-increment, primary key), add and delete columns, browse rows page by page, add, edit and delete rows, and run SQL. Rows can only be edited in tables that have a primary key.
 
 Deleting an instance does not delete its database; delete it on its Database page first if you want it gone.

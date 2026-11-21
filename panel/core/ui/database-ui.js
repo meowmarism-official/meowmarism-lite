@@ -1,6 +1,7 @@
 // Database page: connection details, tables, rows and a SQL console for one database (this server or the whole network).
-// cfg: { el, t, esc, toast, confirm(title, message, label), status() -> { enabled, installed, running, error, job }, targets() -> [{ id, label }],
-//        api(target, method, sub, body) -> data (throws on error) }
+// cfg: { el, t, esc, toast, confirm(title, message, label), status() -> { enabled, installed, running, error, job }, targets(status) -> [{ id, label }],
+//        api(target, method, sub, body) -> data (throws on error),
+//        overview?() -> { databases: [{ id, label, exists, tables, bytes }] }: the panel-wide page lists every database and picks from it }
 (function () {
   const TYPES = ['int', 'bigint', 'smallint', 'tinyint', 'boolean', 'double', 'float', 'decimal', 'varchar', 'text', 'longtext', 'date', 'datetime', 'timestamp', 'uuid', 'json', 'blob'];
   const PAGE = 50;
@@ -9,6 +10,7 @@
     const { t, esc, toast } = cfg;
     let status = null;
     let targets = [];
+    let ov = null;
     let target = null;
     let view = { overview: null, table: null, offset: 0, tab: 'tables', form: null, colForm: null, edit: null, sql: '', result: null, revealed: false };
     const $ = (id) => cfg.el.querySelector(`#${id}`);
@@ -94,10 +96,16 @@
         <div class="row" style="margin:8px 0"><button class="btn primary" id="dbRun">${esc(t('Run'))}</button></div>${out}</div>`;
     }
 
+    const bytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+    function overviewCard() {
+      const rows = ov.databases.map((d) => `<tr class="${d.id === target ? 'editing' : ''}"><td><strong>${esc(d.id === 'shared' ? t('Network') : d.label)}</strong></td><td>${d.exists ? esc(t('Created')) : `<span class="db-null">${esc(t('Not created'))}</span>`}</td><td>${d.exists ? d.tables : ''}</td><td>${d.exists ? esc(bytes(d.bytes)) : ''}</td><td class="db-act"><button class="btn small${d.id === target ? ' primary' : ''}" data-pick="${esc(d.id)}">${esc(t('Open'))}</button></td></tr>`).join('');
+      return `<div class="card"><div class="card-title">${esc(t('Databases'))}</div><div class="db-scroll"><table class="db-grid"><thead><tr><th>${esc(t('Name'))}</th><th>${esc(t('Status'))}</th><th>${esc(t('Tables'))}</th><th>${esc(t('Size'))}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    }
+
     function render() {
       const blocked = notReady();
       if (blocked) { cfg.el.innerHTML = blocked; return; }
-      const tabs = targets.length > 1 ? `<div class="db-tabs">${targets.map((x) => `<button class="btn small${x.id === target ? ' primary' : ''}" data-target="${esc(x.id)}">${esc(t(x.label))}</button>`).join('')}</div>` : '';
+      const tabs = (ov ? overviewCard() : '') + (!ov && targets.length > 1 ? `<div class="db-tabs">${targets.map((x) => `<button class="btn small${x.id === target ? ' primary' : ''}" data-target="${esc(x.id)}">${esc(t(x.label))}</button>`).join('')}</div>` : '');
       if (!view.overview) { cfg.el.innerHTML = `${tabs}<div class="hint">${esc(t('Loading...'))}</div>`; wire(); return; }
       if (!view.overview.exists) {
         cfg.el.innerHTML = `${tabs}<div class="card"><div class="card-title">${esc(t('Database'))}</div><p class="hint">${esc(t('There is no database here yet.'))}</p><button class="btn primary" id="dbCreate">${esc(t('Create database'))}</button></div>`;
@@ -117,6 +125,7 @@
     }
 
     async function reload() {
+      if (cfg.overview) { try { ov = await cfg.overview(); } catch (_) { /* keep the last list */ } }
       view.overview = await call('GET', '');
       if (view.table) {
         if (!view.overview.tables.includes(view.table.name)) view.table = null;
@@ -155,6 +164,7 @@
 
     function wire() {
       cfg.el.querySelectorAll('[data-target]').forEach((b) => b.addEventListener('click', () => act(async () => { target = b.dataset.target; view = { ...view, overview: null, table: null, form: null, edit: null, result: null, revealed: false }; render(); await reload(); })));
+      cfg.el.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => act(async () => { target = b.dataset.pick; view = { ...view, overview: null, table: null, form: null, colForm: null, edit: null, result: null, revealed: false }; render(); await reload(); })));
       cfg.el.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { view.tab = b.dataset.tab; render(); }));
       $('dbCreate')?.addEventListener('click', () => act(async () => { await call('POST', '/create'); await reload(); }));
       $('dbReveal')?.addEventListener('click', () => { view.revealed = !view.revealed; render(); });
@@ -230,7 +240,8 @@
 
     async function load() {
       try { status = await cfg.status(); } catch (_) { return; }
-      targets = cfg.targets(status);
+      if (cfg.overview && status.enabled && status.running) { try { ov = await cfg.overview(); } catch (_) { ov = null; } }
+      targets = ov ? ov.databases.map((d) => ({ id: d.id, label: d.label })) : cfg.targets(status);
       if (!target || !targets.some((x) => x.id === target)) target = targets[0] && targets[0].id;
       const blocked = notReady();
       if (blocked || !target) { render(); return; }
