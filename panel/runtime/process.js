@@ -30,7 +30,7 @@ function seconds(value, fallback) {
   return Number.isFinite(n) && n >= 5 ? n : fallback;
 }
 
-// ctx: { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks, serverPid?, port()?, portSetting? }
+// ctx: { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks, serverPid?, port()?, portSetting?, dataRoot?, rememberJava?(bin) }
 function createProcessRuntime(ctx) {
   const { serverDir, logFile, propertiesFile, mcVersion, panelConfig, hooks } = ctx;
   let child = null;
@@ -49,7 +49,15 @@ function createProcessRuntime(ctx) {
 
   function startBlock() {
     const needJava = launchLib.requiredJavaMajor(mcVersion);
-    const haveJava = launchLib.javaMajor(panelConfig.javaPath);
+    let haveJava = launchLib.javaMajor(panelConfig.javaPath);
+    if (needJava && (haveJava == null || haveJava < needJava) && ctx.dataRoot) {
+      const found = launchLib.findPanelJava(ctx.dataRoot, needJava);
+      if (found) {
+        panelConfig.javaPath = found.bin;
+        if (ctx.rememberJava) ctx.rememberJava(found.bin);
+        haveJava = found.major;
+      }
+    }
     if (needJava && (haveJava == null || haveJava < needJava)) {
       return `Minecraft ${mcVersion} needs Java ${needJava}, but ${haveJava == null ? 'no Java was found' : `Java ${haveJava} is installed`}. Install Java ${needJava} under Automation > Startup.`;
     }

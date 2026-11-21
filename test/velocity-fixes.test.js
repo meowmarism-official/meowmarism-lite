@@ -61,3 +61,31 @@ test('a build that never ended shows up as a failure after the restart, once', (
   marker.end(root);
   assert.strictEqual(marker.interrupted(root), null, 'a finished build leaves no marker');
 });
+
+// The panel's own Java is used when the instance has none and the system has none or too little.
+const unix = { skip: process.platform === 'win32' ? 'needs shell scripts' : false };
+function fakeJava(dataRoot, folder, major) {
+  const dir = path.join(dataRoot, 'java', folder, 'bin');
+  fs.mkdirSync(dir, { recursive: true });
+  const bin = path.join(dir, 'java');
+  fs.writeFileSync(bin, `#!/bin/sh\necho 'openjdk version "${major}.0.1" 2024-01-01' >&2\n`, { mode: 0o755 });
+  return bin;
+}
+
+test('the panel finds its own Java runtimes, smallest sufficient first', unix, () => {
+  const root = tmp();
+  fakeJava(root, '21', 21);
+  fakeJava(root, 'jdk-25', 25);
+  fs.mkdirSync(path.join(root, 'java', 'notes'), { recursive: true });
+  assert.deepStrictEqual(launch.panelJavas(root).map((j) => j.major), [21, 25]);
+  assert.strictEqual(launch.findPanelJava(root, 17).major, 21);
+  assert.strictEqual(launch.findPanelJava(root, 25).bin, path.join(root, 'java', 'jdk-25', 'bin', 'java'));
+  assert.strictEqual(launch.findPanelJava(root, 26), null);
+  assert.deepStrictEqual(launch.panelJavas(path.join(root, 'missing')), []);
+});
+
+test('a runtime that does not run as the version in its folder name is not used', unix, () => {
+  const root = tmp();
+  fakeJava(root, '25', 17);
+  assert.strictEqual(launch.findPanelJava(root, 25), null);
+});

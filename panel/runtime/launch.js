@@ -115,4 +115,25 @@ function javaMajor(javaPath) {
   return value;
 }
 
-module.exports = { requiredJavaMajor, javaMajor, PRESETS, jvmArgsFile, syncJvmArgsFile, readDetectedMemory, limitsMode, buildLaunch, parseExtraArgs, cgroupAvailable, tasksetAvailable };
+// Java runtimes the panel installed itself: <data>/java/<major> and <data>/java/jdk-<major>, smallest first.
+function panelJavas(dataRoot) {
+  const root = path.join(dataRoot, 'java');
+  let names;
+  try { names = fs.readdirSync(root); } catch (_) { return []; }
+  return names
+    .map((name) => { const m = /^(?:jdk-)?(\d+)$/.exec(name); return m ? { major: Number(m[1]), bin: path.join(root, name, 'bin', 'java') } : null; })
+    .filter((j) => j && fs.existsSync(j.bin))
+    .sort((a, b) => a.major - b.major);
+}
+
+// The smallest runtime of the panel that really runs as Java `need` or newer; null when there is none.
+function findPanelJava(dataRoot, need) {
+  for (const j of panelJavas(dataRoot)) {
+    if (j.major < need) continue;
+    const real = javaMajor(j.bin);
+    if (real != null && real >= need) return { major: real, bin: j.bin };
+  }
+  return null;
+}
+
+module.exports = { panelJavas, findPanelJava, requiredJavaMajor, javaMajor, PRESETS, jvmArgsFile, syncJvmArgsFile, readDetectedMemory, limitsMode, buildLaunch, parseExtraArgs, cgroupAvailable, tasksetAvailable };

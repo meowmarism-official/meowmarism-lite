@@ -488,6 +488,8 @@ const runtime = require('./runtime').createRuntime({
   logFile: LOG_FILE,
   propertiesFile: PROPERTIES_FILE,
   port: () => serverPort(),
+  dataRoot: cfg.DATA_ROOT,
+  rememberJava: (bin) => { panelConfig.javaPath = bin; savePanelConfig(); },
   portSetting: IS_PROXY ? 'bind in velocity.toml' : undefined,
   mcVersion: INSTANCE_MC_VERSION,
   panelConfig,
