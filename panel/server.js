@@ -167,7 +167,7 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
     if (child && child.stdin && child.stdin.writable) {
       const forceExit = setTimeout(() => process.exit(0), 20000);
       runtime.whenStopped(() => { clearTimeout(forceExit); process.exit(0); });
-      child.stdin.write('stop\n');
+      child.stdin.write(`${STOP_COMMAND}\n`);
     } else {
       process.exit(0);
     }
@@ -197,6 +197,7 @@ const accessApi = require('./core/modules/access').createAccess({
 });
 const readServerProperties = () => propertiesApi.read();
 const IS_PROXY = INSTANCE_LOADER === 'velocity';
+const STOP_COMMAND = IS_PROXY ? 'shutdown' : 'stop';
 const proxyCfg = require('./core/modules/proxy');
 const buildSettingsState = () => propertiesApi.state();
 function applyQueuedSettings() {
@@ -490,6 +491,7 @@ const runtime = require('./runtime').createRuntime({
   port: () => serverPort(),
   dataRoot: cfg.DATA_ROOT,
   rememberJava: (bin) => { panelConfig.javaPath = bin; savePanelConfig(); },
+  stopCommand: STOP_COMMAND,
   portSetting: IS_PROXY ? 'bind in velocity.toml' : undefined,
   mcVersion: INSTANCE_MC_VERSION,
   panelConfig,

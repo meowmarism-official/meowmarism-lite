@@ -158,7 +158,7 @@ function createProcessRuntime(ctx) {
     const pid = ctx.serverPid?.(true);
     if (pid && pid !== child.pid) javaPid = pid;
     hooks.stopping(why);
-    child.stdin.write('stop\n');
+    child.stdin.write(`${ctx.stopCommand || 'stop'}\n`);
     watchdog.arm(seconds(panelConfig.stopTimeoutSec, DEFAULT_STOP_TIMEOUT_SEC) * 1000);
     return true;
   }
