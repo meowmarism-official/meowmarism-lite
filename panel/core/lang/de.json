@@ -1056,7 +1056,9 @@
   "Build new servers from a template and add them to this network in one step.": "Baue neue Server aus einem Template und füge sie in einem Schritt diesem Netzwerk hinzu.",
   "No templates yet. Save a server as a template on its Manage page.": "Noch keine Templates. Speichere einen Server auf seiner Manage-Seite als Template.",
   "Starting": "Startet",
-  "Retry": "Erneut versuchen"
+  "Retry": "Erneut versuchen",
+  "Start order": "Startreihenfolge",
+  "Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.": "Server, die dieser braucht. Sie starten vor ihm und stoppen nach ihm, auch bei einem Panel-Update. Beispiel: Der Haupt-Proxy braucht den Standby-Proxy."
  },
  "patterns": [
   [

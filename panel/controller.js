@@ -764,6 +764,7 @@ const api = require('./api').createApi({
     remove: (inst, options) => removeInstance(inst, options),
     upgrade: (inst, data, rollback) => startUpgradeJob(inst, data, rollback),
     upgradeStatus: (inst) => upgradeStatusOf(inst),
+    dependencies: { get: (inst) => inst.dependsOn || [], set: (inst, list) => setDependencies(inst, list) },
     templates: {
       list: () => templatesStore.list(),
       save: (inst, data) => saveTemplateFrom(inst, data),
@@ -789,12 +790,52 @@ async function runningInstanceNames() {
   return names;
 }
 
+const order = require('./lib/order');
+
+// Starts instances so that what others need is up first; each layer must be ready before the next one starts.
+async function startInOrder(instances) {
+  const byName = new Map(instances.map((i) => [i.name, i]));
+  await order.startInOrder([...byName.keys()], (n) => byName.get(n).dependsOn, {
+    start: (name) => workerAction(byName.get(name).panelPort, '/start'),
+    ready: (names) => waitReady(names.map((n) => byName.get(n)), 5 * 60 * 1000),
+  });
+}
+async function waitReady(instances, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const answers = await Promise.all(instances.map((i) => workerJson(i.panelPort, '/api/summary', 'GET', 3000)));
+    if (answers.every((r) => r.status === 200 && r.body && r.body.phase === 'ready')) return;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+// Which instances an instance needs to be running (they start before it and stop after it).
+function setDependencies(inst, list) {
+  if (!Array.isArray(list)) throw new Error('dependsOn must be a list of instance names');
+  const all = loadInstances();
+  const names = [...new Set(list.map(String))];
+  for (const n of names) {
+    if (n === inst.name) throw new Error('an instance cannot need itself');
+    if (!all.some((i) => i.name === n)) throw new Error(`no such instance: ${n}`);
+  }
+  const needsOf = (n) => (all.find((i) => i.name === n) || {}).dependsOn;
+  if (order.makesCycle(inst.name, names, needsOf)) throw new Error('that would make two instances wait for each other');
+  saveInstances(all.map((i) => (i.id === inst.id ? { ...i, dependsOn: names } : i)));
+  return names;
+}
+
 // Update hooks: servers are stopped before the panel files are swapped and started again if the swap fails.
 async function stopServersForUpdate() {
   const running = await runningInstanceNames();
   fs.writeFileSync(RESTART_FILE, JSON.stringify(running));
-  for (const inst of loadInstances()) if (running.includes(inst.name)) await workerAction(inst.panelPort, '/stop');
+  const byName = new Map(loadInstances().map((i) => [i.name, i]));
   const stopDeadline = Date.now() + 3 * 60 * 1000;
+  await order.stopInOrder(running, (n) => (byName.get(n) || {}).dependsOn, {
+    stop: (name) => (byName.has(name) ? workerAction(byName.get(name).panelPort, '/stop') : null),
+    running: runningInstanceNames,
+    deadline: stopDeadline,
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  });
   while (Date.now() < stopDeadline && (await runningInstanceNames()).length) await new Promise((r) => setTimeout(r, 1500));
   await Promise.all([...workers.values()].map((w) => new Promise((resolve) => {
     const t = setTimeout(resolve, 45000);
@@ -805,7 +846,7 @@ async function stopServersForUpdate() {
 }
 function restoreAfterFailedUpdate(running) {
   for (const inst of loadInstances()) startWorker(inst);
-  setTimeout(() => { for (const inst of loadInstances()) if (running.includes(inst.name)) workerAction(inst.panelPort, '/start'); }, 3000);
+  setTimeout(() => { startInOrder(loadInstances().filter((i) => running.includes(i.name))); }, 3000);
   try { fs.unlinkSync(RESTART_FILE); } catch (_) {}
 }
 
@@ -1435,6 +1476,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const depMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/dependencies$/);
+  if (depMatch) {
+    const inst = loadInstances().find((i) => i.name === safeDecode(depMatch[1]));
+    if (!inst) { sendJson(res, 404, { ok: false, error: 'not found' }); return; }
+    const caps = capsFor(req, inst.name);
+    if (req.method === 'GET') {
+      if (!caps.includes('view')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+      sendJson(res, 200, { dependsOn: inst.dependsOn || [] });
+      return;
+    }
+    if (req.method === 'POST') {
+      if (!caps.includes('settings')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+      const data = await readBody(req);
+      try { sendJson(res, 200, { ok: true, dependsOn: setDependencies(inst, data.dependsOn) }); } catch (err) { sendJson(res, 400, { ok: false, error: err.message }); }
+      return;
+    }
+  }
+
   // Instances are addressed by name in the API, not their internal id - the
   // id only matters for the workers/panelCrashes maps below.
   const upgradeMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/(upgrade|upgrade\/rollback|upgrade-status)$/);
@@ -1554,7 +1613,5 @@ server.listen(CONTROLLER_PORT, process.env.MEOWMARISM_HOST || '0.0.0.0', () => {
     names = JSON.parse(fs.readFileSync(RESTART_FILE, 'utf8'));
     fs.unlinkSync(RESTART_FILE);
   } catch (_) {}
-  setTimeout(() => {
-    for (const inst of loadInstances()) if (instanceAutoStarts(inst) || names.includes(inst.name)) workerAction(inst.panelPort, '/start');
-  }, 3000);
+  setTimeout(() => { startInOrder(loadInstances().filter((i) => instanceAutoStarts(i) || names.includes(i.name))); }, 3000);
 });

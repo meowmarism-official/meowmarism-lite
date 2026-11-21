@@ -105,6 +105,11 @@
             <div class="hint" id="swLast" style="margin:8px 0"></div>
             <div class="settings-actions"><button class="btn primary" id="btnUpgrade">Upgrade...</button> <button class="btn" id="btnRollback" style="display:none">Roll back</button></div>
           </div></article>
+          <article class="card span-6"><div class="card-head"><div class="card-title">Start order</div></div><div class="card-body">
+            <div class="hint" style="margin-bottom:8px">Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.</div>
+            <div id="depList" style="margin-bottom:8px"></div>
+            <div class="settings-actions"><button class="btn primary" id="btnSaveDeps">Save</button></div>
+          </div></article>
           <article class="card span-6"><div class="card-head"><div class="card-title">Template</div></div><div class="card-body">
             <div class="hint" style="margin-bottom:8px">Save this server as a template, to build new servers from it. Stop the server first.</div>
             <div class="cmd-row" style="margin-bottom:6px"><label class="hint" style="width:100%">Template name<input class="compact-input" id="tplName" maxlength="40" placeholder="lobby"></label></div>

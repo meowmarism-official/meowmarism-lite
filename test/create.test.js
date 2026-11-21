@@ -343,3 +343,29 @@ test('a server template builds new servers that are linked to a proxy', async ()
     assert.ok((await names()).includes('Lobby02'), 'servers built from a template stay when it is deleted');
   });
 });
+
+test('instances can need each other, loops are refused, and the API reaches the same setting', async () => {
+  await withController({}, async ({ create, h, cookie }) => {
+    assert.equal((await create({ name: 'Main', loader: 'velocity', mcVersion: '3.4.0', port: 25601, ramMB: 1024 })).error, null);
+    assert.equal((await create({ name: 'Standby', loader: 'velocity', mcVersion: '3.4.0', port: 25602, ramMB: 1024 })).error, null);
+    assert.deepEqual((await h.json(cookie, 'GET', '/api/instances/Main/dependencies')).body.dependsOn, []);
+    const set = await h.json(cookie, 'POST', '/api/instances/Main/dependencies', { dependsOn: ['Standby'] });
+    assert.deepEqual([set.status, set.body.dependsOn], [200, ['Standby']]);
+    const list = (await h.json(cookie, 'GET', '/api/instances')).body.instances;
+    assert.deepEqual(list.find((i) => i.name === 'Main').dependsOn, ['Standby']);
+    assert.equal((await h.json(cookie, 'POST', '/api/instances/Standby/dependencies', { dependsOn: ['Main'] })).status, 400, 'a loop');
+    assert.equal((await h.json(cookie, 'POST', '/api/instances/Main/dependencies', { dependsOn: ['Main'] })).status, 400, 'itself');
+    assert.equal((await h.json(cookie, 'POST', '/api/instances/Main/dependencies', { dependsOn: ['Nope'] })).status, 400, 'unknown');
+    assert.equal((await h.json(cookie, 'POST', '/api/instances/Main/dependencies', { dependsOn: 'Standby' })).status, 400, 'not a list');
+
+    await h.json(cookie, 'POST', '/api/optional-features', { api: true });
+    const token = (await h.json(cookie, 'POST', '/api/api-admin/tokens', { name: 'ai', scopes: ['instances'] })).body.token;
+    const api = async (method, p, body) => {
+      const r = await fetch(`${h.base}/api/v1${p}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+      return { status: r.status, body: await r.json().catch(() => ({})) };
+    };
+    assert.deepEqual((await api('GET', '/instances/Main/dependencies')).body.dependsOn, ['Standby']);
+    assert.deepEqual((await api('POST', '/instances/Main/dependencies', { dependsOn: [] })).body.dependsOn, []);
+    assert.equal((await api('POST', '/instances/Standby/dependencies', { dependsOn: ['Main'] })).status, 200, 'the loop is gone once Main needs nothing');
+  });
+});

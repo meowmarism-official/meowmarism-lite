@@ -451,7 +451,10 @@
   "Build new servers from a template and add them to this network in one step.": "Crea servidores nuevos desde una plantilla y añádelos a esta red en un paso.",
   "No templates yet. Save a server as a template on its Manage page.": "Aún no hay plantillas. Guarda un servidor como plantilla en su página Manage.",
   "Starting": "Iniciando",
-  "Retry": "Reintentar"
+  "Retry": "Reintentar",
+  "Start order": "Orden de inicio",
+  "Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.": "Servidores que este necesita. Se inician antes y se detienen después, también al actualizar el panel. Ejemplo: el proxy principal necesita el proxy de reserva.",
+  "Saved": "Guardado"
  },
  "patterns": [
   [

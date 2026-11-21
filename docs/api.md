@@ -105,6 +105,8 @@ Scope `instances`. Creating an instance needs a token that is not limited to ins
 | `POST /api/v1/instances/:name/template` | `{ "name", "includeWorld?": true, "description?" }` | Saves a stopped instance as a template: software, plugins or mods, configs and, unless `includeWorld` is false, the world |
 | `DELETE /api/v1/templates/:name` | | Deletes a template; servers built from it stay. Needs a token without instance limits |
 | `POST /api/v1/instances` with `{ "template", "name", "proxy?", "entry?", "port?", "ramMB?" }` | | Builds a server from a template, without any download. With `proxy` (the name of a Velocity instance) it is also linked to that network; `entry` makes it the entry server. The finished build reports what to restart under `link` in `GET /api/v1/creation` |
+| `GET /api/v1/instances/:name/dependencies` | | The instances this one needs to be running |
+| `POST /api/v1/instances/:name/dependencies` | `{ "dependsOn": ["Standby"] }` | Sets them. They start before this instance and stop after it, also when the panel is updated: dependents are stopped first and each group has to be down before the next one is stopped; on the way up each group has to be ready first. Loops are refused |
 | `GET /api/v1/instances/:name/network` | | A proxy: which servers are behind it, the entry server, forced hosts |
 | `POST /api/v1/instances/:name/network` | `{ "servers": ["Hub"], "tryOrder": ["Hub"], "forcedHosts": { "play.example.com": ["Hub"] } }` | Links Paper and Purpur servers (1.19+) to a proxy and sets up secure forwarding on both sides. The answer lists what needs a restart and what failed |
 

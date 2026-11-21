@@ -125,3 +125,28 @@ const DATABASE = MeowDatabase.mount({
     return data;
   },
 });
+
+// --- Start order (which servers this one needs) ---
+async function loadDeps() {
+  const box = $('depList');
+  if (!box) return;
+  try {
+    const list = (await (await fetch(`${location.origin}/_meta/api/instances`, { cache: 'no-store' })).json()).instances || [];
+    const mine = list.find((i) => i.name === INST_NAME);
+    const picked = new Set((mine && mine.dependsOn) || []);
+    const others = list.filter((i) => i.name !== INST_NAME);
+    box.innerHTML = others.length
+      ? others.map((i) => `<label class="hint" style="display:block"><input type="checkbox" data-dep="${esc(i.name)}" ${picked.has(i.name) ? 'checked' : ''}> ${esc(i.name)}</label>`).join('')
+      : `<div class="hint">${esc(t('No other instances yet.'))}</div>`;
+  } catch (_) { /* leave the list empty */ }
+}
+$('btnSaveDeps')?.addEventListener('click', async () => {
+  try {
+    const dependsOn = [...document.querySelectorAll('#depList [data-dep]:checked')].map((b) => b.dataset.dep);
+    const r = await fetch(`${location.origin}/_meta/api/instances/${encodeURIComponent(INST_NAME)}/dependencies`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dependsOn }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    toast(t('Saved'));
+  } catch (e) { toast(e.message, 'error'); }
+});
+document.addEventListener('DOMContentLoaded', () => { loadDeps(); });

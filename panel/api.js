@@ -180,6 +180,12 @@ function createApi(deps) {
     await deps.instances.upgrade(ctx.inst, ctx.body, true);
     return send(ctx.res, 202, { ok: true });
   }), { noWorker: true });
+  route('GET', '/instances/([^/]+)/dependencies', 'instances', (ctx) => send(ctx.res, 200, { ok: true, dependsOn: deps.instances.dependencies.get(ctx.inst) }), { noWorker: true });
+  route('POST', '/instances/([^/]+)/dependencies', 'instances', (ctx) => guard(ctx, async () => {
+    const allowed = ctx.body.dependsOn;
+    if (Array.isArray(allowed) && allowed.some((n) => !allowsInstance(ctx.token, String(n)))) return fail(ctx.res, 404, 'no such instance');
+    return send(ctx.res, 200, { ok: true, dependsOn: deps.instances.dependencies.set(ctx.inst, ctx.body.dependsOn) });
+  }), { noWorker: true });
   route('GET', '/instances/([^/]+)/network', 'instances', (ctx) => guard(ctx, async () => {
     if (ctx.inst.loader !== 'velocity') return fail(ctx.res, 400, 'only a proxy has a network');
     return send(ctx.res, 200, { ok: true, ...deps.instances.network.describe(ctx.inst) });
