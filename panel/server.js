@@ -1429,7 +1429,7 @@ function sendJson(res, status, data) {
 }
 
 function serveIndex(res) {
-  const html = fs.readFileSync(path.join(__dirname, 'index.html'));
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace('<head>', () => `<head><script>window.__LOADER=${JSON.stringify(INSTANCE_LOADER)};</script>`);
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',

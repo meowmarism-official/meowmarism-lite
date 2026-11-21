@@ -597,6 +597,7 @@ const LOADER_LABELS = { quilt: 'Quilt', vanilla: 'Vanilla', paper: 'Paper', purp
 
 const { withServerPort } = require('./core/modules/properties');
 const proxyCfg = require('./core/modules/proxy');
+const proxyNetwork = require('./core/modules/proxy-network');
 
 // Meowmarism only forces what it controls: EULA, port and panel-config. Pack files stay.
 function writeControlledFiles(dir, { mcPort, backupIntervalHours, maxBackups, autoStart, javaBin, ramMB, loader }) {
@@ -881,6 +882,28 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 202, { ok: true });
     return;
   }
+  const proxyMatch = url.pathname.match(/^\/api\/proxy\/([^/]+)$/);
+  if (proxyMatch) {
+    const inst = loadInstances().find((i) => i.name === safeDecode(proxyMatch[1]));
+    if (!inst || inst.loader !== 'velocity') { sendJson(res, 404, { ok: false, error: 'no such proxy' }); return; }
+    const caps = capsFor(req, inst.name);
+    const others = loadInstances().filter((i) => i.id !== inst.id);
+    if (req.method === 'GET') {
+      if (!caps.includes('view')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+      sendJson(res, 200, proxyNetwork.describe(inst.dir, others));
+      return;
+    }
+    if (req.method === 'POST') {
+      if (!caps.includes('settings')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+      try {
+        const body = await readBody(req);
+        const visible = others.filter((i) => capsFor(req, i.name).includes('settings'));
+        sendJson(res, 200, proxyNetwork.apply(inst.dir, visible, { servers: body.servers, tryOrder: body.tryOrder, forcedHosts: body.forcedHosts }));
+      } catch (err) { sendJson(res, 400, { ok: false, error: err.message }); }
+      return;
+    }
+  }
+
   if (url.pathname === '/api/optional-features' && req.method === 'GET') {
     if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
     sendJson(res, 200, {

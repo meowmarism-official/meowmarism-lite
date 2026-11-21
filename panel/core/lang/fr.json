@@ -353,7 +353,27 @@
   "Change settings (restart-only ones are queued)": "Modifier les réglages (ceux qui exigent un redémarrage sont mis en attente)",
   "List and create backups": "Lister et créer des sauvegardes",
   "Read files of an instance": "Lire les fichiers d’une instance",
-  "Receive events and manage webhooks": "Recevoir les événements et gérer les webhooks"
+  "Receive events and manage webhooks": "Recevoir les événements et gérer les webhooks",
+  "servers behind this proxy": "serveurs derrière ce proxy",
+  "Servers in this network": "Serveurs de ce réseau",
+  "The panel sets the proxy and each server up for secure forwarding. Players connect to the proxy on port": "Le panneau configure le proxy et chaque serveur pour un transfert sécurisé. Les joueurs se connectent au proxy sur le port",
+  "No other instances yet.": "Pas encore d’autres instances.",
+  "Entry server": "Serveur d’entrée",
+  "where players join first and where they land if their server stops": "où arrivent les joueurs et où ils vont si leur serveur s’arrête",
+  "Forced hosts": "Hôtes forcés",
+  "Send players who join through a certain address straight to a server.": "Envoie les joueurs arrivant par une certaine adresse directement vers un serveur.",
+  "Add host": "Ajouter un hôte",
+  "Apply": "Appliquer",
+  "port": "port",
+  "the proxy": "le proxy",
+  "Restart to apply:": "Redémarrer pour appliquer :",
+  "Everything was already up to date.": "Tout était déjà à jour.",
+  "Start the proxy once so it creates its configuration, then come back.": "Démarrez le proxy une fois pour qu’il crée sa configuration, puis revenez.",
+  "The port changed, apply to update the proxy.": "Le port a changé, appliquez pour mettre à jour le proxy.",
+  "needs a forwarding mod, which the panel does not set up yet": "nécessite un mod de transfert, que le panneau ne configure pas encore",
+  "automatic setup needs Minecraft 1.19 or newer": "la configuration automatique nécessite Minecraft 1.19 ou plus",
+  "a proxy cannot sit behind another proxy": "un proxy ne peut pas être derrière un autre proxy",
+  "start this server once so it creates its configuration, then apply again": "démarrez ce serveur une fois pour qu’il crée sa configuration, puis appliquez à nouveau"
  },
  "patterns": [
   [

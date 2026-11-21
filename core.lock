@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.19",
-  "commit": "9f4926c573a83c4964868bb81fd0d0197b810fc7",
+  "commit": "35c2c55b7b8fb6dfc9c8fd90e0238de6431f220f",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -37,6 +37,7 @@
     "panel/core/modules/panel-settings.js",
     "panel/core/modules/players.js",
     "panel/core/modules/properties.js",
+    "panel/core/modules/proxy-network.js",
     "panel/core/modules/proxy.js",
     "panel/core/modules/ratelimit.js",
     "panel/core/modules/runtime-contract.js",
@@ -79,6 +80,8 @@
     "panel/core/ui/modrinth-ui.css",
     "panel/core/ui/modrinth-ui.js",
     "panel/core/ui/mods-ui.js",
+    "panel/core/ui/network-ui.css",
+    "panel/core/ui/network-ui.js",
     "panel/core/ui/palette-ui.js",
     "panel/core/ui/players-ui.js",
     "panel/core/ui/resources-ui.js",

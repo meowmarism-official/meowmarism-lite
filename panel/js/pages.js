@@ -86,3 +86,16 @@ async function loadAutomation() { loadStartup(); return AUTOMATION.load(); }
 
 
 
+
+// --- Network (proxy instances) ---
+const NETWORK = MeowNetwork.mount({
+  el: $('networkRoot'),
+  load: async () => (await fetch(`${location.origin}/_meta/api/proxy/${encodeURIComponent(INST_NAME)}`, { cache: 'no-store' })).json(),
+  save: async (body) => {
+    const r = await fetch(`${location.origin}/_meta/api/proxy/${encodeURIComponent(INST_NAME)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  },
+  t, esc, toast,
+});

@@ -34,6 +34,7 @@
 <link rel="stylesheet" href="/core/ui/settings-ui.css">
 <link rel="stylesheet" href="/core/ui/diagnostics-ui.css">
 <link rel="stylesheet" href="/core/ui/access-ui.css">
+<link rel="stylesheet" href="/core/ui/network-ui.css">
 </head>
 <body>
 <div class="app">
@@ -41,6 +42,7 @@
 
   <div class="content">
     <header class="topbar" id="shellTopbar"></header>
+    <script src="/core/ui/network-ui.js"></script>
     <script src="/js/shell-mount.js"></script>
 
     <main class="workspace">
@@ -58,6 +60,8 @@
       </section>
 
       <section class="page" id="page-backups"><div id="backupsRoot"></div></section>
+
+      <section class="page" id="page-network"><div id="networkRoot"></div></section>
 
       <section class="page" id="page-mods"><div id="modsRoot"></div></section>
 

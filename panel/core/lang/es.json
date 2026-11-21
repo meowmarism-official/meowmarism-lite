@@ -353,7 +353,27 @@
   "Change settings (restart-only ones are queued)": "Cambiar ajustes (los que requieren reinicio se encolan)",
   "List and create backups": "Listar y crear copias",
   "Read files of an instance": "Leer archivos de una instancia",
-  "Receive events and manage webhooks": "Recibir eventos y gestionar webhooks"
+  "Receive events and manage webhooks": "Recibir eventos y gestionar webhooks",
+  "servers behind this proxy": "servidores detrás de este proxy",
+  "Servers in this network": "Servidores en esta red",
+  "The panel sets the proxy and each server up for secure forwarding. Players connect to the proxy on port": "El panel configura el proxy y cada servidor para un reenvío seguro. Los jugadores se conectan al proxy en el puerto",
+  "No other instances yet.": "Aún no hay otras instancias.",
+  "Entry server": "Servidor de entrada",
+  "where players join first and where they land if their server stops": "donde entran primero los jugadores y adonde van si su servidor se detiene",
+  "Forced hosts": "Hosts forzados",
+  "Send players who join through a certain address straight to a server.": "Envía a los jugadores que entran por cierta dirección directamente a un servidor.",
+  "Add host": "Añadir host",
+  "Apply": "Aplicar",
+  "port": "puerto",
+  "the proxy": "el proxy",
+  "Restart to apply:": "Reinicia para aplicar:",
+  "Everything was already up to date.": "Todo estaba ya actualizado.",
+  "Start the proxy once so it creates its configuration, then come back.": "Inicia el proxy una vez para que cree su configuración y vuelve.",
+  "The port changed, apply to update the proxy.": "El puerto cambió, aplica para actualizar el proxy.",
+  "needs a forwarding mod, which the panel does not set up yet": "necesita un mod de reenvío, que el panel aún no configura",
+  "automatic setup needs Minecraft 1.19 or newer": "la configuración automática necesita Minecraft 1.19 o superior",
+  "a proxy cannot sit behind another proxy": "un proxy no puede estar detrás de otro proxy",
+  "start this server once so it creates its configuration, then apply again": "inicia este servidor una vez para que cree su configuración y aplica de nuevo"
  },
  "patterns": [
   [

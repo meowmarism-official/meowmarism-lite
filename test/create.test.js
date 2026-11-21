@@ -230,3 +230,33 @@ test('a Velocity proxy gets its port and modern forwarding, and no Minecraft ser
     assert.deepEqual([entry.loader, entry.mcVersion, entry.port], ['velocity', '3.4.0', 25571]);
   });
 });
+
+test('a proxy links a Paper server through the panel, and unlinking undoes it', async () => {
+  await withController({}, async ({ create, dirOf, h, cookie }) => {
+    assert.equal((await create({ name: 'Proxy', loader: 'velocity', mcVersion: '3.4.0', port: 25571, ramMB: 1024 })).error, null);
+    assert.equal((await create({ name: 'Surv', loader: 'paper', mcVersion: '1.21.1', port: 25572 })).error, null);
+    const survDir = dirOf('Surv');
+    fs.mkdirSync(path.join(survDir, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(survDir, 'config', 'paper-global.yml'), 'proxies:\n  velocity:\n    enabled: false\n    online-mode: true\n    secret: \'\'\n');
+
+    const before = await h.json(cookie, 'GET', '/api/proxy/Proxy');
+    assert.equal(before.status, 200);
+    assert.deepEqual(before.body.backends.filter((b) => b.name === 'Surv').map((b) => [b.supported, b.linked]), [[true, false]]);
+
+    const linked = await h.json(cookie, 'POST', '/api/proxy/Proxy', { servers: ['Surv'], tryOrder: ['Surv'], forcedHosts: { 'play.example.com': ['Surv'] } });
+    assert.equal(linked.status, 200, JSON.stringify(linked.body));
+    assert.deepEqual([linked.body.errors, linked.body.changed, linked.body.proxyChanged], [[], ['Surv'], true]);
+    const toml = fs.readFileSync(path.join(dirOf('Proxy'), 'velocity.toml'), 'utf8');
+    assert.match(toml, /^Surv = "127\.0\.0\.1:25572"$/m);
+    assert.match(toml, /"play\.example\.com" = \["Surv"\]/);
+    assert.match(fs.readFileSync(path.join(survDir, 'config', 'paper-global.yml'), 'utf8'), /secret: "secret"/);
+    assert.match(fs.readFileSync(path.join(survDir, 'server.properties'), 'utf8'), /^online-mode=false$/m);
+
+    const after = await h.json(cookie, 'GET', '/api/proxy/Proxy');
+    assert.deepEqual([after.body.backends.find((b) => b.name === 'Surv').linked, after.body.tryOrder], [true, ['Surv']]);
+
+    await h.json(cookie, 'POST', '/api/proxy/Proxy', { servers: [] });
+    assert.match(fs.readFileSync(path.join(survDir, 'server.properties'), 'utf8'), /^online-mode=true$/m);
+    assert.equal((await h.json(cookie, 'GET', '/api/proxy/Surv')).status, 404, 'only proxies have a network');
+  });
+});

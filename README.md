@@ -35,6 +35,7 @@ No framework, no database, no external services required. Manage multiple Minecr
 | **Accounts** | Local accounts with fine-grained per-instance permissions, brute-force protection, HTTPS behind a reverse proxy |
 | **Events & Audit** | Full timeline of server lifecycle events and every panel action taken |
 | **Performance diagnostics** | TPS and tick times, lag warnings, JVM numbers and a timed profile that shows who uses the time |
+| **Velocity proxy** | Create a Velocity proxy like any server, link Paper and Purpur servers to it from the Network page; the panel sets up secure forwarding on both sides |
 | **HTTP API** (optional) | Tokens with scopes, server control, in-game commands, console, metrics, events and signed webhooks. Off until you switch it on under Update, see [docs/api.md](docs/api.md) |
 
 ---
