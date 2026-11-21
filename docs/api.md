@@ -30,6 +30,8 @@ A token is shown once when it is created and only its hash is stored. Each token
 | `files` | list and read files of an instance |
 | `events` | event stream and webhooks |
 | `database` | read and change databases (see Databases below) |
+| `mods` | search, install, update and switch mods and plugins |
+| `instances` | create, upgrade and delete instances, link servers to a proxy |
 
 Limits: 300 requests per minute per token; 20 failed logins per five minutes per address (`429`).
 
@@ -84,6 +86,35 @@ An instance is `{ name, loader, mcVersion, port, panel: "on" | "off", running, p
 | `POST /api/v1/instances/:name/diagnostics/profile` with `{ "seconds": 10 }` | `console` |
 
 A setting that needs a restart is not written while the server runs. The answer lists it under `queued`; it is applied before the next start.
+
+### Instances
+Scope `instances`. Creating an instance needs a token that is not limited to instances; the other calls only reach the instances of the token.
+
+| | Body | |
+|---|---|---|
+| `GET /api/v1/versions?loader=paper[&mc=1.21.1]` | | Versions you can pick: without `mc` the Minecraft versions, with `mc` the loader versions. Loaders: `vanilla`, `paper`, `purpur`, `velocity`, `fabric`, `forge`, `neoforge` |
+| `POST /api/v1/instances` | `{ "name", "loader", "mcVersion", "loaderVersion?", "port?", "ramMB?", "autoStart?" }` | Starts building (`202`). Paper, Purpur, Vanilla and Velocity need no `loaderVersion`; for Velocity `mcVersion` is the Velocity version. A name that is taken gets a number. Also accepts `"modpack": { "versionId" }` instead of loader and version |
+| `GET /api/v1/creation` | | Progress of the build: `phase`, `progress`, `lines`, `done`, `error`. Only one instance is built at a time (`409` otherwise) |
+| `DELETE /api/v1/instances/:name` | `{ "confirm": "<name>", "files?": true, "backups?": true }` | Removes it from the panel; `files` also deletes its folder with the world. The server must be stopped |
+| `GET /api/v1/instances/:name/software` | | Installed version and the state of a running upgrade |
+| `POST /api/v1/instances/:name/software` | `{ "mcVersion", "loaderVersion?", "allowDowngrade?" }` | Changes the Minecraft or loader version with a backup first. The server must be stopped |
+| `POST /api/v1/instances/:name/software/rollback` | `{ "restoreWorld?": true }` | Goes back to the version before the last upgrade |
+| `GET /api/v1/instances/:name/network` | | A proxy: which servers are behind it, the entry server, forced hosts |
+| `POST /api/v1/instances/:name/network` | `{ "servers": ["Hub"], "tryOrder": ["Hub"], "forcedHosts": { "play.example.com": ["Hub"] } }` | Links Paper and Purpur servers (1.19+) to a proxy and sets up secure forwarding on both sides. The answer lists what needs a restart and what failed |
+
+### Mods and plugins
+Scope `mods`. The instance panel has to be running. Paper, Purpur and Velocity use plugins, the others mods.
+
+| | |
+|---|---|
+| `GET /api/v1/instances/:name/mods` | installed and disabled files |
+| `GET /api/v1/instances/:name/mods/search?q=sodium&kind=mod` | search Modrinth for what fits this server (`kind`: mod, datapack, resourcepack, shader, modpack) |
+| `GET /api/v1/instances/:name/mods/versions?project=<id>` | versions of a project that fit |
+| `POST /api/v1/instances/:name/mods/install` with `{ "projectId", "versionId?", "kind?" }` | install it with its required dependencies |
+| `POST /api/v1/instances/:name/mods/toggle` with `{ "name": "a.jar", "enable": false }` | enable or disable a file |
+| `GET /api/v1/instances/:name/mods/updates`, `POST .../mods/update` with `{ "all": true }` | list and apply updates |
+
+A new or changed mod takes effect after the next restart.
 
 ### Databases
 Needs the database feature (see [database.md](database.md)). A token with the `database` scope reaches the database of each server it may access. The network database also needs a token that is not limited to instances.

@@ -11,6 +11,8 @@ const SCOPES = {
   backups: 'List and create backups',
   files: 'Read files of an instance',
   database: 'Read and change the databases of the servers it may access',
+  mods: 'Search, install, update and switch mods and plugins',
+  instances: 'Create, upgrade and delete instances and link servers to a proxy',
   events: 'Receive events and manage webhooks',
 };
 

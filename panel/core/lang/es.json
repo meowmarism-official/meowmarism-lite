@@ -431,7 +431,9 @@
   "Delete this row?": "¿Eliminar esta fila?",
   "The row is deleted for good.": "La fila se elimina para siempre.",
   "This server": "Este servidor",
-  "Whole network": "Toda la red"
+  "Whole network": "Toda la red",
+  "Search, install, update and switch mods and plugins": "Buscar, instalar, actualizar y activar mods y plugins",
+  "Create, upgrade and delete instances and link servers to a proxy": "Crear, actualizar y eliminar instancias y vincular servidores a un proxy"
  },
  "patterns": [
   [

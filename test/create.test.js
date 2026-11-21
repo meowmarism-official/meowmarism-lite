@@ -260,3 +260,38 @@ test('a proxy links a Paper server through the panel, and unlinking undoes it', 
     assert.equal((await h.json(cookie, 'GET', '/api/proxy/Surv')).status, 404, 'only proxies have a network');
   });
 });
+
+test('an AI-style flow through the API: build a proxy and a server, link them, delete one', async () => {
+  await withController({}, async ({ h, cookie, dirOf, names }) => {
+    await h.json(cookie, 'POST', '/api/optional-features', { api: true });
+    const token = (await h.json(cookie, 'POST', '/api/api-admin/tokens', { name: 'ai', scopes: ['instances', 'read'] })).body.token;
+    const api = async (method, p, body) => {
+      const r = await fetch(`${h.base}/api/v1${p}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+      return { status: r.status, body: await r.json().catch(() => ({})) };
+    };
+    const built = async () => h.until(async () => { const c = (await api('GET', '/creation')).body; return c.done && c; }, 'the build to finish');
+
+    assert.equal((await api('GET', '/versions?loader=paper')).status, 200);
+    assert.equal((await api('POST', '/instances', { name: 'Proxy', loader: 'velocity', mcVersion: '3.4.0', port: 25581, ramMB: 1024 })).status, 202);
+    assert.equal((await built()).error, null);
+    assert.equal((await api('POST', '/instances', { name: 'Hub', loader: 'paper', mcVersion: '1.21.1', port: 25582 })).status, 202);
+    assert.equal((await built()).error, null);
+    assert.deepEqual((await names()).sort(), ['Hub', 'Proxy', 'inst1']);
+
+    const hub = dirOf('Hub');
+    fs.mkdirSync(path.join(hub, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(hub, 'config', 'paper-global.yml'), 'proxies:\n  velocity:\n    enabled: false\n    online-mode: true\n    secret: \'\'\n');
+    const linked = await api('POST', '/instances/Proxy/network', { servers: ['Hub'], tryOrder: ['Hub'] });
+    assert.equal(linked.status, 200, JSON.stringify(linked.body));
+    assert.deepEqual([linked.body.errors, linked.body.changed], [[], ['Hub']]);
+    assert.match(fs.readFileSync(path.join(dirOf('Proxy'), 'velocity.toml'), 'utf8'), /^Hub = "127\.0\.0\.1:25582"$/m);
+    assert.deepEqual((await api('GET', '/instances/Proxy/network')).body.backends.find((b) => b.name === 'Hub').linked, true);
+
+    assert.equal((await api('POST', '/instances', { name: 'Bad', loader: 'paper' })).status, 400, 'a missing version is refused');
+    assert.equal((await api('DELETE', '/instances/Hub', { confirm: 'nope' })).status, 400);
+    const gone = await api('DELETE', '/instances/Hub', { confirm: 'Hub', files: true });
+    assert.deepEqual([gone.status, gone.body.deletedFiles], [200, true]);
+    assert.ok(!fs.existsSync(hub));
+    assert.ok(!(await names()).includes('Hub'));
+  });
+});

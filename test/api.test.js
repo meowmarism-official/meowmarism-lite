@@ -20,7 +20,7 @@ function rig({ enabled = true, up = ['survival', 'creative'], summaries = {} } =
   const posts = [];
   const webhooks = createWebhooks({ file: path.join(dir, 'h.json'), backoffMs: [], post: async (url, req) => { posts.push({ url, ...req }); return { status: 200 }; } });
   const hub = createEventHub();
-  const state = { enabled, up: new Set(up), calls: [], summaries, dbCalls: [] };
+  const state = { enabled, up: new Set(up), calls: [], summaries, dbCalls: [], instCalls: [] };
   const api = createApi({
     tokens, webhooks, hub,
     isEnabled: () => state.enabled,
@@ -29,6 +29,18 @@ function rig({ enabled = true, up = ['survival', 'creative'], summaries = {} } =
     version: () => '9.9.9',
     clientIp: () => '1.2.3.4',
     sendJson: (res, status, data) => { res.out = { status, data }; },
+    instances: {
+      create: async (data) => { state.instCalls.push(['create', data]); if (data.name === 'busy') throw Object.assign(new Error('another instance is already being created'), { code: 409 }); },
+      creation: () => ({ done: false, progress: 20, phase: 'Installing Paper', lines: [] }),
+      versions: async (loader, mc) => { state.instCalls.push(['versions', loader, mc]); return ['1.21.1', '1.20.4']; },
+      remove: async (inst, options) => { state.instCalls.push(['remove', inst.name, options]); return { status: 200, body: { ok: true, deletedFiles: options.files, deletedBackups: false } }; },
+      upgrade: async (inst, data, rollback) => { state.instCalls.push(['upgrade', inst.name, data, rollback]); if (data.mcVersion === 'bad') throw new Error('that Minecraft version is not available for this loader'); },
+      upgradeStatus: (inst) => ({ running: false, lines: [], current: { mcVersion: inst.mcVersion } }),
+      network: {
+        describe: (inst) => ({ backends: [], tryOrder: [], forcedHosts: {}, port: 25565, ready: true, proxy: inst.name }),
+        apply: (inst, request, allowed) => { state.instCalls.push(['network', inst.name, request, allowed('survival'), allowed('creative')]); return { changed: [], proxyChanged: true, errors: [] }; },
+      },
+    },
     database: {
       status: () => ({ enabled: true, running: true, port: 3307 }),
       handle: async (request) => { state.dbCalls.push(request); return { status: 200, body: { ok: true, echo: request.sub } }; },
@@ -250,4 +262,73 @@ test('the network database is closed to tokens that are limited to instances, an
   const r = await t.request('GET', '/api/v1/database/shared/tables/x?limit=5', { token: open });
   assert.strictEqual(r.status, 200);
   assert.deepStrictEqual([t.state.dbCalls.at(-1).kind, t.state.dbCalls.at(-1).sub, t.state.dbCalls.at(-1).instance, t.state.dbCalls.at(-1).query.get('limit')], ['shared', '/tables/x', null, '5']);
+});
+
+test('instances can be created, listed in versions, upgraded and deleted with the instances scope', async () => {
+  const t = rig({ up: [] });
+  const token = t.make(['instances']);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances', { token: t.make(['read']), body: { name: 'x' } })).status, 403);
+  const versions = await t.request('GET', '/api/v1/versions?loader=paper&mc=1.21', { token });
+  assert.deepStrictEqual(versions.data.versions, ['1.21.1', '1.20.4']);
+  assert.deepStrictEqual(t.state.instCalls[0], ['versions', 'paper', '1.21']);
+  const made = await t.request('POST', '/api/v1/instances', { token, body: { name: 'new', loader: 'paper', mcVersion: '1.21.1' } });
+  assert.strictEqual(made.status, 202);
+  assert.deepStrictEqual(t.state.instCalls[1], ['create', { name: 'new', loader: 'paper', mcVersion: '1.21.1' }]);
+  const busy = await t.request('POST', '/api/v1/instances', { token, body: { name: 'busy' } });
+  assert.deepStrictEqual([busy.status, busy.data.error], [409, 'another instance is already being created']);
+  assert.strictEqual((await t.request('GET', '/api/v1/creation', { token })).data.phase, 'Installing Paper');
+
+  const up = await t.request('POST', '/api/v1/instances/survival/software', { token, body: { mcVersion: '1.21.1' } });
+  assert.strictEqual(up.status, 202);
+  assert.deepStrictEqual(t.state.instCalls.at(-1), ['upgrade', 'survival', { mcVersion: '1.21.1' }, false]);
+  const bad = await t.request('POST', '/api/v1/instances/survival/software', { token, body: { mcVersion: 'bad' } });
+  assert.deepStrictEqual([bad.status, bad.data.ok], [400, false]);
+  await t.request('POST', '/api/v1/instances/survival/software/rollback', { token, body: { restoreWorld: true } });
+  assert.deepStrictEqual(t.state.instCalls.at(-1), ['upgrade', 'survival', { restoreWorld: true }, true]);
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/software', { token })).data.current.mcVersion, '1.21.1');
+
+  const noConfirm = await t.request('DELETE', '/api/v1/instances/survival', { token, body: {} });
+  assert.strictEqual(noConfirm.status, 400);
+  const wrong = await t.request('DELETE', '/api/v1/instances/survival', { token, body: { confirm: 'creative' } });
+  assert.strictEqual(wrong.status, 400);
+  const gone = await t.request('DELETE', '/api/v1/instances/survival', { token, body: { confirm: 'survival', files: true } });
+  assert.deepStrictEqual([gone.status, gone.data.deletedFiles], [200, true]);
+  assert.deepStrictEqual(t.state.instCalls.at(-1), ['remove', 'survival', { files: true, backups: false }]);
+});
+
+test('a token limited to instances cannot create instances and only changes its own', async () => {
+  const t = rig({ up: [] });
+  const limited = t.make(['instances'], { instances: ['creative'] });
+  assert.strictEqual((await t.request('POST', '/api/v1/instances', { token: limited, body: { name: 'x' } })).status, 403);
+  assert.strictEqual((await t.request('DELETE', '/api/v1/instances/survival', { token: limited, body: { confirm: 'survival' } })).status, 404);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/software', { token: limited, body: { mcVersion: '1' } })).status, 404);
+  assert.strictEqual(t.state.instCalls.length, 0);
+});
+
+test('the network of a proxy is read and set through the API, limited to the instances of the token', async () => {
+  const t = rig({ up: [] });
+  const token = t.make(['instances'], { instances: ['survival'] });
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/network', { token })).status, 400);
+  assert.strictEqual((await t.request('POST', '/api/v1/instances/survival/network', { token, body: { servers: [] } })).status, 400);
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/creative/network', { token })).status, 404);
+  assert.strictEqual(t.state.instCalls.length, 0);
+});
+
+test('mods and plugins go through the instance panel with the mods capability', async () => {
+  const t = rig();
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/mods', { token: t.make(['read']) })).status, 403);
+  const token = t.make(['mods']);
+  await t.request('GET', '/api/v1/instances/survival/mods', { token });
+  await t.request('GET', '/api/v1/instances/survival/mods/search?q=sodium&kind=mod', { token });
+  await t.request('POST', '/api/v1/instances/survival/mods/install', { token, body: { projectId: 'AANobbMI' } });
+  await t.request('POST', '/api/v1/instances/survival/mods/toggle', { token, body: { name: 'a.jar', enable: false } });
+  await t.request('POST', '/api/v1/instances/survival/mods/update', { token, body: { all: true } });
+  assert.deepStrictEqual(t.state.calls.map((c) => [c.method, c.path, c.caps.join()]), [
+    ['GET', '/api/mods', 'view,mods'],
+    ['GET', '/api/modrinth/search?q=sodium&kind=mod', 'view,mods'],
+    ['POST', '/api/modrinth/install', 'view,mods'],
+    ['POST', '/api/mods/toggle', 'view,mods'],
+    ['POST', '/api/modrinth/update', 'view,mods'],
+  ]);
+  assert.deepStrictEqual(t.state.calls[2].body, { projectId: 'AANobbMI' });
 });

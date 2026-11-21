@@ -34,7 +34,8 @@ function readJson(req, limit = 64 * 1024) {
   });
 }
 
-// deps: { tokens, webhooks, hub, isEnabled(), loadInstances(), workerUp(inst), workerSecret, version(), clientIp(req), database: { status(), handle(request) }, callWorker? }
+// deps: { tokens, webhooks, hub, isEnabled(), loadInstances(), workerUp(inst), workerSecret, version(), clientIp(req), database: { status(), handle(request) },
+//         instances: { create, creation, versions, remove, upgrade, upgradeStatus, network: { describe, apply } }, callWorker? }
 function createApi(deps) {
   const { tokens, webhooks, hub, isEnabled, loadInstances, workerUp, version, clientIp } = deps;
   const windows = new Map();
@@ -141,6 +142,58 @@ function createApi(deps) {
   route('POST', '/instances/([^/]+)/backups', 'backups', forward('backups', 'POST', () => '/api/backup', true));
   route('GET', '/instances/([^/]+)/files', 'files', forward('files', 'GET', (c) => `/api/files?path=${encodeURIComponent(c.url.searchParams.get('path') || '.')}`));
   route('GET', '/instances/([^/]+)/files/content', 'files', forward('files', 'GET', (c) => `/api/files/content?path=${encodeURIComponent(c.url.searchParams.get('path') || '')}`));
+
+  // Instances: create, delete, change the software, link servers to a proxy.
+  const guard = async (ctx, work) => {
+    try { return await work(); } catch (err) { return fail(ctx.res, err.code || 400, err.message || 'the request failed'); }
+  };
+  route('GET', '/versions', 'instances', (ctx) => guard(ctx, async () => {
+    const loader = String(ctx.url.searchParams.get('loader') || '');
+    const mc = ctx.url.searchParams.get('mc') || undefined;
+    return send(ctx.res, 200, { ok: true, loader, versions: await deps.instances.versions(loader, mc) });
+  }));
+  route('POST', '/instances', 'instances', (ctx) => {
+    if (ctx.token.instances) return fail(ctx.res, 403, 'creating instances needs a token without instance limits');
+    return guard(ctx, async () => {
+      await deps.instances.create(ctx.body);
+      return send(ctx.res, 202, { ok: true, note: 'the instance is being built, follow GET /api/v1/creation' });
+    });
+  });
+  route('GET', '/creation', 'instances', async ({ res }) => send(res, 200, { ok: true, ...deps.instances.creation() }));
+  route('DELETE', '/instances/([^/]+)', 'instances', (ctx) => guard(ctx, async () => {
+    if (ctx.body.confirm !== ctx.inst.name) return fail(ctx.res, 400, 'confirm must be the name of the instance');
+    const out = await deps.instances.remove(ctx.inst, { files: ctx.body.files === true, backups: ctx.body.backups === true });
+    return send(ctx.res, out.status, out.body);
+  }), { noWorker: true });
+  route('GET', '/instances/([^/]+)/software', 'instances', (ctx) => send(ctx.res, 200, { ok: true, ...deps.instances.upgradeStatus(ctx.inst) }), { noWorker: true });
+  route('POST', '/instances/([^/]+)/software', 'instances', (ctx) => guard(ctx, async () => {
+    await deps.instances.upgrade(ctx.inst, ctx.body, false);
+    return send(ctx.res, 202, { ok: true });
+  }), { noWorker: true });
+  route('POST', '/instances/([^/]+)/software/rollback', 'instances', (ctx) => guard(ctx, async () => {
+    await deps.instances.upgrade(ctx.inst, ctx.body, true);
+    return send(ctx.res, 202, { ok: true });
+  }), { noWorker: true });
+  route('GET', '/instances/([^/]+)/network', 'instances', (ctx) => guard(ctx, async () => {
+    if (ctx.inst.loader !== 'velocity') return fail(ctx.res, 400, 'only a proxy has a network');
+    return send(ctx.res, 200, { ok: true, ...deps.instances.network.describe(ctx.inst) });
+  }), { noWorker: true });
+  route('POST', '/instances/([^/]+)/network', 'instances', (ctx) => guard(ctx, async () => {
+    if (ctx.inst.loader !== 'velocity') return fail(ctx.res, 400, 'only a proxy has a network');
+    return send(ctx.res, 200, { ok: true, ...deps.instances.network.apply(ctx.inst, ctx.body, (name) => allowsInstance(ctx.token, name)) });
+  }), { noWorker: true });
+
+  // Mods and plugins of one instance, through its panel.
+  const modCaps = ['view', 'mods'];
+  const mods = (method, sub, workerPath, { body = false, slow = false } = {}) => route(method, `/instances/([^/]+)/mods${sub}`, 'mods', async (ctx) => answer(ctx.res, await callWorker(ctx.inst, modCaps, method, workerPath(ctx), body ? ctx.body : undefined, slow ? 180000 : 30000)));
+  const query = (ctx) => (ctx.url.search || '');
+  mods('GET', '', () => '/api/mods');
+  mods('POST', '/toggle', () => '/api/mods/toggle', { body: true });
+  mods('GET', '/search', (ctx) => `/api/modrinth/search${query(ctx)}`);
+  mods('GET', '/versions', (ctx) => `/api/modrinth/versions${query(ctx)}`);
+  mods('GET', '/updates', () => '/api/modrinth/updates', { slow: true });
+  mods('POST', '/install', () => '/api/modrinth/install', { body: true, slow: true });
+  mods('POST', '/update', () => '/api/modrinth/update', { body: true, slow: true });
 
   // Databases: the same routes the panel uses, below instances/:name/database and database/shared.
   async function databaseRoute(ctx, kind, sub) {

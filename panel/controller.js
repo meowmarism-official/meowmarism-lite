@@ -454,6 +454,172 @@ async function databaseHandle({ kind, instance, method, sub, body, query }) {
 }
 const databaseStatus = () => ({ enabled: panelSettings.feature('database'), ...dbEngine.status(), job: dbJob });
 
+// Validates a create request and builds the instance in the background; accept() is called once the request is valid.
+async function createInstance(data, accept) {
+  if (instanceCreateInProgress) throw Object.assign(new Error('another instance is already being created'), { code: 409 });
+  instanceCreateInProgress = true;
+  try {
+    const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
+    if (modpackReq && !/^[\w-]{1,64}$/.test(modpackReq.versionId)) throw new Error('invalid modpack');
+    const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
+    let loader = ['vanilla', 'paper', 'purpur', 'velocity', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
+    let mcVersion = String(data.mcVersion || '').trim();
+    let loaderVersion = String(data.loaderVersion || '').trim();
+    let mcPort = Number(data.port);
+    const ramMB = Math.min(32768, Math.max(1024, Number(data.ramMB) || 4096));
+    const backupIntervalHours = Math.min(168, Math.max(1, Number(data.backupIntervalHours) || 6));
+    const maxBackups = Math.min(100, Math.max(1, Number(data.maxBackups) || 10));
+    if (!rawName) throw new Error('invalid instance name');
+    if (!modpackReq && !mcVersion) throw new Error('invalid Minecraft version');
+    if (!modpackReq && !BUILD_LOADERS.includes(loader) && !loaderVersion) throw new Error('invalid loader version');
+    if (!Number.isInteger(mcPort) || mcPort < 1 || mcPort > 65535) throw new Error('invalid port');
+    const instances = loadInstances();
+    const requestedPort = mcPort;
+    mcPort = await findFreePort(mcPort, instances);
+    // A name collision gets a numeric suffix (name02, name03, ...)
+    // instead of failing outright - the first instance with that name
+    // keeps the bare name.
+    let name = rawName;
+    if (instances.some((i) => i.name === name)) {
+      let n = 2;
+      while (instances.some((i) => i.name === `${rawName}${String(n).padStart(2, '0')}`)) n++;
+      name = `${rawName}${String(n).padStart(2, '0')}`;
+    }
+    const dir = path.join(INSTANCES_ROOT, name);
+    const staging = `${dir}.creating`;
+    fs.mkdirSync(INSTANCES_ROOT, { recursive: true });
+    if (fs.existsSync(dir) || fs.existsSync(staging)) throw new Error(`${dir} already exists`);
+    instanceCreateInProgress = true;
+    creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], important: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
+    accept();
+    let renamed = false, registered = false, packTmp = null;
+    try {
+      const createLog = (line) => { console.log(`[create:${name}] ${line}`); pushCreateLog(line); };
+      if (mcPort !== requestedPort) createLog(`port ${requestedPort} is in use, using ${mcPort} instead`);
+      let pack = null;
+      if (modpackReq) {
+        setCreatePhase('Reading modpack', 5);
+        packTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meow-pack-'));
+        const version = await modpackApi.getVersion(modpackReq.versionId);
+        const file = path.join(packTmp, 'pack.mrpack');
+        await (testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified)(version.file.url, file, version.file.sha512, version.file.size);
+        const { inspected } = await resolveEnvironments(inspectMrpack(file), { request: testHooks.modrinthRequest, log: createLog });
+        if (!MODPACK_LOADERS.includes(inspected.loader)) throw new Error(`This pack needs ${LOADER_LABELS[inspected.loader] || inspected.loader}, which LITE cannot run yet.`);
+        if (inspected.loader === 'forge') {
+          const known = await listLoaderVersions('forge', inspected.minecraft);
+          if (!known.includes(inspected.loaderVersion)) throw new Error(`Forge ${inspected.loaderVersion} is not available for Minecraft ${inspected.minecraft}.`);
+        }
+        pack = { file, inspected, version };
+        loader = inspected.loader; mcVersion = inspected.minecraft; loaderVersion = inspected.loaderVersion;
+        Object.assign(creationLog, { loader, mcVersion, loaderVersion });
+        createLog(`Using ${LOADER_LABELS[loader]}${loaderVersion ? ` ${loaderVersion}` : ''} for Minecraft ${mcVersion}`);
+      }
+      setCreatePhase('Preparing Java', 10);
+      const javaBin = await ensureJava(loader === 'velocity' ? '1.21' : mcVersion, createLog);
+      setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
+      const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
+      if (pack) {
+        setCreatePhase('Downloading modpack files', 45);
+        await installModpack({
+          mrpack: pack.file, inspected: pack.inspected, instanceDir: staging,
+          source: { projectId: pack.version.projectId, versionId: pack.version.id, packVersion: pack.version.versionNumber },
+          download: testHooks.modpackFileDownload, log: createLog,
+          progress: ({ phase, done, total }) => {
+            if (phase === 'downloads') setCreatePhase(`Downloading modpack files ${done} / ${total}`, 45 + Math.round(40 * done / Math.max(1, total)));
+            else if (phase === 'overrides') setCreatePhase('Applying overrides', 88);
+          },
+        });
+      }
+      setCreatePhase('Finalizing instance', 92);
+      writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin, ramMB, loader });
+      (testHooks.renameDir || fs.renameSync)(staging, dir);
+      renamed = true;
+      const current = loadInstances();
+      if (current.some((i) => i.name === name)) throw new Error(`an instance named ${name} appeared while this one was being created`);
+      const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, createdAt: Date.now() };
+      saveInstances([...current, inst]);
+      registered = true;
+      startWorker(inst);
+      setCreatePhase('Ready', 100);
+      creationLog.progress = 100;
+      creationLog.instanceId = inst.id;
+      creationLog.panelPort = inst.panelPort;
+    } catch (err) {
+      console.error(`[create:${name}] failed: ${err.message}`);
+      creationLog.error = err.message;
+      try { fs.rmSync(staging, { recursive: true, force: true }); } catch (_) {}
+      if (renamed && !registered) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+    } finally {
+      if (packTmp) { try { fs.rmSync(packTmp, { recursive: true, force: true }); } catch (_) {} }
+      instanceCreateInProgress = false;
+      creationLog.done = true;
+    }
+  } catch (err) {
+    instanceCreateInProgress = false;
+    throw err;
+  }
+}
+// Resolves when the request was accepted and the build runs on its own; rejects with { code } when it was refused.
+const requestCreate = (data) => new Promise((resolve, reject) => { createInstance(data, resolve).catch(reject); });
+
+// Removes an instance from the panel and, on request, its files and backups. Returns { status, body }.
+async function removeInstance(inst, { files: wantFiles = false, backups: wantBackups = false } = {}) {
+  const instances = loadInstances();
+  const id = inst.id;
+    if (workers.has(id)) {
+      const status = await fetchWorkerStatus(inst.panelPort);
+      if (status?.running) { return { status: 400, body: { ok: false, error: 'stop the server before deleting the instance' } }; }
+    }
+    const backupDir = path.join(DATA_ROOT, 'backups', path.basename(path.resolve(inst.dir)));
+    if (wantFiles) {
+      const problem = checkDeletableDir(inst.dir, path.resolve(__dirname, '..'), os.homedir());
+      if (problem) { return { status: 400, body: { ok: false, error: problem } }; }
+    }
+    const w = workers.get(id);
+    if (w) await new Promise((resolve) => { const t = setTimeout(resolve, 15000); w.proc.once('exit', () => { clearTimeout(t); resolve(); }); w.proc.kill('SIGTERM'); });
+    try { saveInstances(instances.filter((i) => i.id !== id)); } catch (err) {
+      startWorker(inst);
+      return { status: 500, body: { ok: false, error: `could not update the instance list: ${err.message}` } };
+    }
+    try {
+      if (wantFiles) fs.rmSync(inst.dir, { recursive: true, force: true });
+      if (wantFiles && wantBackups && backupDir.startsWith(path.join(DATA_ROOT, 'backups') + path.sep)) fs.rmSync(backupDir, { recursive: true, force: true });
+    } catch (err) { return { status: 500, body: { ok: false, error: `removed from the panel, but deleting the files failed: ${err.message}` } }; }
+    return { status: 200, body: { ok: true, deletedFiles: wantFiles, deletedBackups: wantFiles && wantBackups } };
+}
+
+// Starts an upgrade or a rollback in the background. Throws { code } when it cannot start.
+async function startUpgradeJob(inst, data, rollback) {
+    const state = upgrades.get(inst.name);
+    if (state && state.running) throw Object.assign(new Error('an upgrade is already running for this instance'), { code: 409 });
+    if (!workers.has(inst.id)) throw Object.assign(new Error('this instance\'s panel is not running'), { code: 409 });
+    const status = await fetchWorkerStatus(inst.panelPort);
+    if (status && status.running) throw Object.assign(new Error('stop the Minecraft server first'), { code: 409 });
+    if (rollback) { const latest = readLatestUpgrade(inst.dir); if (!latest || latest.rolledBack) throw new Error('nothing to roll back'); }
+    const target = { mcVersion: String(data.mcVersion || '').trim(), loaderVersion: String(data.loaderVersion || '').trim() };
+    if (!rollback) {
+      if (!target.mcVersion) throw new Error('pick a Minecraft version');
+      if (!BUILD_LOADERS.includes(inst.loader) && !target.loaderVersion) throw new Error('pick a loader version');
+      const same = target.mcVersion === inst.mcVersion && (BUILD_LOADERS.includes(inst.loader) || target.loaderVersion === inst.loaderVersion);
+      if (same && !(inst.loader === 'paper' || inst.loader === 'purpur')) throw new Error('that is already the installed version');
+      if (compareSemver(target.mcVersion, inst.mcVersion) < 0 && data.allowDowngrade !== true) throw new Error('going to an older Minecraft version can damage the world, confirm it explicitly');
+      const options = await listLoaderVersions(inst.loader, target.mcVersion);
+      if (!Array.isArray(options) || !options.length) throw new Error('that Minecraft version is not available for this loader');
+      if (!BUILD_LOADERS.includes(inst.loader) && !options.includes(target.loaderVersion)) throw new Error('that loader version does not exist for this Minecraft version');
+    }
+    const st = { running: true, done: false, error: null, lines: [], kind: rollback ? 'rollback' : 'upgrade' };
+    upgrades.set(inst.name, st);
+    const log = (line) => { st.lines.push(line); console.log(`[upgrade:${inst.name}] ${line}`); };
+    (rollback ? runRollback(inst, data.restoreWorld === true, log) : runUpgrade(inst, target, log))
+      .then(() => log('done'))
+      .catch((err) => { st.error = err.message; log(`failed: ${err.message}`); })
+      .finally(() => { st.running = false; st.done = true; });
+}
+function upgradeStatusOf(inst) {
+  const state = upgrades.get(inst.name);
+  return { running: !!(state && state.running), lines: state ? state.lines : [], error: state ? state.error : null, done: !!(state && state.done), kind: state ? state.kind : null, latest: readLatestUpgrade(inst.dir), current: { mcVersion: inst.mcVersion, loader: inst.loader, loaderVersion: inst.loaderVersion || '' } };
+}
+
 function workerJson(port, p, method = 'GET', timeoutMs = 10000, jsonBody = null) {
   return new Promise((resolve) => {
     const req = http.request({ host: '127.0.0.1', port, path: p, method, timeout: timeoutMs, headers: jsonBody ? { 'Content-Type': 'application/json', [workerSecret.HEADER]: workerSecret.get() } : { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
@@ -584,6 +750,18 @@ const api = require('./api').createApi({
   clientIp,
   sendJson: (res, status, data) => sendJson(res, status, data),
   database: { status: () => databaseStatus(), handle: (request) => databaseHandle(request) },
+  instances: {
+    create: (data) => requestCreate(data),
+    creation: () => creationLog || { done: true, lines: [], important: [], progress: 0 },
+    versions: (loader, mc) => listLoaderVersions(loader, mc),
+    remove: (inst, options) => removeInstance(inst, options),
+    upgrade: (inst, data, rollback) => startUpgradeJob(inst, data, rollback),
+    upgradeStatus: (inst) => upgradeStatusOf(inst),
+    network: {
+      describe: (inst) => proxyNetwork.describe(inst.dir, loadInstances().filter((i) => i.id !== inst.id)),
+      apply: (inst, request, allowed) => proxyNetwork.apply(inst.dir, loadInstances().filter((i) => i.id !== inst.id && allowed(i.name)), { servers: request.servers, tryOrder: request.tryOrder, forcedHosts: request.forcedHosts }),
+    },
+  },
 });
 api.start();
 function instanceAutoStarts(inst) {
@@ -1178,109 +1356,12 @@ const server = http.createServer(async (req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
     req.on('end', async () => {
-      if (instanceCreateInProgress) { sendJson(res, 409, { ok: false, error: 'another instance is already being created' }); return; }
-      instanceCreateInProgress = true;
+      let data;
+      try { data = JSON.parse(body || '{}'); } catch (_) { sendJson(res, 400, { ok: false, error: 'invalid instance' }); return; }
       try {
-        const data = JSON.parse(body || '{}');
-        const modpackReq = data.modpack ? { versionId: String(data.modpack.versionId || '') } : null;
-        if (modpackReq && !/^[\w-]{1,64}$/.test(modpackReq.versionId)) throw new Error('invalid modpack');
-        const rawName = String(data.name || '').trim().replace(/[^a-zA-Z0-9]/g, '');
-        let loader = ['vanilla', 'paper', 'purpur', 'velocity', 'fabric', 'forge', 'neoforge'].includes(data.loader) ? data.loader : 'vanilla';
-        let mcVersion = String(data.mcVersion || '').trim();
-        let loaderVersion = String(data.loaderVersion || '').trim();
-        let mcPort = Number(data.port);
-        const ramMB = Math.min(32768, Math.max(1024, Number(data.ramMB) || 4096));
-        const backupIntervalHours = Math.min(168, Math.max(1, Number(data.backupIntervalHours) || 6));
-        const maxBackups = Math.min(100, Math.max(1, Number(data.maxBackups) || 10));
-        if (!rawName) throw new Error('invalid instance name');
-        if (!modpackReq && !mcVersion) throw new Error('invalid Minecraft version');
-        if (!modpackReq && !BUILD_LOADERS.includes(loader) && !loaderVersion) throw new Error('invalid loader version');
-        if (!Number.isInteger(mcPort) || mcPort < 1 || mcPort > 65535) throw new Error('invalid port');
-        const instances = loadInstances();
-        const requestedPort = mcPort;
-        mcPort = await findFreePort(mcPort, instances);
-        // A name collision gets a numeric suffix (name02, name03, ...)
-        // instead of failing outright - the first instance with that name
-        // keeps the bare name.
-        let name = rawName;
-        if (instances.some((i) => i.name === name)) {
-          let n = 2;
-          while (instances.some((i) => i.name === `${rawName}${String(n).padStart(2, '0')}`)) n++;
-          name = `${rawName}${String(n).padStart(2, '0')}`;
-        }
-        const dir = path.join(INSTANCES_ROOT, name);
-        const staging = `${dir}.creating`;
-        fs.mkdirSync(INSTANCES_ROOT, { recursive: true });
-        if (fs.existsSync(dir) || fs.existsSync(staging)) throw new Error(`${dir} already exists`);
-        instanceCreateInProgress = true;
-        creationLog = { name, loader, mcVersion, startedAt: Date.now(), lines: [], important: [], progress: 5, done: false, error: null, instanceId: null, panelPort: null, phase: modpackReq ? 'Reading modpack' : 'Preparing Java' };
+        await requestCreate(data);
         sendJson(res, 202, { ok: true });
-        let renamed = false, registered = false, packTmp = null;
-        try {
-          const createLog = (line) => { console.log(`[create:${name}] ${line}`); pushCreateLog(line); };
-          if (mcPort !== requestedPort) createLog(`port ${requestedPort} is in use, using ${mcPort} instead`);
-          let pack = null;
-          if (modpackReq) {
-            setCreatePhase('Reading modpack', 5);
-            packTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meow-pack-'));
-            const version = await modpackApi.getVersion(modpackReq.versionId);
-            const file = path.join(packTmp, 'pack.mrpack');
-            await (testHooks.modpackDownload || require('./core/modules/modrinth').downloadVerified)(version.file.url, file, version.file.sha512, version.file.size);
-            const { inspected } = await resolveEnvironments(inspectMrpack(file), { request: testHooks.modrinthRequest, log: createLog });
-            if (!MODPACK_LOADERS.includes(inspected.loader)) throw new Error(`This pack needs ${LOADER_LABELS[inspected.loader] || inspected.loader}, which LITE cannot run yet.`);
-            if (inspected.loader === 'forge') {
-              const known = await listLoaderVersions('forge', inspected.minecraft);
-              if (!known.includes(inspected.loaderVersion)) throw new Error(`Forge ${inspected.loaderVersion} is not available for Minecraft ${inspected.minecraft}.`);
-            }
-            pack = { file, inspected, version };
-            loader = inspected.loader; mcVersion = inspected.minecraft; loaderVersion = inspected.loaderVersion;
-            Object.assign(creationLog, { loader, mcVersion, loaderVersion });
-            createLog(`Using ${LOADER_LABELS[loader]}${loaderVersion ? ` ${loaderVersion}` : ''} for Minecraft ${mcVersion}`);
-          }
-          setCreatePhase('Preparing Java', 10);
-          const javaBin = await ensureJava(loader === 'velocity' ? '1.21' : mcVersion, createLog);
-          setCreatePhase(`Installing ${LOADER_LABELS[loader]}`, 20);
-          const builtVersion = await installServerSoftware(loader, mcVersion, loaderVersion, ramMB, staging, createLog, javaBin);
-          if (pack) {
-            setCreatePhase('Downloading modpack files', 45);
-            await installModpack({
-              mrpack: pack.file, inspected: pack.inspected, instanceDir: staging,
-              source: { projectId: pack.version.projectId, versionId: pack.version.id, packVersion: pack.version.versionNumber },
-              download: testHooks.modpackFileDownload, log: createLog,
-              progress: ({ phase, done, total }) => {
-                if (phase === 'downloads') setCreatePhase(`Downloading modpack files ${done} / ${total}`, 45 + Math.round(40 * done / Math.max(1, total)));
-                else if (phase === 'overrides') setCreatePhase('Applying overrides', 88);
-              },
-            });
-          }
-          setCreatePhase('Finalizing instance', 92);
-          writeControlledFiles(staging, { mcPort, backupIntervalHours, maxBackups, autoStart: data.autoStart, javaBin, ramMB, loader });
-          (testHooks.renameDir || fs.renameSync)(staging, dir);
-          renamed = true;
-          const current = loadInstances();
-          if (current.some((i) => i.name === name)) throw new Error(`an instance named ${name} appeared while this one was being created`);
-          const inst = { id: crypto.randomUUID(), name, dir, port: mcPort, panelPort: nextFreePort(current), mcVersion, loader, loaderVersion: builtVersion || loaderVersion, createdAt: Date.now() };
-          saveInstances([...current, inst]);
-          registered = true;
-          startWorker(inst);
-          setCreatePhase('Ready', 100);
-          creationLog.progress = 100;
-          creationLog.instanceId = inst.id;
-          creationLog.panelPort = inst.panelPort;
-        } catch (err) {
-          console.error(`[create:${name}] failed: ${err.message}`);
-          creationLog.error = err.message;
-          try { fs.rmSync(staging, { recursive: true, force: true }); } catch (_) {}
-          if (renamed && !registered) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
-        } finally {
-          if (packTmp) { try { fs.rmSync(packTmp, { recursive: true, force: true }); } catch (_) {} }
-          instanceCreateInProgress = false;
-          creationLog.done = true;
-        }
-      } catch (err) {
-        instanceCreateInProgress = false;
-        sendJson(res, 400, { ok: false, error: err.message || 'invalid instance' });
-      }
+      } catch (err) { sendJson(res, err.code || 400, { ok: false, error: err.message || 'invalid instance' }); }
     });
     return;
   }
@@ -1295,7 +1376,7 @@ const server = http.createServer(async (req, res) => {
     const state = upgrades.get(inst.name);
     if (upgradeMatch[2] === 'upgrade-status' && req.method === 'GET') {
       if (!caps.includes('view')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
-      sendJson(res, 200, { running: !!(state && state.running), lines: state ? state.lines : [], error: state ? state.error : null, done: !!(state && state.done), kind: state ? state.kind : null, latest: readLatestUpgrade(inst.dir), current: { mcVersion: inst.mcVersion, loader: inst.loader, loaderVersion: inst.loaderVersion || '' } });
+      sendJson(res, 200, upgradeStatusOf(inst));
       return;
     }
     if (req.method !== 'POST') { sendJson(res, 405, { ok: false }); return; }
@@ -1306,31 +1387,8 @@ const server = http.createServer(async (req, res) => {
       let data;
       try { data = JSON.parse(body || '{}'); } catch (_) { sendJson(res, 400, { ok: false, error: 'bad json' }); return; }
       try {
-        if (state && state.running) throw Object.assign(new Error('an upgrade is already running for this instance'), { code: 409 });
-        if (!workers.has(inst.id)) throw Object.assign(new Error('this instance\'s panel is not running'), { code: 409 });
-        const status = await fetchWorkerStatus(inst.panelPort);
-        if (status && status.running) throw Object.assign(new Error('stop the Minecraft server first'), { code: 409 });
-        const rollback = upgradeMatch[2] === 'upgrade/rollback';
-        if (rollback) { const latest = readLatestUpgrade(inst.dir); if (!latest || latest.rolledBack) throw new Error('nothing to roll back'); }
-        const target = { mcVersion: String(data.mcVersion || '').trim(), loaderVersion: String(data.loaderVersion || '').trim() };
-        if (!rollback) {
-          if (!target.mcVersion) throw new Error('pick a Minecraft version');
-          if (!BUILD_LOADERS.includes(inst.loader) && !target.loaderVersion) throw new Error('pick a loader version');
-          const same = target.mcVersion === inst.mcVersion && (BUILD_LOADERS.includes(inst.loader) || target.loaderVersion === inst.loaderVersion);
-          if (same && !(inst.loader === 'paper' || inst.loader === 'purpur')) throw new Error('that is already the installed version');
-          if (compareSemver(target.mcVersion, inst.mcVersion) < 0 && data.allowDowngrade !== true) throw new Error('going to an older Minecraft version can damage the world, confirm it explicitly');
-          const options = await listLoaderVersions(inst.loader, target.mcVersion);
-          if (!Array.isArray(options) || !options.length) throw new Error('that Minecraft version is not available for this loader');
-          if (!BUILD_LOADERS.includes(inst.loader) && !options.includes(target.loaderVersion)) throw new Error('that loader version does not exist for this Minecraft version');
-        }
-        const st = { running: true, done: false, error: null, lines: [], kind: rollback ? 'rollback' : 'upgrade' };
-        upgrades.set(inst.name, st);
-        const log = (line) => { st.lines.push(line); console.log(`[upgrade:${inst.name}] ${line}`); };
+        await startUpgradeJob(inst, data, upgradeMatch[2] === 'upgrade/rollback');
         sendJson(res, 202, { ok: true });
-        (rollback ? runRollback(inst, data.restoreWorld === true, log) : runUpgrade(inst, target, log))
-          .then(() => log('done'))
-          .catch((err) => { st.error = err.message; log(`failed: ${err.message}`); })
-          .finally(() => { st.running = false; st.done = true; });
       } catch (err) { sendJson(res, err.code || 400, { ok: false, error: err.message }); }
     });
     return;
@@ -1379,31 +1437,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'DELETE') {
       if (!caps.includes('remove')) { sendJson(res, 403, { ok: false, error: 'not allowed to remove this instance' }); return; }
-      (async () => {
-        const wantFiles = url.searchParams.get('files') === '1';
-        const wantBackups = url.searchParams.get('backups') === '1';
-        if (workers.has(id)) {
-          const status = await fetchWorkerStatus(inst.panelPort);
-          if (status?.running) { sendJson(res, 400, { ok: false, error: 'stop the server before deleting the instance' }); return; }
-        }
-        const backupDir = path.join(DATA_ROOT, 'backups', path.basename(path.resolve(inst.dir)));
-        if (wantFiles) {
-          const problem = checkDeletableDir(inst.dir, path.resolve(__dirname, '..'), os.homedir());
-          if (problem) { sendJson(res, 400, { ok: false, error: problem }); return; }
-        }
-        const w = workers.get(id);
-        if (w) await new Promise((resolve) => { const t = setTimeout(resolve, 15000); w.proc.once('exit', () => { clearTimeout(t); resolve(); }); w.proc.kill('SIGTERM'); });
-        try { saveInstances(instances.filter((i) => i.id !== id)); } catch (err) {
-          startWorker(inst);
-          sendJson(res, 500, { ok: false, error: `could not update the instance list: ${err.message}` });
-          return;
-        }
-        try {
-          if (wantFiles) fs.rmSync(inst.dir, { recursive: true, force: true });
-          if (wantFiles && wantBackups && backupDir.startsWith(path.join(DATA_ROOT, 'backups') + path.sep)) fs.rmSync(backupDir, { recursive: true, force: true });
-        } catch (err) { sendJson(res, 500, { ok: false, error: `removed from the panel, but deleting the files failed: ${err.message}` }); return; }
-        sendJson(res, 200, { ok: true, deletedFiles: wantFiles, deletedBackups: wantFiles && wantBackups });
-      })();
+      removeInstance(inst, { files: url.searchParams.get('files') === '1', backups: url.searchParams.get('backups') === '1' }).then((out) => sendJson(res, out.status, out.body));
       return;
     }
 
