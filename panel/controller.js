@@ -1256,6 +1256,7 @@ const server = http.createServer(async (req, res) => {
     if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
     const data = await readBody(req);
     if (typeof data.enabled !== 'boolean') { sendJson(res, 400, { ok: false, error: 'enabled must be true or false' }); return; }
+    if (!data.enabled && panelSettings.feature('database') && dbEngine.status().installed) { sendJson(res, 409, { ok: false, error: 'the database is installed and cannot be disabled' }); return; }
     const current = loadSettings();
     saveSettings({ ...current, features: { ...current.features, database: data.enabled } });
     if (data.enabled) startDatabase(); else dbEngine.stop().catch(() => {});
@@ -1473,6 +1474,18 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 202, { ok: true });
       } catch (err) { sendJson(res, err.code || 400, { ok: false, error: err.message || 'invalid instance' }); }
     });
+    return;
+  }
+
+  const catMatch = url.pathname.match(/^\/api\/instances\/([^/]+)\/category$/);
+  if (catMatch && req.method === 'POST') {
+    const inst = loadInstances().find((i) => i.name === safeDecode(catMatch[1]));
+    if (!inst) { sendJson(res, 404, { ok: false, error: 'not found' }); return; }
+    if (!capsFor(req, inst.name).includes('settings')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const data = await readBody(req);
+    const category = String(data.category || '').trim().slice(0, 40);
+    saveInstances(loadInstances().map((i) => (i.id === inst.id ? { ...i, category } : i)));
+    sendJson(res, 200, { ok: true, category });
     return;
   }
 

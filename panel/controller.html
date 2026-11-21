@@ -54,6 +54,8 @@
   <div class="modal">
     <div class="modal-title" id="modalTitle"></div>
     <p class="modal-msg" id="modalMsg"></p>
+    <input id="modalInput" list="categoryList" maxlength="40" style="display:none;width:100%;margin-bottom:12px">
+    <datalist id="categoryList"></datalist>
     <div class="modal-actions" id="modalActions"></div>
   </div>
 </div>
@@ -89,6 +91,17 @@ function modalConfirm(title, message, confirmLabel = 'Confirm') {
     { label: 'Cancel', value: false },
     { label: confirmLabel, value: true, primary: true },
   ]);
+}
+
+function modalCategory(current, existing) {
+  const input = $('modalInput');
+  input.value = current;
+  input.style.display = '';
+  $('categoryList').innerHTML = existing.map((c) => `<option value="${esc(c)}">`).join('');
+  return showModal('Category', 'Servers with the same category are grouped. Leave empty to remove it.', [
+    { label: 'Cancel', value: null },
+    { label: 'Save', value: true, primary: true },
+  ]).then((ok) => { input.style.display = 'none'; return ok ? input.value.trim() : null; });
 }
 
 (function () {
@@ -179,6 +192,7 @@ function instCard(i) {
     name: i.name, loader: i.loader, loaderVersion: i.loaderVersion, mcVersion: i.mcVersion, port: i.port, running: i.running,
     pill: { dot: healthDot(i), label: healthLabel(i) }, cpuPercent: i.cpuPercent, rssMB: i.rssMB,
     error: i.health === 'error' && i.crash?.reason ? i.crash.reason : '',
+    category: i.category || '', canCategorize: i.caps.includes('settings'),
     canOpen: i.health !== 'panel-off', canManage: i.caps.includes('power'), openAttr: `href="/instance/${encodeURIComponent(i.name)}/"`,
   };
 }
@@ -194,6 +208,15 @@ document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-act]');
   if (!btn) return;
   const { act, id } = btn.dataset;
+  if (act === 'category') {
+    const all = [...document.querySelectorAll('[data-act="category"]')].map((b) => b.dataset.category).filter(Boolean);
+    const value = await modalCategory(btn.dataset.category, [...new Set(all)]);
+    if (value === null) return;
+    const r = await fetch(`/api/instances/${encodeURIComponent(id)}/category`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: value }) });
+    if (!r.ok) await modalAlert('Could not save', ((await r.json().catch(() => ({}))).error) || `HTTP ${r.status}`);
+    loadInstances();
+    return;
+  }
   if (act === 'stop' || act === 'restart') {
     const stopping = act === 'stop';
     const ok = await modalConfirm(stopping ? 'Stop this server?' : 'Restart this server?', 'Players will be disconnected' + (stopping ? ' and the world is saved.' : ' while it restarts.'), stopping ? 'Stop' : 'Restart');

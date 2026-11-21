@@ -49,7 +49,7 @@ test('the database stays off until enabled, then serves server and network datab
     const shared = await fetch(`${h.base}/api/v1/database/shared`, { headers: { Authorization: `Bearer ${token}` } });
     assert.deepEqual((await shared.json()).tables, ['motd']);
 
-    assert.equal((await h.json(cookie, 'POST', '/api/database/enable', { enabled: false })).status, 200);
-    await h.until(async () => !(await h.json(cookie, 'GET', '/api/database/status')).body.running, 'the database to stop');
+    assert.equal((await h.json(cookie, 'POST', '/api/database/enable', { enabled: false })).status, 409);
+    assert.equal((await h.json(cookie, 'GET', '/api/database/status')).body.running, true);
   } finally { await h.stop(); }
 });

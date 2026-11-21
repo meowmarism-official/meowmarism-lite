@@ -62,6 +62,12 @@ input, select { background: #0c0e12; border: 1px solid var(--line); color: var(-
 .inst-actions { display: flex; gap: 8px; align-items: center; margin-top: auto; }
 .inst-actions .grow { flex: 1; }
 .inst-err { color: var(--red); font-size: 12px; line-height: 1.4; }
+.inst-cat { margin-bottom: 18px; }
+.inst-cat-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; padding: 6px 2px; margin-bottom: 12px; cursor: pointer; font: inherit; text-align: left; }
+.inst-cat-arrow { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor; transition: transform .12s; }
+.inst-cat.closed .inst-cat-arrow { transform: rotate(-90deg); }
+.inst-cat.closed .inst-grid { display: none; }
+.inst-cat-count { color: var(--muted); font-size: 12px; }
 .inst-empty { border: 1px dashed var(--line2); border-radius: 12px; padding: 34px 20px; text-align: center; color: var(--muted); }
 .addbtn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #36506c; background: #26364a; color: #dcecff;
   font-size: 18px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }

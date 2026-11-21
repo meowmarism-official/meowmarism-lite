@@ -1058,7 +1058,11 @@
   "Starting": "Startet",
   "Retry": "Erneut versuchen",
   "Start order": "Startreihenfolge",
-  "Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.": "Server, die dieser braucht. Sie starten vor ihm und stoppen nach ihm, auch bei einem Panel-Update. Beispiel: Der Haupt-Proxy braucht den Standby-Proxy."
+  "Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.": "Server, die dieser braucht. Sie starten vor ihm und stoppen nach ihm, auch bei einem Panel-Update. Beispiel: Der Haupt-Proxy braucht den Standby-Proxy.",
+  "Installed and always on. It cannot be disabled while it is installed.": "Installiert und immer an. Solange sie installiert ist, kann sie nicht deaktiviert werden.",
+  "Category": "Kategorie",
+  "Servers with the same category are grouped. Leave empty to remove it.": "Server mit derselben Kategorie werden gruppiert. Leer lassen, um sie zu entfernen.",
+  "Uncategorized": "Ohne Kategorie"
  },
  "patterns": [
   [

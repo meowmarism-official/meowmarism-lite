@@ -454,7 +454,12 @@
   "Retry": "Reintentar",
   "Start order": "Orden de inicio",
   "Servers this one needs. They start before it and stop after it, also when the panel is updated. Example: the main proxy needs the standby proxy.": "Servidores que este necesita. Se inician antes y se detienen después, también al actualizar el panel. Ejemplo: el proxy principal necesita el proxy de reserva.",
-  "Saved": "Guardado"
+  "Saved": "Guardado",
+  "Installed and always on. It cannot be disabled while it is installed.": "Instalada y siempre activa. No se puede desactivar mientras esté instalada.",
+  "Category": "Categoría",
+  "Servers with the same category are grouped. Leave empty to remove it.": "Los servidores con la misma categoría se agrupan. Déjalo vacío para quitarla.",
+  "Uncategorized": "Sin categoría",
+  "Could not save": "No se pudo guardar"
  },
  "patterns": [
   [

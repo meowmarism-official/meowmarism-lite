@@ -21,6 +21,7 @@
         ? `<button class="btn" data-act="restart" data-id="${name}">Restart</button><button class="btn danger" data-act="stop" data-id="${name}">Stop</button>`
         : `<button class="btn ${i.canOpen ? '' : 'primary grow'}" data-act="start" data-id="${name}">Start</button>`;
     }
+    if (i.canCategorize) actions += `<button class="btn" data-act="category" data-id="${name}" data-category="${esc(i.category || '')}" title="Category">&#9776;</button>`;
     const sub = `${esc(L.label)}${i.loaderVersion && !['paper', 'purpur', 'vanilla', 'velocity'].includes(i.loader) ? ' ' + esc(i.loaderVersion) : ''} · ${esc(i.mcVersion || '-')}`;
     return `<article class="inst-card${i.running ? ' is-on' : ''}">
     <div class="inst-head">
@@ -45,9 +46,36 @@
     ].map(([v, label]) => `<div class="inst-stat"><b>${v}</b><span>${label}</span></div>`).join('') : '';
   }
 
+  const COLLAPSED_KEY = 'meow.collapsedCategories';
+  const collapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]')); } catch (_) { return new Set(); } };
+  const saveCollapsed = (set) => { try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch (_) { /* storage unavailable */ } };
+
+  function section(title, items, hostMemMB, closed) {
+    return `<section class="inst-cat${closed ? ' closed' : ''}"><button class="inst-cat-head" data-cat="${esc(title)}"><span class="inst-cat-arrow"></span><b data-no-i18n>${esc(title)}</b><span class="inst-cat-count">${items.length}</span></button>
+      <div class="inst-grid">${items.map((i) => card(i, hostMemMB)).join('')}</div></section>`;
+  }
+
   function render(gridEl, summaryEl, list, hostMemMB, emptyText) {
     summaryEl.innerHTML = summary(list);
-    gridEl.innerHTML = list.map((i) => card(i, hostMemMB)).join('') || `<div class="inst-empty" style="grid-column:1/-1">${emptyText}</div>`;
+    if (!gridEl.dataset.catBound) {
+      gridEl.dataset.catBound = '1';
+      gridEl.addEventListener('click', (e) => {
+        const head = e.target.closest('.inst-cat-head');
+        if (!head) return;
+        const set = collapsed();
+        const name = head.dataset.cat;
+        if (set.has(name)) set.delete(name); else set.add(name);
+        saveCollapsed(set);
+        head.parentElement.classList.toggle('closed', set.has(name));
+      });
+    }
+    const grouped = list.some((i) => i.category);
+    gridEl.style.display = grouped ? 'block' : '';
+    if (!list.length) { gridEl.innerHTML = `<div class="inst-empty" style="grid-column:1/-1">${emptyText}</div>`; return; }
+    if (!grouped) { gridEl.innerHTML = list.map((i) => card(i, hostMemMB)).join(''); return; }
+    const closed = collapsed();
+    const names = [...new Set(list.map((i) => i.category || ''))].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+    gridEl.innerHTML = names.map((n) => section(n || 'Uncategorized', list.filter((i) => (i.category || '') === n), hostMemMB, closed.has(n || 'Uncategorized'))).join('');
   }
 
   window.MeowInstances = { card, summary, render };
