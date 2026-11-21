@@ -13,6 +13,7 @@ const REQUESTS_PER_MINUTE = 300;
 
 // The worker capability that backs each scope.
 const CAP = { read: 'view', power: 'power', console: 'console', settings: 'settings', backups: 'backups', files: 'files', events: 'view' };
+const BODY_METHODS = ['POST', 'PATCH', 'DELETE'];
 
 const cleanText = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
 
@@ -33,7 +34,7 @@ function readJson(req, limit = 64 * 1024) {
   });
 }
 
-// deps: { tokens, webhooks, hub, isEnabled(), loadInstances(), workerUp(inst), workerSecret, version(), clientIp(req), callWorker? }
+// deps: { tokens, webhooks, hub, isEnabled(), loadInstances(), workerUp(inst), workerSecret, version(), clientIp(req), database: { status(), handle(request) }, callWorker? }
 function createApi(deps) {
   const { tokens, webhooks, hub, isEnabled, loadInstances, workerUp, version, clientIp } = deps;
   const windows = new Map();
@@ -93,7 +94,7 @@ function createApi(deps) {
 
   // Each route: scope needed, a path pattern and the handler. params are the captured parts of the pattern.
   const routes = [];
-  const route = (method, pattern, scope, handler) => routes.push({ method, pattern: new RegExp(`^${pattern}$`), scope, handler });
+  const route = (method, pattern, scope, handler, options = {}) => routes.push({ method, pattern: new RegExp(`^${pattern}$`), scope, handler, ...options });
   const toWorker = (cap, method, workerPath, withBody = false) => async (ctx) => answer(ctx.res, await callWorker(ctx.inst, [cap], method, workerPath(ctx), withBody ? ctx.body : undefined));
   const forward = (scope, method, workerPath, withBody) => (ctx) => toWorker(CAP[scope], method, workerPath, withBody)(ctx);
 
@@ -140,6 +141,20 @@ function createApi(deps) {
   route('POST', '/instances/([^/]+)/backups', 'backups', forward('backups', 'POST', () => '/api/backup', true));
   route('GET', '/instances/([^/]+)/files', 'files', forward('files', 'GET', (c) => `/api/files?path=${encodeURIComponent(c.url.searchParams.get('path') || '.')}`));
   route('GET', '/instances/([^/]+)/files/content', 'files', forward('files', 'GET', (c) => `/api/files/content?path=${encodeURIComponent(c.url.searchParams.get('path') || '')}`));
+
+  // Databases: the same routes the panel uses, below instances/:name/database and database/shared.
+  async function databaseRoute(ctx, kind, sub) {
+    if (kind === 'shared' && ctx.token.instances) return fail(ctx.res, 403, 'the network database needs a token without instance limits');
+    try {
+      const out = await deps.database.handle({ kind, instance: ctx.inst ? ctx.inst.name : null, method: ctx.req.method, sub: sub || '', body: ctx.body, query: ctx.url.searchParams });
+      return send(ctx.res, out.status, out.body);
+    } catch (err) { return fail(ctx.res, 400, err.message); }
+  }
+  route('GET', '/database', 'database', async ({ res }) => send(res, 200, { ok: true, ...deps.database.status() }));
+  for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+    route(method, '/instances/([^/]+)/database(/.*)?', 'database', (ctx) => databaseRoute(ctx, 'server', ctx.params[1]), { noWorker: true });
+    route(method, '/database/shared(/.*)?', 'database', (ctx) => databaseRoute(ctx, 'shared', ctx.params[0]));
+  }
 
   route('GET', '/events', 'events', (ctx) => {
     const { req, res, token, url } = ctx;
@@ -199,10 +214,10 @@ function createApi(deps) {
         ctx.inst = loadInstances().find((i) => i.name === name);
         if (!ctx.inst || !allowsInstance(token, ctx.inst.name)) { fail(res, 404, 'no such instance'); return true; }
         const overviewOnly = req.method === 'GET' && rest === `/instances/${m[1]}`;
-        if (!overviewOnly && !workerUp(ctx.inst)) { fail(res, 409, 'the panel of this instance is not running'); return true; }
+        if (!overviewOnly && !r.noWorker && !workerUp(ctx.inst)) { fail(res, 409, 'the panel of this instance is not running'); return true; }
       }
       try {
-        if (req.method === 'POST') ctx.body = await readJson(req);
+        if (BODY_METHODS.includes(req.method)) ctx.body = await readJson(req);
         await r.handler(ctx);
       } catch (err) {
         if (!res.headersSent) fail(res, err.status || 500, err.status ? err.message : 'the request failed');

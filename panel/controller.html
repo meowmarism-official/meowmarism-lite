@@ -133,7 +133,13 @@ const apiHandlers = {
   renewToken: (id, body) => apiCall('POST', `/api/api-admin/tokens/${id}/renew`, body),
 };
 const API_UI = MeowApi.mount({ ...apiHandlers, mode: 'page', el: $('apiRoot') });
-const API_TOGGLE = MeowApi.mount({ ...apiHandlers, mode: 'toggle', el: $('optionalRoot') });
+const API_TOGGLE = MeowApi.mount({
+  ...apiHandlers, mode: 'toggle', el: $('optionalRoot'),
+  database: {
+    status: async () => (await fetch('/api/database/status', { cache: 'no-store' })).json(),
+    setEnabled: (enabled) => apiCall('POST', '/api/database/enable', { enabled }),
+  },
+});
 const { showPage, pageFromPath } = SHELL;
 let currentRole = null;
 

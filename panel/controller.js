@@ -399,6 +399,61 @@ if (process.platform === 'linux' && process.env.MEOW_AUTO_JDK !== '0') {
   setTimeout(() => { if (!jdkToolsPresent(neededJdkMajor())) installJdkTools(); }, 30000).unref();
 }
 
+// Managed MariaDB, an optional feature: databases for single servers and one for the whole network.
+const sqlDb = require('./core/modules/db-sql');
+const dbJob = { running: false, done: false, error: null, lines: [] };
+const dbEngine = require('./runtime/mariadb').createMariaDb({
+  dataRoot: DATA_ROOT,
+  credsFile: path.join(os.homedir(), '.meowmarism-db.json'),
+  port: Number(process.env.MEOW_DB_PORT) || undefined,
+  log: (line) => { dbJob.lines.push(line); if (dbJob.lines.length > 200) dbJob.lines.shift(); console.log(`[db] ${line}`); },
+  download: downloadFile,
+  getText: httpsGetText,
+  sha256: (file) => new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    fs.createReadStream(file).on('data', (d) => hash.update(d)).on('end', () => resolve(hash.digest('hex'))).on('error', reject);
+  }),
+  extract: (archive, dir) => new Promise((resolve, reject) => {
+    const p = spawn('tar', ['-xzf', archive, '-C', dir, '--strip-components=1']);
+    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('could not unpack MariaDB'))));
+    p.on('error', reject);
+  }),
+});
+const dbService = require('./db-service').createDbService(dbEngine);
+let dbHooked = false;
+
+async function startDatabase() {
+  if (dbJob.running) return;
+  Object.assign(dbJob, { running: true, done: false, error: null, lines: [] });
+  try {
+    await dbEngine.install();
+    await dbEngine.start();
+    if (!dbHooked) {
+      dbHooked = true;
+      for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { dbEngine.stop().catch(() => {}).finally(() => process.exit(0)); });
+    }
+  } catch (err) {
+    dbJob.error = err.message;
+    dbJob.lines.push(`failed: ${err.message}`);
+    console.log(`[db] failed: ${err.message}`);
+  } finally {
+    dbJob.running = false;
+    dbJob.done = true;
+  }
+}
+if (process.env.MEOW_AUTO_DB !== '0') setTimeout(() => { if (panelSettings.feature('database') && dbEngine.tools()) startDatabase(); }, 3000).unref();
+
+const dbTarget = (kind, instance) => {
+  const db = kind === 'shared' ? sqlDb.SHARED_DB : sqlDb.instanceDbName(instance);
+  return { db, user: db };
+};
+async function databaseHandle({ kind, instance, method, sub, body, query }) {
+  if (!panelSettings.feature('database')) return { status: 404, body: { ok: false, error: 'the database is not enabled' } };
+  if (!dbEngine.status().running) return { status: 503, body: { ok: false, error: 'the database is not running' } };
+  return require('./db-service').route({ engine: dbEngine, service: dbService, ...dbTarget(kind, instance), method, sub, body, query });
+}
+const databaseStatus = () => ({ enabled: panelSettings.feature('database'), ...dbEngine.status(), job: dbJob });
+
 function workerJson(port, p, method = 'GET', timeoutMs = 10000, jsonBody = null) {
   return new Promise((resolve) => {
     const req = http.request({ host: '127.0.0.1', port, path: p, method, timeout: timeoutMs, headers: jsonBody ? { 'Content-Type': 'application/json', [workerSecret.HEADER]: workerSecret.get() } : { [workerSecret.HEADER]: workerSecret.get() } }, (res) => {
@@ -528,6 +583,7 @@ const api = require('./api').createApi({
   version: () => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version; } catch (_) { return null; } },
   clientIp,
   sendJson: (res, status, data) => sendJson(res, status, data),
+  database: { status: () => databaseStatus(), handle: (request) => databaseHandle(request) },
 });
 api.start();
 function instanceAutoStarts(inst) {
@@ -902,6 +958,40 @@ const server = http.createServer(async (req, res) => {
       } catch (err) { sendJson(res, 400, { ok: false, error: err.message }); }
       return;
     }
+  }
+
+  if (url.pathname === '/api/database/status' && req.method === 'GET') {
+    sendJson(res, 200, { ...databaseStatus(), shared: canPanel(req, 'users'), job: canPanel(req, 'update') ? dbJob : { running: dbJob.running } });
+    return;
+  }
+  if (url.pathname === '/api/database/enable' && req.method === 'POST') {
+    if (!canPanel(req, 'update')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+    const data = await readBody(req);
+    if (typeof data.enabled !== 'boolean') { sendJson(res, 400, { ok: false, error: 'enabled must be true or false' }); return; }
+    const current = loadSettings();
+    saveSettings({ ...current, features: { ...current.features, database: data.enabled } });
+    if (data.enabled) startDatabase(); else dbEngine.stop().catch(() => {});
+    sendJson(res, 200, databaseStatus());
+    return;
+  }
+  const dbMatch = url.pathname.match(/^\/api\/database\/(?:(shared)|server\/([^/]+))(\/.*)?$/);
+  if (dbMatch) {
+    const kind = dbMatch[1] ? 'shared' : 'server';
+    let instance = null;
+    if (kind === 'shared') {
+      if (!canPanel(req, 'users')) { sendJson(res, 403, { ok: false, error: 'only owners can use the network database' }); return; }
+    } else {
+      const inst = loadInstances().find((i) => i.name === safeDecode(dbMatch[2]));
+      if (!inst) { sendJson(res, 404, { ok: false, error: 'no such instance' }); return; }
+      if (!capsFor(req, inst.name).includes('settings')) { sendJson(res, 403, { ok: false, error: 'not allowed' }); return; }
+      instance = inst.name;
+    }
+    try {
+      const body = ['POST', 'PATCH', 'DELETE'].includes(req.method) ? await readBody(req) : {};
+      const out = await databaseHandle({ kind, instance, method: req.method, sub: dbMatch[3] || '', body, query: url.searchParams });
+      sendJson(res, out.status, out.body);
+    } catch (err) { sendJson(res, 400, { ok: false, error: err.message }); }
+    return;
   }
 
   if (url.pathname === '/api/optional-features' && req.method === 'GET') {

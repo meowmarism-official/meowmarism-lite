@@ -20,7 +20,7 @@ function rig({ enabled = true, up = ['survival', 'creative'], summaries = {} } =
   const posts = [];
   const webhooks = createWebhooks({ file: path.join(dir, 'h.json'), backoffMs: [], post: async (url, req) => { posts.push({ url, ...req }); return { status: 200 }; } });
   const hub = createEventHub();
-  const state = { enabled, up: new Set(up), calls: [], summaries };
+  const state = { enabled, up: new Set(up), calls: [], summaries, dbCalls: [] };
   const api = createApi({
     tokens, webhooks, hub,
     isEnabled: () => state.enabled,
@@ -29,6 +29,10 @@ function rig({ enabled = true, up = ['survival', 'creative'], summaries = {} } =
     version: () => '9.9.9',
     clientIp: () => '1.2.3.4',
     sendJson: (res, status, data) => { res.out = { status, data }; },
+    database: {
+      status: () => ({ enabled: true, running: true, port: 3307 }),
+      handle: async (request) => { state.dbCalls.push(request); return { status: 200, body: { ok: true, echo: request.sub } }; },
+    },
     callWorker: async (inst, caps, method, p, body) => {
       state.calls.push({ inst: inst.name, caps, method, path: p, body });
       if (p === '/api/summary') return { status: 200, body: state.summaries[inst.name] || { running: false, phase: 'offline', lag: { count: 0 } } };
@@ -217,4 +221,33 @@ test('status changes found by polling become events and webhook deliveries', asy
   t.state.summaries.survival = { running: false, phase: 'offline', lag: { count: 1 } };
   await t.api.poll();
   assert.strictEqual(t.hub.since(0).length, 3, 'nothing is published while the API is off');
+});
+
+test('database routes need the database scope and reach the service with the right target', async () => {
+  const t = rig({ up: [] });
+  const none = t.make(['read']);
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/database', { token: none })).status, 403);
+  assert.strictEqual((await t.request('GET', '/api/v1/database', { token: none })).status, 403);
+  const token = t.make(['database']);
+  assert.deepStrictEqual((await t.request('GET', '/api/v1/database', { token })).data, { ok: true, enabled: true, running: true, port: 3307 });
+  const r = await t.request('POST', '/api/v1/instances/survival/database/tables/players/rows', { token, body: { values: { name: 'a' } } });
+  assert.strictEqual(r.status, 200, 'the instance panel does not have to run');
+  const call = t.state.dbCalls[0];
+  assert.deepStrictEqual([call.kind, call.instance, call.method, call.sub, call.body], ['server', 'survival', 'POST', '/tables/players/rows', { values: { name: 'a' } }]);
+  await t.request('DELETE', '/api/v1/instances/survival/database/tables/players/rows', { token, body: { key: { id: 1 } } });
+  assert.deepStrictEqual([t.state.dbCalls[1].method, t.state.dbCalls[1].body], ['DELETE', { key: { id: 1 } }]);
+  await t.request('GET', '/api/v1/instances/survival/database', { token });
+  assert.strictEqual(t.state.dbCalls[2].sub, '');
+});
+
+test('the network database is closed to tokens that are limited to instances, and other instances stay hidden', async () => {
+  const t = rig();
+  const limited = t.make(['database'], { instances: ['creative'] });
+  assert.strictEqual((await t.request('GET', '/api/v1/database/shared/tables', { token: limited })).status, 403);
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/survival/database', { token: limited })).status, 404);
+  assert.strictEqual((await t.request('GET', '/api/v1/instances/creative/database', { token: limited })).status, 200);
+  const open = t.make(['database']);
+  const r = await t.request('GET', '/api/v1/database/shared/tables/x?limit=5', { token: open });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual([t.state.dbCalls.at(-1).kind, t.state.dbCalls.at(-1).sub, t.state.dbCalls.at(-1).instance, t.state.dbCalls.at(-1).query.get('limit')], ['shared', '/tables/x', null, '5']);
 });

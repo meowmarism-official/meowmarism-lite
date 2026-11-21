@@ -99,3 +99,19 @@ const NETWORK = MeowNetwork.mount({
   },
   t, esc, toast,
 });
+
+// --- Database (optional feature) ---
+const DATABASE = MeowDatabase.mount({
+  el: $('databaseRoot'),
+  t, esc, toast,
+  confirm: (title, message, label) => modalConfirm(title, message, label, true),
+  status: async () => (await fetch(`${location.origin}/_meta/api/database/status`, { cache: 'no-store' })).json(),
+  targets: (st) => [{ id: 'server', label: 'This server' }, ...(st && st.shared ? [{ id: 'shared', label: 'Whole network' }] : [])],
+  api: async (target, method, sub, body) => {
+    const base = target === 'shared' ? '/api/database/shared' : `/api/database/server/${encodeURIComponent(INST_NAME)}`;
+    const r = await fetch(`${location.origin}/_meta${base}${sub || ''}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.ok === false) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  },
+});

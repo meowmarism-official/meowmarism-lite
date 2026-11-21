@@ -10,6 +10,7 @@ const SCOPES = {
   settings: 'Change settings (restart-only ones are queued)',
   backups: 'List and create backups',
   files: 'Read files of an instance',
+  database: 'Read and change the databases of the servers it may access',
   events: 'Receive events and manage webhooks',
 };
 

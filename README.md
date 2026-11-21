@@ -36,6 +36,7 @@ No framework, no database, no external services required. Manage multiple Minecr
 | **Events & Audit** | Full timeline of server lifecycle events and every panel action taken |
 | **Performance diagnostics** | TPS and tick times, lag warnings, JVM numbers and a timed profile that shows who uses the time |
 | **Velocity proxy** | Create a Velocity proxy like any server, link Paper and Purpur servers to it from the Network page; the panel sets up secure forwarding on both sides |
+| **Database** (optional) | A MariaDB the panel installs and runs: one database per server and one for the whole network, with a table and row editor, a SQL console and ready connection details, see [docs/database.md](docs/database.md) |
 | **HTTP API** (optional) | Tokens with scopes, server control, in-game commands, console, metrics, events and signed webhooks. Off until you switch it on under Update, see [docs/api.md](docs/api.md) |
 
 ---

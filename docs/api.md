@@ -29,6 +29,7 @@ A token is shown once when it is created and only its hash is stored. Each token
 | `backups` | list and create backups |
 | `files` | list and read files of an instance |
 | `events` | event stream and webhooks |
+| `database` | read and change databases (see Databases below) |
 
 Limits: 300 requests per minute per token; 20 failed logins per five minutes per address (`429`).
 
@@ -83,6 +84,26 @@ An instance is `{ name, loader, mcVersion, port, panel: "on" | "off", running, p
 | `POST /api/v1/instances/:name/diagnostics/profile` with `{ "seconds": 10 }` | `console` |
 
 A setting that needs a restart is not written while the server runs. The answer lists it under `queued`; it is applied before the next start.
+
+### Databases
+Needs the database feature (see [database.md](database.md)). A token with the `database` scope reaches the database of each server it may access. The network database also needs a token that is not limited to instances.
+
+| | |
+|---|---|
+| `GET /api/v1/database` | state of the database engine |
+| `GET /api/v1/instances/:name/database` | exists, connection details, table names |
+| `POST /api/v1/instances/:name/database/create` | create the database of this server |
+| `GET /api/v1/instances/:name/database/tables/:table?limit=50&offset=0` | columns, primary key, total and a page of rows (at most 500) |
+| `POST .../database/tables` with `{ "name", "columns": [{ "name", "type", "size?", "nullable?", "autoIncrement?", "default?" }], "primaryKey": [] }` | create a table |
+| `DELETE .../database/tables/:table` | delete a table |
+| `POST .../database/tables/:table/columns`, `DELETE .../columns/:column` | add or delete a column |
+| `POST .../database/tables/:table/rows` with `{ "values": {} }` | insert a row |
+| `PATCH .../database/tables/:table/rows` with `{ "key": {}, "values": {} }` | change the row with that primary key |
+| `DELETE .../database/tables/:table/rows` with `{ "key": {} }` | delete that row |
+| `POST .../database/query` with `{ "sql": "SELECT ..." }` | run one SQL statement (at most 1000 rows come back) |
+| `POST .../database/reset-password`, `DELETE .../database` | new password, delete the database |
+
+The same routes exist below `/api/v1/database/shared` for the network database. Everything runs as the database's own user, so a statement can never reach another database.
 
 ### Events and webhooks
 `GET /api/v1/events` is a Server-Sent Events stream (`events` scope). Reconnect with `Last-Event-ID` (or `?since=<id>`) to get what you missed (the last 200 events are kept).

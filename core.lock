@@ -1,7 +1,7 @@
 {
   "core": "meowmarism-core",
   "version": "0.0.20",
-  "commit": "fb96ef9ac250b15f48afd4af90f78a81afece6e2",
+  "commit": "ea0c1caa8ad0a886aa44a2b9b188d274850bb894",
   "files": [
     "LICENSE",
     "CONTRIBUTOR-AGREEMENT.md",
@@ -23,6 +23,7 @@
     "panel/core/modules/backup.js",
     "panel/core/modules/build-info.js",
     "panel/core/modules/create-log.js",
+    "panel/core/modules/db-sql.js",
     "panel/core/modules/diagnostics.js",
     "panel/core/modules/files.js",
     "panel/core/modules/metrics.js",
@@ -61,6 +62,8 @@
     "panel/core/ui/charts-ui.css",
     "panel/core/ui/charts-ui.js",
     "panel/core/ui/console-ui.js",
+    "panel/core/ui/database-ui.css",
+    "panel/core/ui/database-ui.js",
     "panel/core/ui/diagnostics-ui.css",
     "panel/core/ui/diagnostics-ui.js",
     "panel/core/ui/events-ui.js",

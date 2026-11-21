@@ -16,6 +16,7 @@
     let secret = null;
     let form = null;
     let copyLabel = null;
+    let db = null;
 
     const when = (at) => (at ? new Date(at).toLocaleString() : '—');
     const $ = (id) => cfg.el.querySelector(`#${id}`);
@@ -70,11 +71,25 @@
         <div class="api-actions"><button class="btn small" data-test="${esc(h.id)}">${esc(t('Test'))}</button><button class="btn small danger" data-remove="${esc(h.id)}">${esc(t('Remove'))}</button></div></div>`;
     }
 
+    function dbRow() {
+      if (!cfg.database || !db) return '';
+      const busy = !!(db.job && db.job.running);
+      let line = '';
+      if (db.enabled) {
+        if (busy) line = (db.job.lines || []).slice(-1)[0] || t('Working...');
+        else if (db.running) line = `${t('Running on port')} ${db.port}`;
+        else line = db.error || (db.job && db.job.error) || t('Not running');
+      }
+      const hint = !db.installed && !db.canDownload ? t('Needs mariadb-server installed on this host; the panel then runs it for you.') : t('Installs and runs a MariaDB for you: one database per server and one shared by the whole network. Off until you switch it on.');
+      return `<div class="api-feature" style="border-top:1px solid var(--line);margin-top:8px"><div><strong>${esc(t('Database'))}</strong><div class="hint" style="margin-top:2px">${esc(hint)}</div>${line ? `<div class="card-meta" style="margin-top:4px">${esc(line)}</div>` : ''}</div>
+        <button class="btn ${db.enabled ? '' : 'primary'}" id="dbToggle" ${busy ? 'disabled' : ''}>${esc(db.enabled ? t('Disable') : t('Enable'))}</button></div>`;
+    }
+
     function renderToggle() {
       cfg.el.innerHTML = `<div class="card api-card"><div class="card-title">${esc(t('Optional features'))}</div>
         <div class="api-feature"><div><strong>${esc(t('HTTP API'))}</strong><div class="hint" style="margin-top:2px">${esc(t('Lets scripts and bots read status and control servers with API tokens. Off until you switch it on.'))}</div></div>
         <button class="btn ${state.enabled ? '' : 'primary'}" id="apiToggle">${esc(state.enabled ? t('Disable') : t('Enable'))}</button></div>
-        ${state.enabled ? `<p class="hint">${esc(t('Manage tokens and webhooks on the API page.'))}</p>` : ''}</div>`;
+        ${state.enabled ? `<p class="hint">${esc(t('Manage tokens and webhooks on the API page.'))}</p>` : ''}${dbRow()}</div>`;
     }
 
     function renderPage() {
@@ -100,7 +115,9 @@
 
     async function refresh() {
       try { state = await cfg.load(); } catch (_) { return; }
+      if (cfg.database) { try { db = await cfg.database.status(); } catch (_) { /* keep the last state */ } }
       render();
+      if (db && db.job && db.job.running) setTimeout(refresh, 2000);
     }
 
     async function act(fn) {
@@ -137,6 +154,10 @@
     }
 
     function wire() {
+      $('dbToggle')?.addEventListener('click', () => act(async () => {
+        if (db.enabled && !(await cfg.confirm(t('Disable the database?'), t('The database server stops. Your data is kept and comes back when you enable it again.'), t('Disable')))) return;
+        await cfg.database.setEnabled(!db.enabled);
+      }));
       $('apiToggle')?.addEventListener('click', () => act(async () => {
         if (state.enabled && !(await cfg.confirm(t('Disable the API?'), t('Every token stops working until you enable it again. Tokens and webhooks are kept.'), t('Disable')))) return;
         await cfg.setEnabled(!state.enabled);
