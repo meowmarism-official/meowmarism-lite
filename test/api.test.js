@@ -371,3 +371,17 @@ test('the startup configuration is read and changed through the settings scope, 
   assert.deepStrictEqual(t.state.calls.map((c) => [c.method, c.path, c.caps.join()]), [['GET', '/api/config', 'view,settings'], ['POST', '/api/config', 'view,settings'], ['POST', '/api/config', 'view,settings,files']]);
   assert.deepStrictEqual(t.state.calls[2].body, { extraJvmArgs: '-Dfoo=bar' });
 });
+
+test('a token limited to instances cannot manage webhooks', async () => {
+  const t = rig();
+  const token = t.make(['events'], { instances: ['survival'] });
+  assert.strictEqual((await t.request('GET', '/api/v1/webhooks', { token })).status, 403);
+  assert.strictEqual((await t.request('POST', '/api/v1/webhooks', { token, body: { url: 'https://example.com/h' } })).status, 403);
+  assert.strictEqual((await t.request('DELETE', '/api/v1/webhooks/abc123', { token })).status, 403);
+});
+
+test('a malformed instance name is a 400, not a crash', async () => {
+  const t = rig();
+  const r = await t.request('GET', '/api/v1/instances/%E0%A4%A', { token: t.make(['read']) });
+  assert.strictEqual(r.status, 400);
+});

@@ -1051,7 +1051,11 @@ function crossOrigin(req) {
   } catch (_) { return true; }
 }
 
+process.on('unhandledRejection', (err) => console.error('unhandled rejection:', err));
+
 const server = http.createServer(async (req, res) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch (_) { res.writeHead(400); res.end('bad request'); return; }
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -1097,6 +1101,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/auth/logout' && req.method === 'GET') {
+    if (req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); res.end('forbidden'); return; }
     const token = parseCookies(req)[SESSION_COOKIE];
     if (token) deleteSession(token);
     res.writeHead(302, { 'Set-Cookie': `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${isHttps(req) ? '; Secure' : ''}; Max-Age=0`, Location: '/' });

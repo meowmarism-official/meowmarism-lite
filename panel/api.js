@@ -245,16 +245,18 @@ function createApi(deps) {
       streams.set(token.id, Math.max(0, (streams.get(token.id) || 1) - 1));
     });
   });
-  route('GET', '/webhooks', 'events', async ({ res }) => send(res, 200, { ok: true, webhooks: webhooks.list() }));
-  route('POST', '/webhooks', 'events', async ({ res, body }) => {
+  // Webhooks see the events of every instance, so only a token without an instance list may manage them.
+  const unrestricted = (handler) => (ctx) => (ctx.token.instances ? fail(ctx.res, 403, 'webhooks need a token that is not limited to instances') : handler(ctx));
+  route('GET', '/webhooks', 'events', unrestricted(async ({ res }) => send(res, 200, { ok: true, webhooks: webhooks.list() })));
+  route('POST', '/webhooks', 'events', unrestricted(async ({ res, body }) => {
     try { send(res, 201, { ok: true, webhook: webhooks.add({ url: body.url, events: body.events, name: body.name }) }); } catch (err) { fail(res, 400, err.message); }
-  });
-  route('POST', '/webhooks/([a-f0-9]+)/test', 'events', async ({ res, params }) => {
+  }));
+  route('POST', '/webhooks/([a-f0-9]+)/test', 'events', unrestricted(async ({ res, params }) => {
     const ok = await webhooks.test(params[0]);
     if (ok === null) return fail(res, 404, 'no such webhook');
     return send(res, 200, { ok });
-  });
-  route('DELETE', '/webhooks/([a-f0-9]+)', 'events', async ({ res, params }) => (webhooks.remove(params[0]) ? send(res, 200, { ok: true }) : fail(res, 404, 'no such webhook')));
+  }));
+  route('DELETE', '/webhooks/([a-f0-9]+)', 'events', unrestricted(async ({ res, params }) => (webhooks.remove(params[0]) ? send(res, 200, { ok: true }) : fail(res, 404, 'no such webhook'))));
 
   function bearer(req) {
     const m = /^Bearer\s+(\S+)$/i.exec(String(req.headers.authorization || ''));
@@ -283,7 +285,8 @@ function createApi(deps) {
       if (r.scope && !hasScope(token, r.scope)) { fail(res, 403, `this token lacks the ${r.scope} scope`); return true; }
       const ctx = { req, res, url, token, params: m.slice(1), body: {} };
       if (rest.startsWith('/instances/')) {
-        const name = decodeURIComponent(m[1]);
+        let name;
+        try { name = decodeURIComponent(m[1]); } catch (_) { fail(res, 400, 'invalid instance name'); return true; }
         ctx.inst = loadInstances().find((i) => i.name === name);
         if (!ctx.inst || !allowsInstance(token, ctx.inst.name)) { fail(res, 404, 'no such instance'); return true; }
         const overviewOnly = req.method === 'GET' && rest === `/instances/${m[1]}`;

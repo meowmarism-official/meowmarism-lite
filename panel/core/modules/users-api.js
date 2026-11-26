@@ -1,5 +1,5 @@
 // HTTP routes for account management on top of the user store (see users.js).
-const { hasPanelCap, INSTANCE_CAPS } = require('./users');
+const { hasPanelCap, effectiveCaps, INSTANCE_CAPS } = require('./users');
 
 // store: createUserStore(...); session(req) -> { username, role } | null; revokeSessions(username) ends that account's logins
 function createUsersApi({ store, session, revokeSessions = () => {} }) {
@@ -25,8 +25,20 @@ function createUsersApi({ store, session, revokeSessions = () => {} }) {
     const me = s ? store.findUser(s.username) : null;
     const isOwner = !!me && me.role === 'owner';
     if (!hasPanelCap(me, 'users')) { send(res, 403, { error: 'not allowed to manage users' }); return true; }
+    // Only the owner can hand out rights the granting account does not have itself.
     const limit = (settings) => {
-      if (!isOwner && settings?.panel) settings.panel.users = false;
+      if (isOwner || !settings) return settings;
+      const mine = (list, allowed) => (Array.isArray(list) ? list.filter((c) => allowed.includes(c)) : []);
+      if (settings.panel) {
+        settings.panel = Object.fromEntries(Object.entries(settings.panel).map(([k, v]) => [k, k !== 'users' && !!v && hasPanelCap(me, k)]));
+      }
+      if (settings.access) {
+        const own = me.access || {};
+        settings.access = {
+          global: mine(settings.access.global, own.global || []),
+          instances: Object.fromEntries(Object.entries(settings.access.instances || {}).map(([k, v]) => [k, mine(v, effectiveCaps(me, k))])),
+        };
+      }
       return settings;
     };
 

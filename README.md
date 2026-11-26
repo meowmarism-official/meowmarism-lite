@@ -90,6 +90,10 @@ Prefer to read the script before piping it into a shell? Download it first: `cur
 
 ---
 
+## Permissions
+
+Servers run as the same system user as the panel. A member with the **Files**, **Mods** or **Settings** right on a server can make it run their own code, so treat these rights like administrator access to the host. Run the service under a dedicated user without sudo.
+
 ## HTTPS and internet access
 
 The panel speaks plain HTTP on port 8090. That is fine inside a home network. For anything reachable from the internet, put it behind a reverse proxy that terminates HTTPS.
